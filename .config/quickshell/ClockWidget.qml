@@ -4,45 +4,79 @@ import "Colors.js" as Colors
 
 Item {
     implicitWidth: 340
-    implicitHeight: 140
+    implicitHeight: 108
 
-    SystemClock {
-        id: clock
-        precision: SystemClock.Seconds
+    SystemClock { id: clock; precision: SystemClock.Seconds }
+
+    property string timeStr: Qt.formatTime(new Date(), "HH:mm")
+    property string secsStr: Qt.formatTime(new Date(), "ss")
+    property string dayStr:  Qt.formatDate(new Date(), "dddd")
+    property string dateStr: Qt.formatDate(new Date(), "d MMMM yyyy")
+
+    Connections {
+        target: clock
+        function onSecondsChanged() {
+            var d = new Date()
+            timeStr = Qt.formatTime(d, "HH:mm")
+            secsStr = Qt.formatTime(d, "ss")
+            dayStr  = Qt.formatDate(d, "dddd")
+            dateStr = Qt.formatDate(d, "d MMMM yyyy")
+        }
     }
 
     Column {
-        anchors.centerIn: parent
-        spacing: 4
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 8
 
-        Text {
-            id: timeText
+        // HH:mm + :ss on one baseline
+        Item {
             anchors.horizontalCenter: parent.horizontalCenter
-            font.pixelSize: 64
-            font.weight: Font.Light
-            color: Colors.primary
+            implicitWidth: timeLabel.implicitWidth + secLabel.implicitWidth + 4
+            implicitHeight: timeLabel.implicitHeight
 
-            Connections {
-                target: clock
-                function onSecondsChanged() {
-                    timeText.text = Qt.formatTime(new Date(), "HH:mm")
-                    dateText.text = Qt.formatDate(new Date(), "dddd, d. MMMM yyyy")
-                }
+            Text {
+                id: timeLabel
+                text: timeStr
+                font.pixelSize: 72
+                font.weight: Font.Thin
+                color: Colors.primary
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
             }
 
-            Component.onCompleted: {
-                text = Qt.formatTime(new Date(), "HH:mm")
+            Text {
+                id: secLabel
+                text: secsStr
+                font.pixelSize: 26
+                font.weight: Font.Light
+                color: Colors.outline
+                anchors.left: timeLabel.right
+                anchors.leftMargin: 3
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 9
             }
         }
 
-        Text {
-            id: dateText
+        Row {
             anchors.horizontalCenter: parent.horizontalCenter
-            font.pixelSize: 13
-            color: Colors.onSurfaceVariant
+            spacing: 6
 
-            Component.onCompleted: {
-                text = Qt.formatDate(new Date(), "dddd, d. MMMM yyyy")
+            Text {
+                text: dayStr
+                font.pixelSize: 13
+                font.weight: Font.Medium
+                color: Colors.onSurfaceVariant
+            }
+            Text {
+                text: "·"
+                font.pixelSize: 13
+                color: Colors.outline
+            }
+            Text {
+                text: dateStr
+                font.pixelSize: 13
+                color: Colors.onSurfaceVariant
             }
         }
     }

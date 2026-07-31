@@ -1,12 +1,11 @@
 import Quickshell
-import Quickshell.Io
 import Quickshell.Services.Mpris
 import QtQuick
 import "Colors.js" as Colors
 
 Item {
     implicitWidth: 340
-    implicitHeight: activePlayer ? (hasArt ? 110 : 88) : 0
+    implicitHeight: visible ? (hasArt ? 182 : 96) : 0
     visible: !!activePlayer
 
     property var activePlayer: {
@@ -18,151 +17,190 @@ Item {
         return players.length > 0 ? players[0] : null
     }
 
-    property bool hasArt: activePlayer && activePlayer.trackArtUrl && activePlayer.trackArtUrl.toString() !== ""
+    property bool hasArt: activePlayer
+        && activePlayer.trackArtUrl
+        && activePlayer.trackArtUrl.toString() !== ""
     property real trackProgress: 0.0
+    property int  trackPos: 0
+    property int  trackLen: 0
+
+    function fmtTime(us) {
+        var s = Math.floor(us / 1000000)
+        var m = Math.floor(s / 60)
+        s = s % 60
+        return m + ":" + (s < 10 ? "0" : "") + s
+    }
 
     Timer {
         interval: 1000
         running: !!activePlayer && activePlayer.playbackState === MprisPlaybackState.Playing
         repeat: true
         onTriggered: {
-            if (activePlayer && activePlayer.trackLength > 0)
-                trackProgress = Math.min(activePlayer.trackPosition / activePlayer.trackLength, 1.0)
+            if (!activePlayer) return
+            trackLen = activePlayer.trackLength || 0
+            trackPos = activePlayer.trackPosition || 0
+            trackProgress = trackLen > 0 ? Math.min(trackPos / trackLen, 1.0) : 0
         }
     }
 
     Connections {
         target: activePlayer
-        function onTrackTitleChanged() { trackProgress = 0 }
+        function onTrackTitleChanged() { trackProgress = 0; trackPos = 0 }
     }
 
     Rectangle {
         anchors.fill: parent
         radius: 14
-        color: Qt.rgba(
-            Qt.color(Colors.surfaceContainerHigh).r,
-            Qt.color(Colors.surfaceContainerHigh).g,
-            Qt.color(Colors.surfaceContainerHigh).b,
-            0.9
-        )
+        color: Qt.rgba(Qt.color(Colors.surfaceContainerHigh).r,
+                       Qt.color(Colors.surfaceContainerHigh).g,
+                       Qt.color(Colors.surfaceContainerHigh).b, 0.92)
         border.color: Colors.outlineVariant
         border.width: 1
         clip: true
 
-        // Album art strip on left if available
+        // Full-width album art banner
         Rectangle {
-            id: artStrip
+            id: artBanner
             visible: hasArt
-            anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-            width: visible ? 80 : 0
-            color: "transparent"
+            anchors { left: parent.left; right: parent.right; top: parent.top }
+            height: visible ? 120 : 0
+            color: Colors.surfaceContainer
 
             Image {
                 anchors.fill: parent
                 source: hasArt ? activePlayer.trackArtUrl : ""
                 fillMode: Image.PreserveAspectCrop
                 smooth: true
+                asynchronous: true
             }
 
-            // gradient fade to right
+            // Bottom gradient over art
             Rectangle {
-                anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
-                width: 32
+                anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                height: 72
                 gradient: Gradient {
-                    orientation: Gradient.Horizontal
                     GradientStop { position: 0.0; color: "transparent" }
                     GradientStop {
                         position: 1.0
-                        color: Qt.rgba(
-                            Qt.color(Colors.surfaceContainerHigh).r,
-                            Qt.color(Colors.surfaceContainerHigh).g,
-                            Qt.color(Colors.surfaceContainerHigh).b,
-                            0.9
-                        )
+                        color: Qt.rgba(Qt.color(Colors.surfaceContainerHigh).r,
+                                       Qt.color(Colors.surfaceContainerHigh).g,
+                                       Qt.color(Colors.surfaceContainerHigh).b, 0.95)
                     }
+                }
+            }
+
+            // Track info overlaid on gradient
+            Column {
+                anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                anchors.leftMargin: 14; anchors.rightMargin: 14; anchors.bottomMargin: 10
+                spacing: 1
+
+                Text {
+                    width: parent.width
+                    text: activePlayer ? (activePlayer.trackTitle || "Unknown") : ""
+                    font.pixelSize: 14
+                    font.weight: Font.SemiBold
+                    color: Colors.onSurface
+                    elide: Text.ElideRight
+                }
+                Text {
+                    width: parent.width
+                    text: activePlayer ? (activePlayer.trackArtist || activePlayer.identity || "") : ""
+                    font.pixelSize: 12
+                    color: Colors.onSurfaceVariant
+                    elide: Text.ElideRight
                 }
             }
         }
 
+        // Controls + progress section
         Column {
             anchors {
-                left: artStrip.right
-                right: parent.right
-                top: parent.top
-                bottom: parent.bottom
-                leftMargin: hasArt ? 4 : 14
-                rightMargin: 14
-                topMargin: 14
-                bottomMargin: 10
+                left: parent.left; right: parent.right
+                top: artBanner.bottom
+                leftMargin: 14; rightMargin: 14; topMargin: 10; bottomMargin: 12
             }
             spacing: 8
 
-            Row {
+            // Track info when no art
+            Column {
+                visible: !hasArt
                 width: parent.width
-                spacing: 8
+                spacing: 2
 
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - controlRow.width - 8
-                    spacing: 2
+                Text {
+                    width: parent.width
+                    text: activePlayer ? (activePlayer.trackTitle || "Unknown") : ""
+                    font.pixelSize: 14
+                    font.weight: Font.Medium
+                    color: Colors.onSurface
+                    elide: Text.ElideRight
+                }
+                Text {
+                    width: parent.width
+                    text: activePlayer ? (activePlayer.trackArtist || activePlayer.identity || "") : ""
+                    font.pixelSize: 12
+                    color: Colors.onSurfaceVariant
+                    elide: Text.ElideRight
+                }
+            }
 
-                    Text {
-                        width: parent.width
-                        text: activePlayer ? (activePlayer.trackTitle || "Neznámý titul") : ""
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                        color: Colors.onSurface
-                        elide: Text.ElideRight
-                    }
+            // Progress bar + time
+            Column {
+                width: parent.width
+                spacing: 4
 
-                    Text {
-                        width: parent.width
-                        text: activePlayer ? (activePlayer.trackArtist || activePlayer.identity || "") : ""
-                        font.pixelSize: 11
-                        color: Colors.onSurfaceVariant
-                        elide: Text.ElideRight
+                Rectangle {
+                    width: parent.width
+                    height: 3
+                    radius: 2
+                    color: Colors.outlineVariant
+
+                    Rectangle {
+                        width: parent.width * trackProgress
+                        height: parent.height
+                        radius: 2
+                        color: Colors.primary
+                        Behavior on width { NumberAnimation { duration: 800; easing.type: Easing.Linear } }
                     }
                 }
 
                 Row {
-                    id: controlRow
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
+                    width: parent.width
 
-                    MediaButton {
-                        icon: "⏮"
-                        onClicked: if (activePlayer) activePlayer.previous()
+                    Text {
+                        text: fmtTime(trackPos)
+                        font.pixelSize: 10
+                        font.family: "JetBrains Mono"
+                        color: Colors.outline
                     }
-
-                    MediaButton {
-                        icon: activePlayer && activePlayer.playbackState === MprisPlaybackState.Playing ? "⏸" : "▶"
-                        size: 32
-                        onClicked: if (activePlayer) activePlayer.togglePlaying()
-                    }
-
-                    MediaButton {
-                        icon: "⏭"
-                        onClicked: if (activePlayer) activePlayer.next()
+                    Item { width: parent.width - 2 * 36; height: 1 }
+                    Text {
+                        text: trackLen > 0 ? fmtTime(trackLen) : ""
+                        font.pixelSize: 10
+                        font.family: "JetBrains Mono"
+                        color: Colors.outline
                     }
                 }
             }
 
-            // Progress bar
-            Rectangle {
-                width: parent.width
-                height: 3
-                radius: 2
-                color: Colors.outlineVariant
+            // Controls
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 4
 
-                Rectangle {
-                    width: parent.width * trackProgress
-                    height: parent.height
-                    radius: 2
-                    color: Colors.primary
-
-                    Behavior on width {
-                        NumberAnimation { duration: 800; easing.type: Easing.Linear }
-                    }
+                MediaButton {
+                    icon: "⏮"
+                    onClicked: if (activePlayer) activePlayer.previous()
+                }
+                MediaButton {
+                    icon: activePlayer && activePlayer.playbackState === MprisPlaybackState.Playing ? "⏸" : "▶"
+                    size: 34
+                    onClicked: if (activePlayer) activePlayer.togglePlaying()
+                }
+                MediaButton {
+                    icon: "⏭"
+                    onClicked: if (activePlayer) activePlayer.next()
                 }
             }
         }
