@@ -308,12 +308,16 @@ if [[ -f "$CURRENT_SOURCE_FILE" ]]; then
 fi
 
 wal_input="$wal_source"
-if [[ "$FAST_MODE" == "yes" ]] && command -v magick >/dev/null 2>&1; then
-    sample_wall="$STATE_DIR/wal-sample.jpg"
-    magick "${wal_source}[0]" -auto-orient -resize "960x960>" -quality 92 "$sample_wall" >/dev/null 2>&1 || true
-    if [[ -f "$sample_wall" ]]; then
-        wal_input="$sample_wall"
+if command -v magick >/dev/null 2>&1; then
+    # matugen cannot read JPEG — always convert to PNG for color extraction.
+    # In fast mode resize to 960px to speed things up; in normal mode keep full res.
+    matugen_png="$STATE_DIR/wal-matugen.png"
+    if [[ "$FAST_MODE" == "yes" ]]; then
+        magick "${wal_source}[0]" -auto-orient -resize "960x960>" "$matugen_png" >/dev/null 2>&1 || true
+    else
+        magick "${wal_source}[0]" -auto-orient "$matugen_png" >/dev/null 2>&1 || true
     fi
+    [[ -f "$matugen_png" ]] && wal_input="$matugen_png"
 fi
 
 # Generate color scheme with matugen (replaces pywal)
