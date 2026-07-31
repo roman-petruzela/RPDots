@@ -3,127 +3,137 @@
 * {
     border: none;
     box-shadow: none;
-    font-family:
-        "JetBrainsMono Nerd Font", "Noto Sans", "Noto Color Emoji",
-        "Symbols Nerd Font", sans-serif;
+    font-family: "JetBrainsMono Nerd Font", "Noto Sans", "Symbols Nerd Font", sans-serif;
     font-size: 13px;
     min-height: 0;
 }
 
 window#waybar {
-    background: alpha(@background, 0.7);
-    color: @foreground;
+    background: transparent;
+    color: @on_surface;
 }
 
-#workspaces,
-#window,
-#clock,
-#hardware,
-#audio-peripherals,
-#custom-kb-layout,
-#tray,
-#custom-power {
-    background: alpha(@color0, 0.62);
-    border: 1px solid alpha(@accent, 0.2);
+.modules-left,
+.modules-center,
+.modules-right {
+    background: alpha(@surface_container, 0.80);
+    border: 1px solid alpha(@outline_variant, 0.35);
     border-radius: 16px;
-    margin: 4px 2px;
-    padding: 0 6px;
-    color: @foreground;
-    transition: all 0.3s ease;
+    margin: 5px 4px;
+    padding: 0 4px;
+}
+
+.modules-left   { margin-left: 8px; }
+.modules-right  { margin-right: 8px; }
+
+/* --- WORKSPACES --- */
+#workspaces {
+    padding: 0 2px;
+}
+
+#workspaces button {
+    color: alpha(@on_surface, 0.45);
+    background: transparent;
+    padding: 0 5px;
+    margin: 0 1px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    font-size: 11px;
+}
+
+#workspaces button.active {
+    color: @primary;
+}
+
+#workspaces button:hover {
+    color: @on_surface;
+    background: alpha(@primary, 0.12);
+}
+
+/* --- WINDOW TITLE --- */
+#window {
+    color: alpha(@on_surface, 0.70);
+    padding: 0 8px;
 }
 
 #window.empty {
     background: transparent;
-    border: none;
-    margin: 4px 0;
     padding: 0;
     min-width: 0;
 }
 
-/* --- WORKSPACES --- */
-#workspaces {
-    padding: 0 4px;
+/* --- CLOCK --- */
+#clock {
+    color: @on_surface;
+    font-weight: 500;
+    padding: 0 10px;
 }
 
-#workspaces button {
-    color: alpha(@foreground, 0.65);
-    background: transparent;
-    padding: 0 4px 0 0;
-    margin: 0 2px;
-    border-radius: 12px;
-    transition: all 0.2s ease;
-}
-
-#workspaces button.active {
-    color: @foreground;
-}
-
-#workspaces button:hover {
-    color: @foreground;
-}
-
-#custom-power {
-    color: @accent;
-    font-size: 15px;
-    padding: 0 8px 0 6px;
-    margin: 4px 2px;
-}
-
-#custom-start-menu,
-#custom-niri-settings {
-    color: @foreground;
-    font-size: 15px;
-    padding: 0 6px;
-    margin: 4px 2px;
-    background: alpha(@color0, 0.62);
-    border: 1px solid alpha(@accent, 0.2);
-    border-radius: 16px;
-}
-
-#custom-power:hover {
-    background: alpha(@accent, 0.22);
-}
-
-#custom-start-menu:hover,
-#custom-niri-settings:hover {
-    background: alpha(@accent, 0.22);
-}
-
-#network,
-#custom-vpn,
-#custom-cava-music,
-#custom-player {
-    font-size: 12px;
-    font-family: "Noto Sans Mono", monospace;
-    padding: 0 3px;
-    letter-spacing: 0px;
-}
-
-#network,
-#custom-vpn {
-    min-width: 0;
-}
-
+/* --- COMMON MODULE STYLE --- */
 #cpu,
 #memory,
 #temperature,
 #pulseaudio,
-#custom-gpu,
 #battery,
-#backlight {
-    background: transparent;
-    border: none;
-    margin: 0;
-    padding: 0 3px;
-    color: @foreground;
+#backlight,
+#network,
+#custom-gpu,
+#custom-vpn,
+#tray {
+    color: @on_surface_variant;
+    padding: 0 5px;
 }
 
+#cpu:hover,
+#memory:hover,
+#pulseaudio:hover,
+#battery:hover,
+#backlight:hover,
+#network:hover {
+    color: @on_surface;
+}
+
+/* --- CAVA / PLAYER --- */
+#custom-cava-music,
+#custom-player {
+    color: alpha(@primary, 0.75);
+    font-size: 12px;
+    padding: 0 4px;
+}
+
+/* --- STATUS HIGHLIGHTS --- */
+#temperature.critical { color: @error; }
+#battery.warning      { color: @tertiary; }
+#battery.critical     { color: @error; }
+#pulseaudio.muted     { color: alpha(@on_surface, 0.35); }
+
+/* --- POWER BUTTON --- */
+#custom-power {
+    color: @primary;
+    font-size: 15px;
+    padding: 0 10px 0 6px;
+    border-radius: 0 14px 14px 0;
+    transition: all 0.2s ease;
+}
+
+#custom-power:hover {
+    color: @on_primary;
+    background: alpha(@primary, 0.20);
+}
+
+/* --- TRAY --- */
 #tray {
     padding: 0 8px;
 }
 
+/* --- TOOLTIP --- */
 tooltip {
-    background: @background;
-    border: 1px solid @accent;
-    border-radius: 8px;
+    background: @surface_container;
+    border: 1px solid alpha(@outline_variant, 0.5);
+    border-radius: 10px;
+    color: @on_surface;
+}
+
+tooltip label {
+    color: @on_surface;
 }

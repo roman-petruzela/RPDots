@@ -9,15 +9,15 @@ ShellRoot {
     property bool dashboardVisible: false
 
     IpcHandler {
-        target: "toggle-dashboard"
-        function onMessage() {
+        target: "dashboard"
+        function toggle(): void {
             root.dashboardVisible = !root.dashboardVisible
         }
     }
 
     IpcHandler {
-        target: "reload-colors"
-        function onMessage() {
+        target: "shell"
+        function reload(): void {
             Quickshell.reload(false)
         }
     }
@@ -25,4 +25,6 @@ ShellRoot {
     Dashboard {
         visible: root.dashboardVisible
     }
+
+    OSD {}
 }

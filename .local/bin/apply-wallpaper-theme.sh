@@ -323,9 +323,12 @@ if command -v matugen >/dev/null 2>&1; then
 fi
 
 # Extract matugen colors into pywal-compatible shell variables
-eval "$(echo "$_matugen_json" | python3 - <<'PYEOF'
-import sys, json
-txt = sys.stdin.read().strip()
+# NOTE: pipe+heredoc for python3 is broken (pipe overrides heredoc as script src);
+# pass JSON via env var instead.
+export _MATUGEN_JSON="$_matugen_json"
+eval "$(python3 - <<'PYEOF'
+import json, os
+txt = os.environ.get("_MATUGEN_JSON", "").strip()
 fallbacks = {
     "background": "#1a120d", "on_surface": "#f0dfd7", "primary": "#ffb68c",
     "surface_container_lowest": "#140d08", "error": "#ffb4ab",
@@ -364,6 +367,7 @@ print(f'color14="{c["secondary_fixed"]}"')
 print(f'color15="{c["on_surface"]}"')
 PYEOF
 )"
+unset _MATUGEN_JSON
 
 pick_vivid_color() {
     command -v python3 >/dev/null 2>&1 || return 1

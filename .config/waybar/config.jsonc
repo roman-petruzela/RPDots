@@ -30,8 +30,8 @@
     "format": "{icon}",
     "hide-empty": true,
     "format-icons": {
-      "active": "",
-      "default": "",
+      "active": "",
+      "default": "",
     },
   },
   "niri/window": {
@@ -39,29 +39,44 @@
     "format-empty": "",
   },
   "clock": {
-    "format": "  {:%d.%m. %H:%M}",
+    "format": "  {:%d.%m. %H:%M}",
+    "tooltip-format": "<tt><small>{calendar}</small></tt>",
+    "calendar": {
+      "mode": "month",
+      "weeks-pos": "left",
+      "format": {
+        "today": "<b>{}</b>",
+      },
+    },
   },
-  "cpu": { "format": " {usage}%" },
-  "memory": { "format": " {}%" },
+  "cpu": { "format": " {usage}%" },
+  "memory": { "format": " {}%" },
   "temperature": {
-    "format": " {temperatureC}°C",
+    "format": " {temperatureC}°C",
     "critical-threshold": 85,
   },
   "pulseaudio": {
     "format": "{icon} {volume}%",
-    "format-muted": " ",
-    "format-icons": { "default": ["", "", ""] },
-    "on-click": "~/.local/bin/control-panel.sh",
+    "format-muted": " ",
+    "format-icons": { "default": ["", "", ""] },
+    "scroll-step": 2,
+    "on-click": "pavucontrol",
+    "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 2%+ -l 1.0",
+    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 2%-",
   },
-  "backlight": { "format": "󰃟 {percent}%" },
+  "backlight": {
+    "format": "󰃟 {percent}%",
+    "on-scroll-up": "brightnessctl set +5%",
+    "on-scroll-down": "brightnessctl set 5%-",
+  },
   "network": {
     "interface": "wlo1",
     "interval": 2,
-    "format-wifi": "  󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
+    "format-wifi": "  󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
     "format-ethernet": "󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
     "format-disconnected": "󰖪 offline",
     "max-length": 26,
-    "tooltip-format-wifi": "  {essid}\n{ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}\nSignal {signalStrength}%",
+    "tooltip-format-wifi": "  {essid}\n{ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}\nSignal {signalStrength}%",
     "tooltip-format-ethernet": "{ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}",
   },
   "custom/vpn": {
@@ -76,21 +91,10 @@
   "battery": {
     "states": { "warning": 30, "critical": 15 },
     "format": "{icon} {capacity}%",
-    "format-charging": " {capacity}%",
-    "format-icons": ["", "", "", "", ""],
+    "format-charging": " {capacity}%",
+    "format-icons": ["", "", "", "", ""],
   },
   "tray": { "icon-size": 16, "spacing": 10 },
-
-  "custom/start-menu": {
-    "format": "󰍜",
-    "tooltip": false,
-    "on-click": "~/.config/eww/scripts/toggle_start_menu.sh",
-  },
-  "custom/niri-settings": {
-    "format": "󰒓",
-    "tooltip": false,
-    "on-click": "~/.config/eww/scripts/toggle_niri_quick.sh",
-  },
   "custom/cava-music": {
     "exec": "~/.local/bin/waybar-cava-stream.sh",
     "tooltip": false,
@@ -100,11 +104,6 @@
     "exec": "playerctl metadata --format '♫ {{artist}} - {{title}}' --follow",
     "tooltip": false,
   },
-  "custom/kb-layout": {
-    "exec": "bash -lc 'layout=$(niri msg keyboard-layouts 2>/dev/null | awk \"/^\\*/{print \\$2; exit}\"); [ -n \"$layout\" ] && printf \"⌨ %s\" \"$layout\" || printf \"⌨ ?\"'",
-    "interval": 2,
-    "tooltip": false,
-  },
   "custom/gpu": {
     "exec-if": "command -v nvidia-smi >/dev/null 2>&1",
     "exec": "bash -lc 'read -r util <<< \"$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n1 | tr -d \",\")\"; printf \"󰢮 %s%%\" \"$util\"'",
@@ -112,7 +111,8 @@
     "tooltip": false,
   },
   "custom/power": {
-    "format": "",
-    "on-click": "~/.config/eww/scripts/toggle_dashboard.sh",
+    "format": "󰘚",
+    "tooltip": false,
+    "on-click": "qs ipc call toggle-dashboard",
   },
 }

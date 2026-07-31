@@ -17,7 +17,8 @@ PKGS=(
     rofi-wayland
     fastfetch
     awww
-    python-pywal
+    matugen
+    quickshell
     imagemagick
     playerctl
     brightnessctl

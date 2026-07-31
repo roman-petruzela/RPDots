@@ -5,7 +5,7 @@ run_after = [
     "~/.local/bin/matugen-fuzzel.py 2>/dev/null || true",
     "makoctl reload 2>/dev/null || true",
     "pkill -SIGUSR2 waybar 2>/dev/null || true",
-    "qs ipc call reload-colors 2>/dev/null || true",
+    "qs ipc call shell reload 2>/dev/null || true",
 ]
 
 [config.custom_colors]
