@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import "Colors.js" as Colors
@@ -31,14 +32,42 @@ PanelWindow {
     }
 
     property real slideX: visible ? 0 : 380
+    property string networkInfo: ""
+
+    Process {
+        id: netProc
+        command: ["bash", "-c",
+            "iface=$(ip route show default 2>/dev/null | awk '/default/ {print $5; exit}');" +
+            "if [ -z \"$iface\" ]; then echo 'Offline'; exit; fi;" +
+            "ssid=$(iw dev \"$iface\" link 2>/dev/null | awk '/SSID:/ {print substr($0, index($0,$2))}');" +
+            "ipaddr=$(ip -4 addr show \"$iface\" 2>/dev/null | awk '/inet / {split($2,a,\"/\"); print a[1]; exit}');" +
+            "if [ -n \"$ssid\" ]; then printf '%s  %s' \"$ssid\" \"${ipaddr:-}\"; " +
+            "else printf '%s  %s' \"$iface\" \"${ipaddr:-}\"; fi"
+        ]
+        running: true
+        stdout: SplitParser {
+            onRead: function(line) { root.networkInfo = line.trim() }
+        }
+    }
+
+    Timer {
+        interval: 10000
+        running: true
+        repeat: true
+        onTriggered: netProc.running = true
+    }
 
     Behavior on slideX {
         NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
     }
 
     onVisibleChanged: {
-        if (visible) slideX = 0
-        else slideX = 380
+        if (visible) {
+            slideX = 0
+            netProc.running = true
+        } else {
+            slideX = 380
+        }
     }
 
     MouseArea {
@@ -61,6 +90,7 @@ PanelWindow {
         )
         radius: 0
 
+        // Left border accent
         Rectangle {
             x: 0; y: 0
             width: 1
@@ -73,57 +103,63 @@ PanelWindow {
             anchors.fill: parent
         }
 
-        Column {
+        Flickable {
             anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
+                fill: parent
                 topMargin: 48
+                bottomMargin: 20
                 leftMargin: 20
                 rightMargin: 20
             }
-            spacing: 28
-
-            ClockWidget {
-                width: parent.width
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Colors.outlineVariant
-                opacity: 0.4
-            }
+            contentHeight: contentCol.implicitHeight
+            clip: true
 
             Column {
+                id: contentCol
                 width: parent.width
-                spacing: 14
+                spacing: 0
 
-                SectionLabel {
-                    title: "Systém"
+                // Clock
+                ClockWidget {
+                    width: parent.width
                 }
+
+                // Network row under clock
+                Text {
+                    width: parent.width
+                    text: networkInfo
+                    font.pixelSize: 12
+                    color: Colors.onSurfaceVariant
+                    horizontalAlignment: Text.AlignHCenter
+                    topPadding: 8
+                    bottomPadding: 20
+                    elide: Text.ElideRight
+                }
+
+                Divider { width: parent.width }
+
+                Item { width: parent.width; height: 20 }
+
+                SectionLabel { title: "Systém" }
+
+                Item { width: parent.width; height: 12 }
 
                 SystemWidget {
                     width: parent.width
                 }
-            }
 
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Colors.outlineVariant
-                opacity: 0.4
-                visible: mediaWidget.visible
-            }
+                Item { width: parent.width; height: 20 }
 
-            Column {
-                width: parent.width
-                spacing: 14
-                visible: mediaWidget.visible
+                Divider { width: parent.width; visible: mediaWidget.visible }
+
+                Item { width: parent.width; height: mediaWidget.visible ? 20 : 0; visible: mediaWidget.visible }
 
                 SectionLabel {
                     title: "Přehrávač"
+                    visible: mediaWidget.visible
                 }
+
+                Item { width: parent.width; height: mediaWidget.visible ? 12 : 0; visible: mediaWidget.visible }
 
                 MediaWidget {
                     id: mediaWidget

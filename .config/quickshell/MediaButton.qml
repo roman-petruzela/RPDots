@@ -3,10 +3,11 @@ import "Colors.js" as Colors
 
 Rectangle {
     property string icon: ""
+    property int size: 30
     signal clicked()
 
-    width: 30
-    height: 30
+    width: size
+    height: size
     radius: 8
     color: mouseArea.containsMouse ? Colors.surfaceContainerHighest : "transparent"
 

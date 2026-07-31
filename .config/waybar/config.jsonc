@@ -113,6 +113,6 @@
   "custom/power": {
     "format": "󰘚",
     "tooltip": false,
-    "on-click": "qs ipc call toggle-dashboard",
+    "on-click": "qs ipc call dashboard toggle",
   },
 }
