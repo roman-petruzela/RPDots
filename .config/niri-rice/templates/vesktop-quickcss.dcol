@@ -1,0 +1,7 @@
+$HOME/.config/vesktop/settings/quickCss.css|
+:root {
+  --wal-accent: <accent>;
+  --wal-accent-alt: <accent_blue>;
+  --wal-bg: <background>;
+  --wal-fg: <foreground>;
+}

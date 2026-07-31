@@ -1,0 +1,34 @@
+;; --- NIRI QUICK SETTINGS ---
+(defwidget niri_quick_panel []
+  (box :class "niri-quick-root" :orientation "v" :space-evenly false :spacing 12
+    (box :orientation "h" :space-evenly true
+      (label :class "start-title" :text "Niri quick settings")
+      (label :class "uptime" :text "Layout: ${kb_layout}")
+    )
+    (label :class "uptime" :text "Overview: ${overview_state}" :halign "start")
+    (box :class "niri-row" :orientation "h" :space-evenly true :spacing 8
+      (button :class "niri-btn" :onclick "niri msg action switch-layout" "󰌌 Layout")
+      (button :class "niri-btn" :onclick "niri msg action load-config-file" "󰑓 Reload config")
+      (button :class "niri-btn" :onclick "niri msg action toggle-overview" "󰕮 Overview")
+    )
+    (box :class "niri-row" :orientation "h" :space-evenly true :spacing 8
+      (button :class "niri-btn" :onclick "niri msg action toggle-window-floating" "󰖯 Float")
+      (button :class "niri-btn" :onclick "niri msg action fullscreen-window" "󰊓 Fullscreen")
+      (button :class "niri-btn" :onclick "niri msg action center-column" "󰆟 Center")
+    )
+    (box :class "niri-row" :orientation "h" :space-evenly true :spacing 8
+      (button :class "niri-btn" :onclick "niri msg action focus-workspace 1" "󰎤 WS1")
+      (button :class "niri-btn" :onclick "niri msg action focus-workspace 2" "󰎧 WS2")
+      (button :class "niri-btn" :onclick "niri msg action focus-workspace 3" "󰎪 WS3")
+      (button :class "niri-btn" :onclick "niri msg action focus-workspace 4" "󰎭 WS4")
+    )
+  )
+)
+
+(defwindow niri_quick
+  :monitor 0
+  :geometry (geometry :x "15px" :y "392px" :width "520px" :height "235px" :anchor "top left")
+  :stacking "fg"
+  :exclusive false
+  (niri_quick_panel)
+)

@@ -1,0 +1,118 @@
+{
+  "layer": "top",
+  "position": "top",
+  "height": 36,
+  "spacing": 0,
+  "modules-left": [
+    "niri/workspaces",
+    "niri/window",
+    "custom/cava-music",
+    "custom/player",
+  ],
+  "modules-center": ["clock"],
+  "modules-right": [
+    "network",
+    "custom/vpn",
+    "group/hardware",
+    "group/audio-peripherals",
+    "tray",
+    "custom/power",
+  ],
+  "group/hardware": {
+    "orientation": "horizontal",
+    "modules": ["cpu", "custom/gpu", "memory", "temperature"],
+  },
+  "group/audio-peripherals": {
+    "orientation": "horizontal",
+    "modules": ["pulseaudio", "battery", "backlight"],
+  },
+  "niri/workspaces": {
+    "format": "{icon}",
+    "hide-empty": true,
+    "format-icons": {
+      "active": "",
+      "default": "",
+    },
+  },
+  "niri/window": {
+    "max-length": 50,
+    "format-empty": "",
+  },
+  "clock": {
+    "format": "  {:%d.%m. %H:%M}",
+  },
+  "cpu": { "format": " {usage}%" },
+  "memory": { "format": " {}%" },
+  "temperature": {
+    "format": " {temperatureC}°C",
+    "critical-threshold": 85,
+  },
+  "pulseaudio": {
+    "format": "{icon} {volume}%",
+    "format-muted": " ",
+    "format-icons": { "default": ["", "", ""] },
+    "on-click": "~/.local/bin/control-panel.sh",
+  },
+  "backlight": { "format": "󰃟 {percent}%" },
+  "network": {
+    "interface": "wlo1",
+    "interval": 2,
+    "format-wifi": "  󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
+    "format-ethernet": "󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
+    "format-disconnected": "󰖪 offline",
+    "max-length": 26,
+    "tooltip-format-wifi": "  {essid}\n{ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}\nSignal {signalStrength}%",
+    "tooltip-format-ethernet": "{ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}",
+  },
+  "custom/vpn": {
+    "exec": "~/.local/bin/waybar-vpn.sh",
+    "interval": 5,
+    "return-type": "json",
+    "format": "{text}",
+    "max-length": 14,
+    "hide-empty-text": true,
+    "tooltip": true,
+  },
+  "battery": {
+    "states": { "warning": 30, "critical": 15 },
+    "format": "{icon} {capacity}%",
+    "format-charging": " {capacity}%",
+    "format-icons": ["", "", "", "", ""],
+  },
+  "tray": { "icon-size": 16, "spacing": 10 },
+
+  "custom/start-menu": {
+    "format": "󰍜",
+    "tooltip": false,
+    "on-click": "~/.config/eww/scripts/toggle_start_menu.sh",
+  },
+  "custom/niri-settings": {
+    "format": "󰒓",
+    "tooltip": false,
+    "on-click": "~/.config/eww/scripts/toggle_niri_quick.sh",
+  },
+  "custom/cava-music": {
+    "exec": "~/.local/bin/waybar-cava-stream.sh",
+    "tooltip": false,
+  },
+  "custom/player": {
+    "max-length": 40,
+    "exec": "playerctl metadata --format '♫ {{artist}} - {{title}}' --follow",
+    "tooltip": false,
+  },
+  "custom/kb-layout": {
+    "exec": "bash -lc 'layout=$(niri msg keyboard-layouts 2>/dev/null | awk \"/^\\*/{print \\$2; exit}\"); [ -n \"$layout\" ] && printf \"⌨ %s\" \"$layout\" || printf \"⌨ ?\"'",
+    "interval": 2,
+    "tooltip": false,
+  },
+  "custom/gpu": {
+    "exec-if": "command -v nvidia-smi >/dev/null 2>&1",
+    "exec": "bash -lc 'read -r util <<< \"$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n1 | tr -d \",\")\"; printf \"󰢮 %s%%\" \"$util\"'",
+    "interval": 3,
+    "tooltip": false,
+  },
+  "custom/power": {
+    "format": "",
+    "on-click": "~/.config/eww/scripts/toggle_dashboard.sh",
+  },
+}

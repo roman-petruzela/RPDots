@@ -1,0 +1,18 @@
+$HOME/.config/spicetify/Themes/PywalDynamic/color.ini|
+[wal]
+text               = <color6_raw>
+subtext            = <color7_raw>
+main               = <background_raw>
+main-elevated      = <color0_raw>
+sidebar            = <color0_raw>
+player             = <background_raw>
+card               = <color0_raw>
+shadow             = 000000
+selected-row       = <color8_raw>
+button             = <accent_raw>
+button-active      = <accent_blue_raw>
+button-disabled    = <color8_raw>
+tab-active         = <accent_soft_raw>
+notification       = <accent_raw>
+notification-error = <accent_urgent_raw>
+misc               = <accent_raw>

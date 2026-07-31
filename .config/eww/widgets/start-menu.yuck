@@ -1,0 +1,35 @@
+;; --- START MENU ---
+(defwidget start_menu_panel []
+  (box :class "start-menu-root" :orientation "v" :space-evenly false :spacing 12
+    (label :class "start-title" :text "Start menu")
+    (box :class "start-main-grid" :orientation "h" :space-evenly false :spacing 12
+      (box :class "start-group" :orientation "v" :space-evenly false :spacing 8
+        (label :class "section-title" :text "Aplikace" :halign "start")
+        (button :class "start-btn" :onclick "fuzzel & eww close start_menu" "󰣇 Spustit appku")
+        (button :class "start-btn" :onclick "kitty & eww close start_menu" " Terminál")
+        (button :class "start-btn" :onclick "firefox & eww close start_menu" "󰈹 Firefox")
+        (button :class "start-btn" :onclick "thunar & eww close start_menu" "󰉋 Soubory")
+      )
+      (box :class "start-group" :orientation "v" :space-evenly false :spacing 8
+        (label :class "section-title" :text "Rychlé akce" :halign "start")
+        (button :class "start-btn" :onclick "eww open --toggle niri_quick" "󰒓 Niri quick settings")
+        (button :class "start-btn" :onclick "niri msg action screenshot" "󰹑 Screenshot")
+        (button :class "start-btn" :onclick "niri msg action toggle-overview" "󰕮 Přehled oken")
+        (button :class "start-btn danger" :onclick "niri msg action quit" "󰗼 Odhlásit niri")
+      )
+    )
+    (box :class "start-power-row" :orientation "h" :space-evenly true
+      (button :class "pwr-btn" :onclick "systemctl suspend" "󰤄")
+      (button :class "pwr-btn" :onclick "systemctl reboot" "󰜉")
+      (button :class "pwr-btn shutdown" :onclick "systemctl poweroff" "󰐥")
+    )
+  )
+)
+
+(defwindow start_menu
+  :monitor 0
+  :geometry (geometry :x "15px" :y "52px" :width "520px" :height "330px" :anchor "top left")
+  :stacking "fg"
+  :exclusive false
+  (start_menu_panel)
+)

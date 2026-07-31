@@ -1,0 +1,14 @@
+# Generované pywalem
+.config/waybar/colors.css
+.config/kitty/current-theme.conf
+.config/rofi/pywal-dynamic.rasi
+
+# Cache a dočasné soubory
+.config/btop/btop.log
+.config/fastfetch/*.jsonc.bak
+*.bak
+*.log
+__pycache__/
+
+# Osobní / lokální
+.config/niri/theme-colors.kdl
