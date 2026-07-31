@@ -111,7 +111,7 @@
     "tooltip": false,
   },
   "custom/power": {
-    "format": "󰘚",
+    "format": "",
     "tooltip": false,
     "on-click": "qs ipc call dashboard toggle",
   },
