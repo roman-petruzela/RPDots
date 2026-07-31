@@ -310,17 +310,21 @@ fi
 wal_input="$wal_source"
 if command -v magick >/dev/null 2>&1; then
     # matugen cannot read JPEG — always convert to PNG for color extraction.
-    # In fast mode resize to 960px to speed things up; in normal mode keep full res.
+    # Resize to 1920px max; beyond that resolution adds no color accuracy.
     matugen_png="$STATE_DIR/wal-matugen.png"
     if [[ "$FAST_MODE" == "yes" ]]; then
         magick "${wal_source}[0]" -auto-orient -resize "960x960>" "$matugen_png" >/dev/null 2>&1 || true
     else
-        magick "${wal_source}[0]" -auto-orient "$matugen_png" >/dev/null 2>&1 || true
+        magick "${wal_source}[0]" -auto-orient -resize "1920x1920>" "$matugen_png" >/dev/null 2>&1 || true
     fi
     [[ -f "$matugen_png" ]] && wal_input="$matugen_png"
 fi
 
-# Generate color scheme with matugen (replaces pywal)
+# Generate color scheme with matugen: templates first (Colors.js, waybar, kitty, gtk…),
+# then extract JSON for the bash color variables used by the remaining modules.
+if command -v matugen >/dev/null 2>&1 && [[ -f "$wal_input" ]]; then
+    matugen image "$wal_input" --source-color-index 0 2>/dev/null || true
+fi
 _matugen_json=""
 if command -v matugen >/dev/null 2>&1; then
     _matugen_json="$(matugen image "$wal_input" --source-color-index 0 -j hex 2>/dev/null || true)"
