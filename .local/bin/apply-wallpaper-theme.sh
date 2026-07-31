@@ -315,25 +315,55 @@ if [[ "$FAST_MODE" == "yes" ]] && command -v magick >/dev/null 2>&1; then
         wal_input="$sample_wall"
     fi
 fi
-wal_args=(-q -i "$wal_input")
-if [[ "${WAL_NO_CACHE:-0}" == "1" || "$SAME_WALLPAPER" == "1" || "$wal_source" == "$CURRENT_WALL" || "$wal_input" == "$STATE_DIR/wal-sample.jpg" ]]; then
-    wal_args+=(-n)
-fi
-if wal --help 2>/dev/null | grep -q -- '--saturate'; then
-    wal_args+=(--saturate "${WAL_SATURATE:-0.35}")
-fi
-wal "${wal_args[@]}"
 
-if [[ -f "$HOME/.cache/wal/sequences" ]]; then
-    for tty in /dev/pts/[0-9]*; do
-        [[ -w "$tty" ]] || continue
-        cat "$HOME/.cache/wal/sequences" >"$tty" 2>/dev/null || true
-    done
+# Generate color scheme with matugen (replaces pywal)
+_matugen_json=""
+if command -v matugen >/dev/null 2>&1; then
+    _matugen_json="$(matugen image "$wal_input" --source-color-index 0 -j hex 2>/dev/null || true)"
 fi
 
-set +u
-source "$HOME/.cache/wal/colors.sh"
-set -u
+# Extract matugen colors into pywal-compatible shell variables
+eval "$(echo "$_matugen_json" | python3 - <<'PYEOF'
+import sys, json
+txt = sys.stdin.read().strip()
+fallbacks = {
+    "background": "#1a120d", "on_surface": "#f0dfd7", "primary": "#ffb68c",
+    "surface_container_lowest": "#140d08", "error": "#ffb4ab",
+    "tertiary": "#ccc992", "secondary": "#e5bfaa",
+    "tertiary_fixed_dim": "#ccc992", "secondary_fixed_dim": "#e5bfaa",
+    "on_surface_variant": "#d7c2b8", "surface_container": "#271e19",
+    "error_container": "#93000a", "tertiary_container": "#4a481d",
+    "secondary_container": "#5c4131", "primary_container": "#6f3812",
+    "tertiary_fixed": "#e9e5ab", "secondary_fixed": "#ffdbc9",
+}
+c = fallbacks.copy()
+try:
+    data = json.loads(txt[txt.index("{"):])
+    for k, v in data.get("colors", {}).items():
+        c[k] = v.get("default", {}).get("color", fallbacks.get(k, "#000000"))
+except Exception:
+    pass
+print(f'background="{c["background"]}"')
+print(f'foreground="{c["on_surface"]}"')
+print(f'cursor="{c["primary"]}"')
+print(f'color0="{c["surface_container_lowest"]}"')
+print(f'color1="{c["error"]}"')
+print(f'color2="{c["tertiary"]}"')
+print(f'color3="{c["secondary"]}"')
+print(f'color4="{c["primary"]}"')
+print(f'color5="{c["tertiary_fixed_dim"]}"')
+print(f'color6="{c["secondary_fixed_dim"]}"')
+print(f'color7="{c["on_surface_variant"]}"')
+print(f'color8="{c["surface_container"]}"')
+print(f'color9="{c["error_container"]}"')
+print(f'color10="{c["tertiary_container"]}"')
+print(f'color11="{c["secondary_container"]}"')
+print(f'color12="{c["primary_container"]}"')
+print(f'color13="{c["tertiary_fixed"]}"')
+print(f'color14="{c["secondary_fixed"]}"')
+print(f'color15="{c["on_surface"]}"')
+PYEOF
+)"
 
 pick_vivid_color() {
     command -v python3 >/dev/null 2>&1 || return 1

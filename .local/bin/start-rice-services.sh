@@ -113,6 +113,18 @@ if command -v xwayland-satellite >/dev/null 2>&1; then
   ensure_pidfile_running "$PID_DIR/xwayland-satellite.pid" xwayland-satellite xwayland-satellite
 fi
 
+if command -v kanshi >/dev/null 2>&1; then
+  ensure_pidfile_running "$PID_DIR/kanshi.pid" kanshi kanshi
+fi
+
+if command -v qs >/dev/null 2>&1; then
+  pkill -x qs 2>/dev/null || true
+  sleep 0.2
+  qs >/dev/null 2>&1 &
+  echo $! > "$PID_DIR/quickshell.pid"
+  log "quickshell started"
+fi
+
 ensure_pidfile_running \
   "$PID_DIR/swayidle.pid" swayidle \
   swayidle -w \

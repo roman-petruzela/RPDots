@@ -282,6 +282,7 @@ binds {
     Ctrl+Print { spawn-sh "~/.local/bin/screenshot-area.sh"; }
     Alt+Print { spawn-sh "~/.local/bin/screenshot-area.sh"; }
     Mod+Shift+W { spawn-sh "~/.local/bin/pick-wallpaper.sh"; }
+    Mod+Shift+D hotkey-overlay-title="Dashboard: quickshell" { spawn "qs" "ipc" "call" "toggle-dashboard"; }
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
     Mod+Shift+E { quit; }
     Ctrl+Alt+Delete { quit; }
