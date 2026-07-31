@@ -29,4 +29,4 @@ output_path = "~/.config/kitty/current-theme.conf"
 
 [templates.gtk-colors]
 input_path = "~/.config/matugen/templates/gtk.css"
-output_path = "~/.config/gtk-3.0/colors.css"
+output_path = "~/.config/gtk-4.0/gtk.css"
