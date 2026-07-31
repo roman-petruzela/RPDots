@@ -13,4 +13,5 @@ if [[ -f "$KITTY_MAIN_CONF" ]] && ! grep -Fq "include ~/.config/kitty/current-th
 fi
 
 # Apply colors live to all running kitty instances
+kitty @ --to=unix:/tmp/kitty-remote set-colors -a "$KITTY_THEME_FILE" >/dev/null 2>&1 || \
 kitty @ set-colors -a "$KITTY_THEME_FILE" >/dev/null 2>&1 || true
