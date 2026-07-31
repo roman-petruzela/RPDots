@@ -18,7 +18,7 @@ ShellRoot {
     IpcHandler {
         target: "shell"
         function reload(): void {
-            Quickshell.reload(false)
+            Quickshell.reload(true)
         }
     }
 
