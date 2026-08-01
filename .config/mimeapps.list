@@ -1,5 +1,5 @@
 [Default Applications]
-application/x-terminal-emulator=kitty.desktop
+application/x-terminal-emulator=com.mitchellh.ghostty.desktop
 inode/directory=thunar.desktop
 text/html=app.zen_browser.zen.desktop
 text/plain=dev.zed.Zed.desktop
@@ -42,7 +42,7 @@ x-scheme-handler/about=app.zen_browser.zen.desktop
 x-scheme-handler/discord=vesktop.desktop
 x-scheme-handler/http=app.zen_browser.zen.desktop
 x-scheme-handler/https=app.zen_browser.zen.desktop
-x-scheme-handler/terminal=kitty.desktop
+x-scheme-handler/terminal=com.mitchellh.ghostty.desktop
 x-scheme-handler/unknown=app.zen_browser.zen.desktop
 x-scheme-handler/mailto=userapp-Thunderbird-LZ48P3.desktop
 message/rfc822=userapp-Thunderbird-LZ48P3.desktop

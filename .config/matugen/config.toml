@@ -8,6 +8,8 @@ run_after = [
     "qs ipc call shell reload 2>/dev/null || true",
     "~/.local/bin/kitty-theme-postprocess.sh 2>/dev/null || true",
     "~/.local/bin/theme-modules/10-kitty.sh 2>/dev/null || true",
+    "~/.local/bin/ghostty-colors-postprocess.sh 2>/dev/null || true",
+    "gdbus call --session --dest com.mitchellh.ghostty --object-path /com/mitchellh/ghostty --method org.gtk.Actions.Activate reload-config '[]' '{\"timestamp\": <uint32 0>}' 2>/dev/null || true",
 ]
 
 [config.custom_colors]
@@ -56,3 +58,7 @@ output_path = "~/.config/qt5ct/colors/RPRice.conf"
 [templates.qt6ct-colors]
 input_path = "~/.config/matugen/templates/qt5ct-colors.conf"
 output_path = "~/.config/qt6ct/colors/RPRice.conf"
+
+[templates.ghostty-colors]
+input_path = "~/.config/matugen/templates/ghostty-colors.conf"
+output_path = "~/.config/ghostty/colors.conf"
