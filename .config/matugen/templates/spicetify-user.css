@@ -1,0 +1,19 @@
+:root {
+  --spice-text:              {{colors.on_surface.default.hex}};
+  --spice-subtext:           {{colors.on_surface_variant.default.hex}};
+  --spice-main:              {{colors.surface_container_lowest.default.hex}};
+  --spice-main-elevated:     {{colors.surface_container.default.hex}};
+  --spice-sidebar:           {{colors.surface_container_high.default.hex}};
+  --spice-player:            {{colors.surface_container_lowest.default.hex}};
+  --spice-card:              {{colors.surface_container.default.hex}};
+  --spice-button:            {{colors.primary.default.hex}};
+  --spice-button-active:     {{colors.tertiary.default.hex}};
+  --spice-button-disabled:   {{colors.outline.default.hex}};
+  --spice-tab-active:        {{colors.secondary.default.hex}};
+  --spice-notification:      {{colors.primary.default.hex}};
+  --spice-notification-error:{{colors.error.default.hex}};
+  --spice-misc:              {{colors.primary.default.hex}};
+  --spice-selected-row:      {{colors.primary_container.default.hex}};
+  --spice-shadow:            #000000;
+  --spice-border:            {{colors.outline_variant.default.hex}};
+}

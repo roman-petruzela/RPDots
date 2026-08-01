@@ -12,9 +12,6 @@ if [[ -f "$KITTY_MAIN_CONF" ]] && ! grep -Fq "include ~/.config/kitty/current-th
     printf '\ninclude ~/.config/kitty/current-theme.conf\n' >> "$KITTY_MAIN_CONF"
 fi
 
-# Darken background to 50% brightness (primary_container is too bright for bg)
-"$HOME/.local/bin/kitty-theme-postprocess.sh" 2>/dev/null || true
-
 # Apply to every running kitty instance; --configured updates the "reset" baseline too
 for sock in /tmp/kitty-*; do
     [[ -S "$sock" ]] || continue

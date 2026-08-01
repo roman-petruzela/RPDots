@@ -1,189 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ZED_DIR="$HOME/.config/zed"
-THEMES_DIR="$ZED_DIR/themes"
-THEME_NAME="rmneq-velvet"
-THEME_FILE="$THEMES_DIR/${THEME_NAME}.json"
+ZED_SETTINGS="$HOME/.config/zed/settings.json"
+THEME_NAME="RPRice Dark"
 
-mkdir -p "$THEMES_DIR"
+[[ -f "$ZED_SETTINGS" ]] || exit 0
 
-# Match kitty default opacity ~0.85 -> hex D9.
-bg_85="${background}D9"
-bg_75="${background}BF"
-bg_65="${background}A6"
-bg_55="${background}8C"
-bg_40="${background}66"
+# matugen already wrote ~/.config/zed/themes/rprice.json via its template.
+# Update settings.json (JSONC with // comments) to reference this theme.
+# Python handles stripping // comments before parsing and writes back as JSON.
+python3 - "$ZED_SETTINGS" "$THEME_NAME" <<'PY'
+import sys, re, json
 
-cat > "$THEME_FILE" <<EOF
-{
-  "\$schema": "https://zed.dev/schema/themes/v0.2.0.json",
-  "name": "Rmneq Velvet",
-  "author": "Rmneq",
-  "themes": [
-    {
-      "name": "Rmneq Velvet Dark",
-      "appearance": "dark",
-      "style": {
-        "accents": ["${accent}", "${accent_blue}", "${accent_soft}"],
-        "background": "${bg_85}",
-        "background.appearance": "transparent",
-        "surface.background": "${bg_75}",
-        "elevated_surface.background": "${bg_65}",
-        "panel.background": "${bg_65}",
-        "pane_group.border": "${color3}",
-        "pane.focused_border": "${accent_blue}",
-        "panel.focused_border": "${accent}",
-        "tab_bar.background": "${bg_65}",
-        "tab.inactive_background": "${bg_55}",
-        "tab.active_background": "${bg_85}",
-        "title_bar.background": "${bg_75}",
-        "title_bar.inactive_background": "${bg_55}",
-        "toolbar.background": "${bg_65}",
-        "status_bar.background": "${bg_65}",
-        "border": "${color3}",
-        "border.variant": "${color1}",
-        "border.focused": "${accent_blue}",
-        "border.selected": "${accent}",
-        "border.transparent": "#00000000",
-        "border.disabled": "${color8}",
-        "element.background": "${bg_55}",
-        "element.hover": "${bg_65}",
-        "element.active": "${bg_75}",
-        "element.selected": "${bg_85}",
-        "element.disabled": "${bg_40}",
-        "ghost_element.background": "#00000000",
-        "ghost_element.hover": "${bg_55}",
-        "ghost_element.active": "${bg_65}",
-        "ghost_element.selected": "${bg_75}",
-        "ghost_element.disabled": "${bg_40}",
-        "drop_target.background": "${accent_blue}55",
-        "scrollbar.thumb.background": "${color8}",
-        "scrollbar.thumb.hover_background": "${accent_blue}",
-        "scrollbar.thumb.border": "${color3}",
-        "scrollbar.track.background": "${bg_40}",
-        "scrollbar.track.border": "${color1}",
-        "text": "${foreground}",
-        "text.muted": "${color8}",
-        "text.placeholder": "${color8}",
-        "text.accent": "${accent}",
-        "text.disabled": "${color8}",
-        "icon": "${foreground}",
-        "icon.muted": "${color8}",
-        "icon.disabled": "${color8}",
-        "icon.placeholder": "${color8}",
-        "icon.accent": "${accent}",
-        "link_text.hover": "${accent_blue}",
-        "editor.background": "${bg_85}",
-        "editor.foreground": "${foreground}",
-        "editor.gutter.background": "${bg_75}",
-        "editor.subheader.background": "${bg_65}",
-        "editor.active_line.background": "${bg_55}",
-        "editor.highlighted_line.background": "${bg_55}",
-        "editor.line_number": "${color3}",
-        "editor.active_line_number": "${accent_soft}",
-        "editor.invisible": "${color3}",
-        "editor.wrap_guide": "${color1}",
-        "editor.active_wrap_guide": "${accent_blue}",
-        "editor.indent_guide": "${color1}",
-        "editor.indent_guide_active": "${accent_blue}",
-        "editor.document_highlight.read_background": "${accent}33",
-        "editor.document_highlight.write_background": "${accent_blue}44",
-        "editor.document_highlight.bracket_background": "${accent_soft}33",
-        "search.match_background": "${accent}44",
-        "terminal.background": "${bg_85}",
-        "terminal.foreground": "${foreground}",
-        "terminal.bright_foreground": "${foreground}",
-        "terminal.dim_foreground": "${color8}",
-        "terminal.ansi.background": "${background}",
-        "terminal.ansi.black": "${color0}",
-        "terminal.ansi.red": "${color1}",
-        "terminal.ansi.green": "${color2}",
-        "terminal.ansi.yellow": "${color3}",
-        "terminal.ansi.blue": "${color4}",
-        "terminal.ansi.magenta": "${color5}",
-        "terminal.ansi.cyan": "${color6}",
-        "terminal.ansi.white": "${color7}",
-        "terminal.ansi.bright_black": "${color8}",
-        "terminal.ansi.bright_red": "${color9}",
-        "terminal.ansi.bright_green": "${color10}",
-        "terminal.ansi.bright_yellow": "${color11}",
-        "terminal.ansi.bright_blue": "${color12}",
-        "terminal.ansi.bright_magenta": "${color13}",
-        "terminal.ansi.bright_cyan": "${color14}",
-        "terminal.ansi.bright_white": "${color15}",
-        "terminal.ansi.dim_black": "${color8}",
-        "terminal.ansi.dim_red": "${color1}",
-        "terminal.ansi.dim_green": "${color2}",
-        "terminal.ansi.dim_yellow": "${color3}",
-        "terminal.ansi.dim_blue": "${color4}",
-        "terminal.ansi.dim_magenta": "${color5}",
-        "terminal.ansi.dim_cyan": "${color6}",
-        "terminal.ansi.dim_white": "${color7}",
-        "error": "${color1}",
-        "error.background": "${color1}33",
-        "error.border": "${color1}",
-        "warning": "${color3}",
-        "warning.background": "${color3}33",
-        "warning.border": "${color3}",
-        "info": "${color4}",
-        "info.background": "${color4}33",
-        "info.border": "${color4}",
-        "hint": "${color6}",
-        "hint.background": "${color6}33",
-        "hint.border": "${color6}",
-        "success": "${color2}",
-        "success.background": "${color2}33",
-        "success.border": "${color2}",
-        "created": "${color2}",
-        "created.background": "${color2}22",
-        "created.border": "${color2}",
-        "modified": "${accent_blue}",
-        "modified.background": "${accent_blue}22",
-        "modified.border": "${accent_blue}",
-        "renamed": "${accent_soft}",
-        "renamed.background": "${accent_soft}22",
-        "renamed.border": "${accent_soft}",
-        "deleted": "${color1}",
-        "deleted.background": "${color1}22",
-        "deleted.border": "${color1}",
-        "conflict": "${color11}",
-        "conflict.background": "${color11}22",
-        "conflict.border": "${color11}",
-        "predictive": "${accent_soft}",
-        "predictive.background": "${accent_soft}22",
-        "predictive.border": "${accent_soft}",
-        "ignored": "${color8}",
-        "ignored.background": "${color8}22",
-        "ignored.border": "${color8}",
-        "hidden": "${color8}",
-        "hidden.background": "${color8}22",
-        "hidden.border": "${color8}",
-        "unreachable": "${color8}",
-        "unreachable.background": "${color8}22",
-        "unreachable.border": "${color8}",
-        "syntax": {
-          "attribute": { "color": "${color14}" },
-          "boolean": { "color": "${color9}" },
-          "comment": { "color": "#888888", "font_style": "italic" },
-          "function": { "color": "${color13}" },
-          "keyword": { "color": "${color11}", "font_weight": 700 },
-          "number": { "color": "${color9}" },
-          "operator": { "color": "${color14}" },
-          "property": { "color": "${foreground}" },
-          "punctuation": { "color": "${color7}" },
-          "punctuation.bracket": { "color": "${color7}" },
-          "string": { "color": "${color10}" },
-          "string.escape": { "color": "${color11}" },
-          "tag": { "color": "${accent_soft}" },
-          "text": { "color": "${foreground}" },
-          "type": { "color": "${color9}" },
-          "variable": { "color": "${foreground}" },
-          "variable.special": { "color": "${accent_blue}" },
-          "variant": { "color": "${color14}" }
-        }
-      }
-    }
-  ]
-}
-EOF
+path, theme_name = sys.argv[1], sys.argv[2]
+raw = open(path).read()
+
+# Strip // line comments (outside strings — good enough for Zed's settings.json)
+def strip_line_comments(text):
+    result = []
+    for line in text.splitlines():
+        # Remove comment only if // appears outside a string context on that line
+        stripped = re.sub(r'(?<!:)//.*$', '', line)
+        result.append(stripped)
+    return '\n'.join(result)
+
+cleaned = strip_line_comments(raw)
+try:
+    data = json.loads(cleaned)
+except json.JSONDecodeError:
+    # If it still fails, try removing trailing commas too
+    cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)
+    data = json.loads(cleaned)
+
+data['theme'] = theme_name
+data['themes'] = {'mode': 'dark', 'light': theme_name, 'dark': theme_name}
+
+# Write back without comments (Zed is fine with clean JSON)
+with open(path, 'w') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+PY

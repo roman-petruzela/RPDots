@@ -32,3 +32,27 @@ output_path = "~/.config/kitty/current-theme.conf"
 [templates.gtk-colors]
 input_path = "~/.config/matugen/templates/gtk.css"
 output_path = "~/.config/gtk-4.0/gtk.css"
+
+[templates.zed-theme]
+input_path = "~/.config/matugen/templates/zed-theme.json"
+output_path = "~/.config/zed/themes/rprice.json"
+
+[templates.vesktop-quickcss]
+input_path = "~/.config/matugen/templates/vesktop-quickcss.css"
+output_path = "~/.config/vesktop/settings/quickCss.css"
+
+[templates.spicetify-colors]
+input_path = "~/.config/matugen/templates/spicetify-colors.ini"
+output_path = "~/.config/spicetify/Themes/PywalDynamic/color.ini"
+
+[templates.spicetify-user-css]
+input_path = "~/.config/matugen/templates/spicetify-user.css"
+output_path = "~/.config/spicetify/Themes/PywalDynamic/user.css"
+
+[templates.qt5ct-colors]
+input_path = "~/.config/matugen/templates/qt5ct-colors.conf"
+output_path = "~/.config/qt5ct/colors/RPRice.conf"
+
+[templates.qt6ct-colors]
+input_path = "~/.config/matugen/templates/qt5ct-colors.conf"
+output_path = "~/.config/qt6ct/colors/RPRice.conf"
