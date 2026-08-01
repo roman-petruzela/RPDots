@@ -12,15 +12,11 @@ if [[ -f "$KITTY_MAIN_CONF" ]] && ! grep -Fq "include ~/.config/kitty/current-th
     printf '\ninclude ~/.config/kitty/current-theme.conf\n' >> "$KITTY_MAIN_CONF"
 fi
 
-# Apply to every running kitty instance via its per-pid socket
-# (requires listen_on unix:/tmp/kitty-{kitty_pid} in kitty.conf)
-applied=0
-for sock in /tmp/kitty-[0-9]*; do
-    [[ -S "$sock" ]] || continue
-    kitty @ --to="unix:$sock" set-colors -a "$KITTY_THEME_FILE" 2>/dev/null && applied=1 || true
-done
+# Darken background to 50% brightness (primary_container is too bright for bg)
+"$HOME/.local/bin/kitty-theme-postprocess.sh" 2>/dev/null || true
 
-# Fallback: try without explicit socket (works inside a kitty terminal)
-if [[ "$applied" -eq 0 ]]; then
-    kitty @ set-colors -a "$KITTY_THEME_FILE" 2>/dev/null || true
-fi
+# Apply to every running kitty instance; --configured updates the "reset" baseline too
+for sock in /tmp/kitty-*; do
+    [[ -S "$sock" ]] || continue
+    kitty @ --to="unix:$sock" set-colors --configured -a "$KITTY_THEME_FILE" 2>/dev/null || true
+done

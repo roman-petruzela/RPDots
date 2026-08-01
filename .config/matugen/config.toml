@@ -6,6 +6,8 @@ run_after = [
     "makoctl reload 2>/dev/null || true",
     "pkill -SIGUSR2 waybar 2>/dev/null || true",
     "qs ipc call shell reload 2>/dev/null || true",
+    "~/.local/bin/kitty-theme-postprocess.sh 2>/dev/null || true",
+    "~/.local/bin/theme-modules/10-kitty.sh 2>/dev/null || true",
 ]
 
 [config.custom_colors]
