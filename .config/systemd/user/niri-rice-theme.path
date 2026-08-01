@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch wallpaper changes for niri rice theme
+
+[Path]
+PathChanged=%h/.local/share/wallpapers/current
+Unit=niri-rice-theme.service
+
+[Install]
+WantedBy=default.target

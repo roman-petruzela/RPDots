@@ -69,6 +69,9 @@ apply_wallpaper_transition() {
     fi
 }
 
+# Skip if apply-wallpaper-theme.sh already ran the transition at script start
+[[ "${WALLPAPER_TRANSITION_DONE:-}" == "1" ]] && exit 0
+
 if [[ -f "$CURRENT_WALL" ]]; then
     apply_wallpaper_transition "$CURRENT_WALL"
 fi

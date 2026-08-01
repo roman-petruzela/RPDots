@@ -292,11 +292,19 @@ else
             cp -f "$WALLPAPER" "$CURRENT_WALL"
         fi
     fi
+    # Triggered by systemd path unit without a new wallpaper: skip if nothing actually changed.
+    sig="$(wallpaper_sig "$WALLPAPER")"
+    last_sig_file="$STATE_DIR/last-wallpaper.sig"
+    if [[ -f "$last_sig_file" ]] && [[ "$(cat "$last_sig_file" 2>/dev/null || true)" == "$sig" ]]; then
+        exit 0
+    fi
 fi
 
-# Wallpaper transition is deferred until after waybar reloads to avoid
-# interrupting the animation mid-frame. See DEFERRED_WALL_TRANSITION below.
-DEFERRED_WALL_TRANSITION="$CURRENT_WALL"
+# Start wallpaper transition immediately so it's visible at once.
+# Theme processing (matugen, modules) runs after — the transition daemon is
+# GPU-side so CPU work doesn't stutter the animation.
+apply_wallpaper_now "$CURRENT_WALL"
+export WALLPAPER_TRANSITION_DONE=1
 printf '%s\n' "$(wallpaper_sig "$WALLPAPER")" >"$STATE_DIR/last-wallpaper.sig" 2>/dev/null || true
 
 wal_source="$WALLPAPER"
@@ -655,12 +663,6 @@ if command -v makoctl >/dev/null 2>&1; then
 fi
 
 niri msg action load-config-file >/dev/null 2>&1 || true
-# Launch wallpaper transition after all compositor/daemon reloads to avoid stuttering.
-if [[ -n "${DEFERRED_WALL_TRANSITION:-}" ]]; then
-    sleep 0.1
-    ( apply_wallpaper_now "$DEFERRED_WALL_TRANSITION" ) >/dev/null 2>&1 &
-    DEFERRED_WALL_TRANSITION=""
-fi
 pending_args=()
 if [[ -f "$PENDING_FLAG" ]]; then
     rm -f "$PENDING_FLAG"
@@ -668,13 +670,20 @@ if [[ -f "$PENDING_FLAG" ]]; then
         mapfile -d '' -t pending_args <"$PENDING_ARGS"
     fi
     rm -f "$PENDING_ARGS"
+    # If pending has no new wallpaper (just a systemd path-unit re-trigger), skip it —
+    # we just finished applying, so sig will match and the else-branch would exit 0 anyway.
+    has_wall_arg=0
+    for a in "${pending_args[@]}"; do
+        [[ -f "$a" ]] && has_wall_arg=1 && break
+    done
+    if [[ "$has_wall_arg" == "0" ]]; then
+        cleanup_lock
+        trap - EXIT
+        exit 0
+    fi
     cleanup_lock
     trap - EXIT
-    if [[ ${#pending_args[@]} -gt 0 ]]; then
-        exec "$0" "${pending_args[@]}"
-    else
-        exec "$0"
-    fi
+    exec "$0" "${pending_args[@]}"
 fi
 notify_msg "Rice" "Theme aplikovano."
 if [[ "$FAST_MODE" != "yes" ]]; then
