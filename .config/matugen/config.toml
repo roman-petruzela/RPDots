@@ -75,3 +75,7 @@ output_path = "~/.config/btop/themes/rprice.theme"
 [templates.cava]
 input_path = "~/.config/matugen/templates/cava.conf"
 output_path = "~/.config/cava/config"
+
+[templates.rofi]
+input_path = "~/.config/matugen/templates/rofi.rasi"
+output_path = "~/.config/rofi/pywal-dynamic.rasi"

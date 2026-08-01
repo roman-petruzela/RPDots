@@ -5,7 +5,7 @@ CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch"
 CFG_FILE="$CFG_DIR/config.jsonc"
 LOGO_HELPER="$HOME/.local/bin/fastfetch-logo.sh"
 logo_source=""
-logo_type="kitty" # Změň na "w3m", pokud nepoužíváš kitty a používáš w3m-img
+logo_type="kitty"
 
 # Prioritně zkusíme načíst náš dynamický pywal smajlík
 if [[ -x "$LOGO_HELPER" ]]; then
@@ -26,8 +26,8 @@ cat >"$CFG_FILE" <<'EOF'
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
   "logo": {
-    "source": "arch",
-    "type": "auto"
+    "source": "__LOGO_SOURCE__",
+    "type": "__LOGO_TYPE__"
   },
   "display": {
     "separator": " : ",
