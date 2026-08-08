@@ -93,7 +93,7 @@ ensure_modules_cfg() {
 50-fuzzel.sh|1|50|
 55-rofi.sh|1|55|
 60-gtk.sh|1|60|
-61-thunar.sh|1|61|xfconf-query
+61-thunar.sh|1|61|
 62-qt.sh|1|62|qt5ct,qt6ct
 63-dcol.sh|1|63|
 65-vscode.sh|1|65|jq

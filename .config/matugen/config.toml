@@ -2,13 +2,13 @@
 reload_apps = false
 set_wallpaper = false
 run_after = [
-    "~/.local/bin/matugen-fuzzel.py 2>/dev/null || true",
     "makoctl reload 2>/dev/null || true",
     "pkill -SIGUSR2 waybar 2>/dev/null || true",
     "qs ipc call shell reload 2>/dev/null || true",
     "~/.local/bin/kitty-theme-postprocess.sh 2>/dev/null || true",
     "~/.local/bin/theme-modules/10-kitty.sh 2>/dev/null || true",
     "~/.local/bin/ghostty-colors-postprocess.sh 2>/dev/null || true",
+    "~/.local/bin/gtk-live-reload.sh 2>/dev/null || true",
     "gdbus call --session --dest com.mitchellh.ghostty --object-path /com/mitchellh/ghostty --method org.gtk.Actions.Activate reload-config '[]' '{\"timestamp\": <uint32 0>}' 2>/dev/null || true",
     "pkill -SIGUSR1 cava 2>/dev/null || true",
 ]
@@ -35,6 +35,18 @@ output_path = "~/.config/kitty/current-theme.conf"
 [templates.gtk-colors]
 input_path = "~/.config/matugen/templates/gtk.css"
 output_path = "~/.config/gtk-4.0/gtk.css"
+
+# GTK3 — the RPRice theme, which drives Thunar and every other GTK3 app.
+# It has to be a named theme, not ~/.config/gtk-3.0/gtk.css: GTK3 reads the user
+# stylesheet once at startup, but re-reads a theme whenever the theme name changes,
+# which is what makes live recoloring possible (see gtk-live-reload.sh).
+[templates.gtk3-theme-light]
+input_path = "~/.config/matugen/templates/gtk3-light.css"
+output_path = "~/.local/share/themes/RPRice/gtk-3.0/gtk.css"
+
+[templates.gtk3-theme-dark]
+input_path = "~/.config/matugen/templates/gtk3-dark.css"
+output_path = "~/.local/share/themes/RPRice/gtk-3.0/gtk-dark.css"
 
 [templates.zed-theme]
 input_path = "~/.config/matugen/templates/zed-theme.json"
@@ -79,3 +91,7 @@ output_path = "~/.config/cava/config"
 [templates.rofi]
 input_path = "~/.config/matugen/templates/rofi.rasi"
 output_path = "~/.config/rofi/pywal-dynamic.rasi"
+
+[templates.fuzzel]
+input_path = "~/.config/matugen/templates/fuzzel.ini"
+output_path = "~/.config/fuzzel/fuzzel.ini"

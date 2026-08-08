@@ -1,0 +1,319 @@
+/* RPRice — GTK3 widget rules.
+ *
+ * Static: it only ever references @-color names. The palette behind those names
+ * is generated per wallpaper by matugen into gtk.css / gtk-dark.css, which
+ * import Adwaita first, then define the colors, then import this file.
+ *
+ * Adwaita in GTK 3.24 bakes most of its colors in as literals rather than
+ * reading @theme_* colors, so overriding the @define-colors is not enough —
+ * anything that should follow the wallpaper needs an explicit rule here.
+ */
+
+/* --- tint & transparency -------------------------------------------------
+ * Two knobs, both here:
+ *
+ *   mix(..., @m3_primary, N)  how much of the wallpaper's primary is mixed into
+ *                             the surface. Higher = more colourful. 0 = plain M3.
+ *   alpha(..., N)             opacity. 1.0 = solid. Menus and popovers stay near
+ *                             opaque on purpose so text over the wallpaper is
+ *                             still readable.
+ *
+ * Selections keep alpha 1.0 — a translucent selection over a busy wallpaper is
+ * unreadable.
+ */
+@define-color rp_window      alpha(mix(@theme_bg_color, @m3_primary, 0.14), 0.86);
+@define-color rp_surface     alpha(mix(@m3_surface_container, @m3_primary, 0.22), 0.80);
+@define-color rp_surface_hi  alpha(mix(@m3_surface_container_high, @m3_primary, 0.22), 0.88);
+@define-color rp_surface_hii alpha(mix(@m3_surface_container_highest, @m3_primary, 0.22), 0.92);
+@define-color rp_view        alpha(mix(@m3_surface_container_lowest, @m3_primary, 0.10), 0.78);
+@define-color rp_base        alpha(mix(@theme_base_color, @m3_primary, 0.18), 0.90);
+@define-color rp_popover     alpha(mix(@m3_surface_container_high, @m3_primary, 0.22), 0.97);
+@define-color rp_sel         mix(@m3_primary_container, @m3_primary, 0.45);
+@define-color rp_sel_soft    mix(@m3_secondary_container, @m3_primary, 0.38);
+
+/* --- surfaces ----------------------------------------------------------- */
+window,
+dialog,
+.background {
+  background-color: @rp_window;
+  color: @theme_fg_color;
+}
+
+headerbar,
+.titlebar,
+toolbar,
+.toolbar,
+statusbar {
+  background-image: none;
+  background-color: @rp_surface;
+  color: @theme_fg_color;
+}
+
+headerbar,
+.titlebar,
+toolbar,
+.toolbar {
+  border-bottom: 1px solid @borders;
+}
+
+statusbar,
+statusbar label {
+  color: @m3_on_surface_variant;
+}
+
+menubar,
+.menubar {
+  background-color: @rp_surface;
+  color: @theme_fg_color;
+}
+
+popover,
+popover.background,
+menu,
+.menu,
+.context-menu {
+  background-color: @rp_popover;
+  color: @theme_fg_color;
+  border: 1px solid @borders;
+}
+
+paned > separator {
+  background-color: @borders;
+  background-image: none;
+}
+
+/* Sidebar — Thunar's shortcuts pane and tree pane both carry .sidebar */
+.sidebar,
+.sidebar .view,
+.sidebar treeview.view,
+.sidebar scrolledwindow,
+.shortcuts-pane,
+.shortcuts-pane .view {
+  background-color: @rp_surface;
+  color: @theme_fg_color;
+}
+
+/* --- selection ---------------------------------------------------------- */
+/* Adwaita hardcodes #3584e4 here, so every selectable node is restated. */
+treeview.view:selected,
+treeview.view:selected:focus,
+treeview.view:selected:hover,
+iconview:selected,
+iconview:selected:focus,
+.view:selected,
+.view:selected:focus,
+list row:selected,
+list row:selected:focus,
+flowbox flowboxchild:selected,
+label:selected,
+entry selection,
+textview text selection {
+  background-color: @rp_sel;
+  color: @m3_on_primary_container;
+}
+
+/* Sidebar selection gets the softer secondary tone so it reads as chrome. */
+.sidebar treeview.view:selected,
+.sidebar treeview.view:selected:focus,
+.sidebar .view:selected,
+.shortcuts-pane .view:selected,
+.sidebar list row:selected {
+  background-color: @rp_sel_soft;
+  color: @m3_on_secondary_container;
+}
+
+treeview.view:hover,
+iconview:hover,
+list row:hover {
+  background-color: alpha(@m3_primary, 0.10);
+}
+
+menuitem:hover,
+popover modelbutton:hover,
+menu menuitem:hover {
+  background-color: @rp_sel;
+  color: @m3_on_primary_container;
+}
+
+/* --- controls ----------------------------------------------------------- */
+button {
+  background-image: none;
+  background-color: @rp_surface_hi;
+  color: @theme_fg_color;
+  border: 1px solid @borders;
+}
+
+button:hover {
+  background-image: none;
+  background-color: @rp_surface_hii;
+}
+
+button:checked,
+button:active {
+  background-image: none;
+  background-color: @rp_sel;
+  color: @m3_on_primary_container;
+}
+
+button:disabled {
+  background-image: none;
+  background-color: @insensitive_bg_color;
+  color: @insensitive_fg_color;
+}
+
+entry,
+spinbutton,
+textview text {
+  background-image: none;
+  background-color: @rp_base;
+  color: @theme_text_color;
+  border: 1px solid @borders;
+}
+
+entry:focus {
+  border-color: @m3_primary;
+}
+
+scrollbar {
+  background-color: @rp_window;
+  border-color: @borders;
+}
+
+scrollbar slider {
+  background-color: @m3_outline;
+}
+
+scrollbar slider:hover {
+  background-color: @m3_primary;
+}
+
+progressbar progress {
+  background-color: @m3_primary;
+  background-image: none;
+}
+
+check:checked,
+radio:checked {
+  background-image: none;
+  background-color: @m3_primary;
+  color: @m3_on_primary;
+  border-color: @m3_primary;
+}
+
+/* --- Thunar ------------------------------------------------------------- */
+/* .standard-view is the file area (icon / detailed / compact view). */
+.standard-view,
+.standard-view.view,
+.standard-view treeview.view,
+.standard-view iconview {
+  background-color: @rp_view;
+  color: @theme_fg_color;
+}
+
+/* Thunar's icon view is ExoIconView, not GtkIconView, so its CSS node is not
+ * called "iconview" — the .standard-view class is the only reliable handle.
+ * It renders items through the view's own style context, hence :selected here. */
+.standard-view:selected,
+.standard-view:selected:focus,
+.standard-view .view:selected,
+.standard-view .view:selected:focus {
+  background-color: @rp_sel;
+  color: @m3_on_primary_container;
+}
+
+/* Column headers of the detailed list view */
+.standard-view treeview.view header button,
+treeview.view header button {
+  background-image: none;
+  background-color: @rp_surface;
+  color: @m3_on_surface_variant;
+  border-color: @borders;
+}
+
+/* Breadcrumb path bar */
+.path-bar,
+.path-bar button,
+.location-button {
+  background-color: transparent;
+  background-image: none;
+  color: @m3_on_surface_variant;
+  border: none;
+}
+
+.path-bar button:hover,
+.location-button:hover {
+  background-color: alpha(@m3_primary, 0.14);
+  color: @theme_fg_color;
+}
+
+.path-bar button:checked,
+.location-button:checked {
+  background-color: @rp_sel;
+  color: @m3_on_primary_container;
+}
+
+/* --- backdrop ------------------------------------------------------------ */
+/* Adwaita ships :backdrop variants, and element:backdrop (0,1,1) outranks a
+ * plain element selector (0,0,1) — without these an unfocused window silently
+ * falls back to Adwaita's greys. Thunar's window carries the .thunar class. */
+window:backdrop,
+dialog:backdrop,
+.background:backdrop,
+window.thunar:backdrop {
+  background-color: @rp_window;
+  color: @theme_fg_color;
+}
+
+headerbar:backdrop,
+.titlebar:backdrop,
+toolbar:backdrop,
+.toolbar:backdrop,
+menubar:backdrop,
+statusbar:backdrop {
+  background-color: @rp_surface;
+  color: @theme_fg_color;
+}
+
+entry:backdrop,
+spinbutton:backdrop,
+textview text:backdrop {
+  background-color: @rp_base;
+  color: @theme_text_color;
+  border-color: @borders;
+}
+
+button:backdrop {
+  background-color: @rp_surface_hi;
+  color: @theme_fg_color;
+  border-color: @borders;
+}
+
+.standard-view:backdrop,
+.standard-view treeview.view:backdrop,
+treeview.view:backdrop {
+  background-color: @rp_view;
+  color: @theme_fg_color;
+}
+
+.sidebar:backdrop,
+.sidebar treeview.view:backdrop,
+.shortcuts-pane:backdrop {
+  background-color: @rp_surface;
+  color: @theme_fg_color;
+}
+
+treeview.view:selected:backdrop,
+.view:selected:backdrop,
+.standard-view:selected:backdrop,
+label:selected:backdrop,
+list row:selected:backdrop {
+  background-color: @rp_sel;
+  color: @m3_on_primary_container;
+}
+
+.sidebar treeview.view:selected:backdrop,
+.sidebar .view:selected:backdrop,
+.shortcuts-pane .view:selected:backdrop {
+  background-color: @rp_sel_soft;
+  color: @m3_on_secondary_container;
+}
