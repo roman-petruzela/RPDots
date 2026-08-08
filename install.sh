@@ -34,6 +34,17 @@ PKGS=(
     nwg-look
     qt5ct
     qt6ct
+    # Thunar + to, co potřebuje: xfce4-settings dodává xfce4-mime-helper,
+    # bez kterého Thunar neumí "Open Terminal Here"
+    thunar
+    thunar-archive-plugin
+    thunar-volman
+    xfce4-settings
+    gvfs
+    gvfs-smb
+    gvfs-afc
+    tumbler
+    ffmpegthumbnailer
 )
 
 install_packages() {
