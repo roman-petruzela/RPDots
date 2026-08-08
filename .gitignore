@@ -1,7 +1,18 @@
-# Generované pywalem
+# Generované matugenem (šablony jsou v .config/matugen/templates/)
 .config/waybar/colors.css
 .config/kitty/current-theme.conf
 .config/rofi/pywal-dynamic.rasi
+.config/quickshell/Colors.js
+.config/mako/config
+.config/swaylock/config
+.config/cava/config
+.config/fuzzel/fuzzel.ini
+
+# GTK témata generovaná matugenem (šablony jsou v .config/matugen/templates/)
+.local/share/themes/RPRice/gtk-3.0/gtk.css
+.local/share/themes/RPRice/gtk-3.0/gtk-dark.css
+.config/gtk-3.0/gtk.css
+.config/gtk-4.0/gtk.css
 
 # Cache a dočasné soubory
 .config/btop/btop.log
