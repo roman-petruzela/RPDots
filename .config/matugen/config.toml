@@ -7,9 +7,7 @@ run_after = [
     "qs ipc call shell reload 2>/dev/null || true",
     "~/.local/bin/kitty-theme-postprocess.sh 2>/dev/null || true",
     "~/.local/bin/theme-modules/10-kitty.sh 2>/dev/null || true",
-    "~/.local/bin/ghostty-colors-postprocess.sh 2>/dev/null || true",
     "~/.local/bin/gtk-live-reload.sh 2>/dev/null || true",
-    "gdbus call --session --dest com.mitchellh.ghostty --object-path /com/mitchellh/ghostty --method org.gtk.Actions.Activate reload-config '[]' '{\"timestamp\": <uint32 0>}' 2>/dev/null || true",
     "pkill -SIGUSR1 cava 2>/dev/null || true",
 ]
 
@@ -52,9 +50,13 @@ output_path = "~/.local/share/themes/RPRice/gtk-3.0/gtk-dark.css"
 input_path = "~/.config/matugen/templates/zed-theme.json"
 output_path = "~/.config/zed/themes/rprice.json"
 
+# Pozor na dvoukrokovy zapis: matugen soubor NAHRAZUJE (novy inode), cimz by
+# se utrhl inotify watch, ktery na quickCss.css drzi Vencord, a Discord by
+# zustal na stare palete az do restartu. Proto se generuje stranou a obsah
+# preleje modul theme-modules/70-vesktop.sh pres `cat` do puvodniho inode.
 [templates.vesktop-quickcss]
 input_path = "~/.config/matugen/templates/vesktop-quickcss.css"
-output_path = "~/.config/vesktop/settings/quickCss.css"
+output_path = "~/.config/vesktop/settings/quickCss.generated.css"
 
 [templates.spicetify-colors]
 input_path = "~/.config/matugen/templates/spicetify-colors.ini"
@@ -72,9 +74,6 @@ output_path = "~/.config/qt5ct/colors/RPRice.conf"
 input_path = "~/.config/matugen/templates/qt5ct-colors.conf"
 output_path = "~/.config/qt6ct/colors/RPRice.conf"
 
-[templates.ghostty-colors]
-input_path = "~/.config/matugen/templates/ghostty-colors.conf"
-output_path = "~/.config/ghostty/colors.conf"
 
 [templates.swaylock]
 input_path = "~/.config/matugen/templates/swaylock.conf"
