@@ -63,6 +63,7 @@ parse_meta() {
     enabled=""
     priority=""
     requires=""
+    # Parse module metadata in one pass (fewer forks than multiple greps).
     IFS='|' read -r enabled priority requires < <(
         awk -F': *' '
       BEGIN { e=""; p=""; r="" }
@@ -225,6 +226,7 @@ apply_wallpaper_now() {
         sleep 0.3
     fi
     
+    # Run wallpaper transition module
     if [[ -x "$HOME/.local/bin/theme-modules/01-wallpaper-transition.sh" ]]; then
         export CURRENT_WALL="$wall"
         "$HOME/.local/bin/theme-modules/01-wallpaper-transition.sh" >/dev/null 2>&1 || true
@@ -254,6 +256,7 @@ done
 
 wallpaper_sig() {
     local f="$1"
+    # Fast signature: path + mtime + size (good enough to detect changes cheaply).
     stat -c '%n|%Y|%s' "$f" 2>/dev/null || printf '%s\n' "$f"
 }
 
@@ -282,19 +285,29 @@ else
     if [[ -f "$CURRENT_WALL" ]]; then
         WALLPAPER="$CURRENT_WALL"
     else
+        # Stop as soon as we find the first matching file (much faster than piping to head).
         WALLPAPER="$(find "$HOME/Pictures" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print -quit 2>/dev/null || true)"
         [[ -n "$WALLPAPER" ]] || exit 0
         if [[ "$(readlink -f "$WALLPAPER" 2>/dev/null || printf '%s' "$WALLPAPER")" != "$(readlink -f "$CURRENT_WALL" 2>/dev/null || printf '%s' "$CURRENT_WALL")" ]]; then
             cp -f "$WALLPAPER" "$CURRENT_WALL"
         fi
     fi
+    # Triggered by systemd path unit without a new wallpaper: skip if nothing actually changed.
     sig="$(wallpaper_sig "$WALLPAPER")"
     last_sig_file="$STATE_DIR/last-wallpaper.sig"
     if [[ -f "$last_sig_file" ]] && [[ "$(cat "$last_sig_file" 2>/dev/null || true)" == "$sig" ]]; then
+        # At fresh login the wallpaper daemon isn't running yet — restore wallpaper without re-running matugen.
+        _wd="swww-daemon"; command -v awww-daemon >/dev/null 2>&1 && _wd="awww-daemon"
+        if ! pgrep -x "$_wd" >/dev/null 2>&1; then
+            apply_wallpaper_now "$WALLPAPER"
+        fi
         exit 0
     fi
 fi
 
+# Start wallpaper transition immediately so it's visible at once.
+# Theme processing (matugen, modules) runs after — the transition daemon is
+# GPU-side so CPU work doesn't stutter the animation.
 apply_wallpaper_now "$CURRENT_WALL"
 export WALLPAPER_TRANSITION_DONE=1
 printf '%s\n' "$(wallpaper_sig "$WALLPAPER")" >"$STATE_DIR/last-wallpaper.sig" 2>/dev/null || true
@@ -309,6 +322,8 @@ fi
 
 wal_input="$wal_source"
 if command -v magick >/dev/null 2>&1; then
+    # matugen cannot read JPEG — always convert to PNG for color extraction.
+    # Resize to 1920px max; beyond that resolution adds no color accuracy.
     matugen_png="$STATE_DIR/wal-matugen.png"
     if [[ "$FAST_MODE" == "yes" ]]; then
         magick "${wal_source}[0]" -auto-orient -resize "960x960>" "$matugen_png" >/dev/null 2>&1 || true
@@ -318,6 +333,8 @@ if command -v magick >/dev/null 2>&1; then
     [[ -f "$matugen_png" ]] && wal_input="$matugen_png"
 fi
 
+# Generate color scheme with matugen: templates first (Colors.js, waybar, kitty, gtk…),
+# then extract JSON for the bash color variables used by the remaining modules.
 if command -v matugen >/dev/null 2>&1 && [[ -f "$wal_input" ]]; then
     matugen image "$wal_input" --source-color-index 0 2>/dev/null || true
 fi
@@ -326,6 +343,9 @@ if command -v matugen >/dev/null 2>&1; then
     _matugen_json="$(matugen image "$wal_input" --source-color-index 0 -j hex 2>/dev/null || true)"
 fi
 
+# Extract matugen colors into pywal-compatible shell variables
+# NOTE: pipe+heredoc for python3 is broken (pipe overrides heredoc as script src);
+# pass JSON via env var instead.
 export _MATUGEN_JSON="$_matugen_json"
 eval "$(python3 - <<'PYEOF'
 import json, os
@@ -413,7 +433,10 @@ if proc.returncode != 0:
 rows = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
 cands = []
 for line in rows:
-    m = re.match(r'^\s*(\d+):.*#([0-9A-Fa-f]{6})\b', line)
+    # Wallpapers with an alpha channel make ImageMagick print #RRGGBBAA, so the
+    # trailing pair has to be optional — with a fixed six the \b never matched,
+    # every candidate was dropped and accent came out empty.
+    m = re.match(r'^\s*(\d+):.*#([0-9A-Fa-f]{6})(?:[0-9A-Fa-f]{2})?\b', line)
     if not m:
         continue
     count = int(m.group(1))
@@ -449,8 +472,14 @@ accent_mode="${THEME_ACCENT_MODE:-image}"
 case "$accent_mode" in
 image)
     if image_pick="$(pick_image_accent "$WALLPAPER")"; then
-        accent="$(echo "$image_pick" | sed -n '1p')"
+        first="$(echo "$image_pick" | sed -n '1p')"
         second="$(echo "$image_pick" | sed -n '2p')"
+        # The picker can legitimately come up empty (an all-dark wallpaper drops
+        # every candidate). Keep the matugen fallback then — an empty accent is
+        # written straight into theme-colors.kdl and makes the niri config invalid.
+        if [[ -n "${first:-}" ]]; then
+            accent="$first"
+        fi
         if [[ -n "${second:-}" ]]; then
             accent_blue="$second"
         fi
@@ -468,6 +497,18 @@ vivid)
 wal | *)
     ;;
 esac
+
+# Last-resort net: whatever happened above, no accent may reach the modules empty.
+# 30-niri.sh interpolates these straight into KDL, and `active-color ""` fails
+# `niri validate`, so the whole config (not just the colors) stops loading.
+: "${accent:=${color5:-#ffb68c}}"
+: "${accent_soft:=${color6:-#e5bfaa}}"
+: "${accent_blue:=${color4:-#ffb68c}}"
+: "${accent_urgent:=${color1:-#ffb4ab}}"
+[[ -n "$accent" ]] || accent="#ffb68c"
+[[ -n "$accent_soft" ]] || accent_soft="#e5bfaa"
+[[ -n "$accent_blue" ]] || accent_blue="#ffb68c"
+[[ -n "$accent_urgent" ]] || accent_urgent="#ffb4ab"
 
 if [[ "${THEME_ACCENT_SOFT_FOLLOW_ACCENT:-0}" == "1" ]]; then
     accent_soft="$accent"
@@ -560,6 +601,7 @@ if [[ -d "$MODULE_DIR" ]]; then
         exit 1
     fi
 
+    # By default we do NOT wait for async heavy modules. To wait: export THEME_ASYNC_WAIT=1
     if [[ "${THEME_ASYNC_WAIT:-0}" == "1" ]] && [[ ${#async_pids[@]} -gt 0 ]]; then
         for pid in "${async_pids[@]}"; do
             wait "$pid" || true
@@ -636,6 +678,8 @@ if [[ "$NO_RESTART" != "yes" ]]; then
     ensure_pidfile_running "$PID_DIR/mako.pid" mako mako
 fi
 
+# Always reload running daemons so systemd-triggered theme applies (with --no-daemon-restart)
+# still refresh Waybar/Mako without spawning new processes.
 signal_running_processes waybar USR2
 if [[ "$waybar_css_changed" -eq 1 || "$waybar_config_changed" -eq 1 ]]; then
     restart_waybar_if_running
@@ -652,6 +696,8 @@ if [[ -f "$PENDING_FLAG" ]]; then
         mapfile -d '' -t pending_args <"$PENDING_ARGS"
     fi
     rm -f "$PENDING_ARGS"
+    # If pending has no new wallpaper (just a systemd path-unit re-trigger), skip it —
+    # we just finished applying, so sig will match and the else-branch would exit 0 anyway.
     has_wall_arg=0
     for a in "${pending_args[@]}"; do
         [[ -f "$a" ]] && has_wall_arg=1 && break
