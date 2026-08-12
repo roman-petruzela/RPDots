@@ -67,8 +67,10 @@ prefer-no-csd
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 // Animace žijí v power-mode.kdl, přepíná je rp-power (režim gaming je vypíná).
 include optional=true "~/.config/niri/power-mode.kdl"
+// Pozn.: dřív tu bylo namespace="^wallpaper$", což nesedělo na nic — awww-daemon
+// registruje vrstvu pod svým vlastním jménem, takže se backdrop neuplatňoval.
 layer-rule {
-    match namespace="^wallpaper$"
+    match namespace="^awww-daemon$"
     place-within-backdrop true
 }
 window-rule {
