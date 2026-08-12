@@ -1,0 +1,10 @@
+# Generováno matugenem — needituj ručně.
+# Nahrazuje dřívější ~/.cache/wal/colors.sh (pywal se už nepoužívá).
+background='{{colors.surface_container_lowest.default.hex}}'
+foreground='{{colors.on_surface.default.hex}}'
+background_alt='{{colors.surface_container.default.hex}}'
+foreground_muted='{{colors.on_surface_variant.default.hex}}'
+accent='{{colors.primary.default.hex}}'
+accent_alt='{{colors.tertiary.default.hex}}'
+selected='{{colors.primary_container.default.hex}}'
+selected_fg='{{colors.on_primary_container.default.hex}}'

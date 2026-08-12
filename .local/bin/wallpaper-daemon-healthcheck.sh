@@ -37,3 +37,10 @@ if [[ -f "$CURRENT_WALL" ]]; then
     fi
 fi
 
+# Video vrstva: pokud je aktivní video tapeta a mpvpaper neběží (po restartu sezení
+# nebo když spadl), nahodit ho zpátky. 'ensure' běžící instanci nechá být, aby
+# healthcheck nerestartoval video při každém tiknutí timeru.
+if [[ -x "$HOME/.local/bin/wallpaper-video-ctl.sh" ]]; then
+    "$HOME/.local/bin/wallpaper-video-ctl.sh" ensure >/dev/null 2>&1 || true
+fi
+

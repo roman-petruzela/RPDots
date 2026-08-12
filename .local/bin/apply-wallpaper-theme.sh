@@ -7,6 +7,8 @@ CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/niri-rice"
 WALL_DIR="$HOME/.local/share/wallpapers"
 CURRENT_WALL="$WALL_DIR/current"
 CURRENT_SOURCE_FILE="$STATE_DIR/current-wallpaper-source"
+# Drží cestu k video tapetě, pokud je aktivní. Neexistuje = statická tapeta.
+CURRENT_VIDEO_FILE="$STATE_DIR/current-video"
 MODULE_DIR="$HOME/.local/bin/theme-modules"
 THEME_LOG="$STATE_DIR/theme-modules.log"
 MODULE_CFG="$CFG_DIR/modules.conf"
@@ -233,6 +235,50 @@ apply_wallpaper_now() {
     fi
 }
 
+is_video_wallpaper() {
+    case "${1,,}" in
+        *.mp4 | *.mkv | *.webm | *.mov | *.avi) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Připraví $CURRENT_WALL a stav videa.
+#
+# CURRENT_WALL je *vždy* obrázek, i když je vybrané video — v tom případě do něj
+# uložíme první snímek. Matugen z něj vytáhne barvy, awww ho zobrazí jako podklad
+# a přechodový efekt tak vypadá stejně jako u obrázkových tapet. Teprve navrch
+# se pak položí mpvpaper s videem.
+install_wallpaper_source() {
+    local src="$1"
+
+    if is_video_wallpaper "$src"; then
+        if ! command -v ffmpeg >/dev/null 2>&1; then
+            echo "ffmpeg chybí, video tapetu nelze použít: $src" >&2
+            return 1
+        fi
+        local frame="$STATE_DIR/video-frame.png"
+        # Filtr thumbnail vybere z prvních 100 snímků ten nejreprezentativnější.
+        # Prostý -frames:v 1 by u videí s fade-in z černé vytáhl černý snímek —
+        # a matugen by z něj udělal generickou tmavou paletu, takže by to
+        # vypadalo, že video tapety barvy vůbec nemění.
+        if ! ffmpeg -y -v error -i "$src" -vf "thumbnail=100" -frames:v 1 -f image2 "$frame" >/dev/null 2>&1; then
+            # Záloha pro velmi krátká videa, kde thumbnail nemá z čeho vybírat.
+            if ! ffmpeg -y -v error -i "$src" -frames:v 1 -f image2 "$frame" >/dev/null 2>&1; then
+                echo "Nepodařilo se vytáhnout snímek z videa: $src" >&2
+                return 1
+            fi
+        fi
+        cp -f "$frame" "$CURRENT_WALL"
+        printf '%s\n' "$src" >"$CURRENT_VIDEO_FILE"
+        return 0
+    fi
+
+    rm -f "$CURRENT_VIDEO_FILE"
+    if [[ "$(readlink -f "$src" 2>/dev/null || printf '%s' "$src")" != "$(readlink -f "$CURRENT_WALL" 2>/dev/null || printf '%s' "$CURRENT_WALL")" ]]; then
+        cp -f "$src" "$CURRENT_WALL"
+    fi
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
     --no-daemon-restart)
@@ -266,21 +312,21 @@ if [[ -n "$WALLPAPER_ARG" ]]; then
         echo "Wallpaper not found: $WALLPAPER" >&2
         exit 1
     }
+    # Musí proběhnout před prvním přechodem — awww i matugen pracují s CURRENT_WALL,
+    # a u videa ho teprve tohle naplní prvním snímkem.
+    install_wallpaper_source "$WALLPAPER" || exit 1
+    printf '%s\n' "$WALLPAPER" >"$CURRENT_SOURCE_FILE"
     sig="$(wallpaper_sig "$WALLPAPER")"
     last_sig_file="$STATE_DIR/last-wallpaper.sig"
     if [[ -f "$last_sig_file" ]] && [[ "$(cat "$last_sig_file" 2>/dev/null || true)" == "$sig" ]]; then
         SAME_WALLPAPER=1
-        apply_wallpaper_now "$WALLPAPER"
+        apply_wallpaper_now "$CURRENT_WALL"
         if [[ "${THEME_SKIP_REGEN_IF_SAME_WALLPAPER:-0}" == "1" ]]; then
             notify_msg "Rice" "Wallpaper beze zmeny — preskakuju regen theme."
             exit 0
         fi
         notify_msg "Rice" "Wallpaper beze zmeny — obnovuju theme."
     fi
-    if [[ "$(readlink -f "$WALLPAPER" 2>/dev/null || printf '%s' "$WALLPAPER")" != "$(readlink -f "$CURRENT_WALL" 2>/dev/null || printf '%s' "$CURRENT_WALL")" ]]; then
-        cp -f "$WALLPAPER" "$CURRENT_WALL"
-    fi
-    printf '%s\n' "$WALLPAPER" >"$CURRENT_SOURCE_FILE"
 else
     if [[ -f "$CURRENT_WALL" ]]; then
         WALLPAPER="$CURRENT_WALL"
@@ -320,11 +366,21 @@ if [[ -f "$CURRENT_SOURCE_FILE" ]]; then
     fi
 fi
 
+# U videa bereme barvy z už vytaženého prvního snímku v CURRENT_WALL, ne ze
+# samotného .mp4 — magick by ho musel dekódovat znovu (u 4K souboru zbytečně)
+# a spoléhal by přitom na ffmpeg delegáta, který nemusí být všude k dispozici.
+if is_video_wallpaper "$wal_source" && [[ -f "$CURRENT_WALL" ]]; then
+    wal_source="$CURRENT_WALL"
+fi
+
 wal_input="$wal_source"
 if command -v magick >/dev/null 2>&1; then
     # matugen cannot read JPEG — always convert to PNG for color extraction.
     # Resize to 1920px max; beyond that resolution adds no color accuracy.
     matugen_png="$STATE_DIR/wal-matugen.png"
+    # Smazat předem: kdyby magick selhal, zůstal by tu snímek z předchozí tapety
+    # a matugen by tiše vygeneroval staré barvy (vypadá to jako "barvy se nemění").
+    rm -f "$matugen_png"
     if [[ "$FAST_MODE" == "yes" ]]; then
         magick "${wal_source}[0]" -auto-orient -resize "960x960>" "$matugen_png" >/dev/null 2>&1 || true
     else

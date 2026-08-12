@@ -91,6 +91,11 @@ output_path = "~/.config/cava/config"
 input_path = "~/.config/matugen/templates/rofi.rasi"
 output_path = "~/.config/rofi/pywal-dynamic.rasi"
 
+# Barvy pro shellové skripty (pick-wallpaper.sh) — dřív se braly z pywalu.
+[templates.shell-colors]
+input_path = "~/.config/matugen/templates/colors.sh"
+output_path = "~/.cache/niri-rice/colors.sh"
+
 [templates.fuzzel]
 input_path = "~/.config/matugen/templates/fuzzel.ini"
 output_path = "~/.config/fuzzel/fuzzel.ini"

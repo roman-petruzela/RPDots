@@ -16,6 +16,7 @@ PKGS=(
     rofi-wayland
     fastfetch
     awww
+    mpvpaper
     matugen
     quickshell
     imagemagick

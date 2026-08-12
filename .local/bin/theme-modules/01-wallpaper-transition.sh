@@ -69,8 +69,28 @@ apply_wallpaper_transition() {
     fi
 }
 
+# Video tapeta: awww odbaví přechod na první snímek videa (CURRENT_WALL je u videa
+# právě on) a teprve pak se navrch položí mpvpaper. Přechod tak vypadá identicky
+# jako u obrázků — divák uvidí stejnou wave animaci a video se pak rozhýbe.
+# Pro statickou tapetu tohle mpvpaper naopak zabije.
+#
+# Běží odpojeně na pozadí: start videa musí počkat, až awww dokreslí přechod
+# (~3 s), a nemá smysl o tu dobu zdržovat matugen a zbytek témování. setsid ho
+# odpojí od procesní skupiny, aby přežil konec apply-wallpaper-theme.sh.
+sync_video_layer() {
+    local ctl="$HOME/.local/bin/wallpaper-video-ctl.sh"
+    [[ -x "$ctl" ]] || return 0
+    if command -v setsid >/dev/null 2>&1; then
+        setsid "$ctl" sync >/dev/null 2>&1 </dev/null &
+    else
+        "$ctl" sync >/dev/null 2>&1 || true
+    fi
+}
+
+# Skip if apply-wallpaper-theme.sh already ran the transition at script start
 [[ "${WALLPAPER_TRANSITION_DONE:-}" == "1" ]] && exit 0
 
 if [[ -f "$CURRENT_WALL" ]]; then
     apply_wallpaper_transition "$CURRENT_WALL"
+    sync_video_layer
 fi

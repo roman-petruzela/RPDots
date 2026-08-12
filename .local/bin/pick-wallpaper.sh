@@ -3,6 +3,7 @@ set -euo pipefail
 
 WALL_DIR=""
 THUMB_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/wallpaper-thumbs"
+STATE_COLORS="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/colors.sh"
 for candidate in "$HOME/Pictures/Wallpapers" "$HOME/.local/share/wallpapers" "$HOME/Pictures"; do
   if [[ -d "$candidate" ]]; then
     WALL_DIR="$candidate"
@@ -13,23 +14,52 @@ done
 [[ -n "$WALL_DIR" ]] || exit 0
 mkdir -p "$THUMB_DIR"
 
-if [[ -f "$HOME/.cache/wal/colors.sh" ]]; then
+# Barvy generuje matugen (šablona ~/.config/matugen/templates/colors.sh).
+# Dřív se braly z pywalu, ten se už nepoužívá.
+if [[ -f "$STATE_COLORS" ]]; then
   set +u
-  source "$HOME/.cache/wal/colors.sh"
+  source "$STATE_COLORS"
   set -u
 fi
 wal_bg="${background:-#0b0909}"
 wal_fg="${foreground:-#e3c8a1}"
-wal_ac="${color5:-#976D54}"
+wal_ac="${accent:-#976D54}"
+
+is_video() {
+  case "${1,,}" in
+    *.mp4 | *.mkv | *.webm | *.mov | *.avi) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 make_thumb() {
   local img="$1"
-  local sig key thumb
+  local sig key thumb src tmpframe
   sig="$(stat -c '%Y_%s' "$img" 2>/dev/null || echo "0_0")"
   key="$(printf 'v2|%s|%s|%s' "$img" "$sig" "$wal_bg" | md5sum | awk '{print $1}')"
   thumb="$THUMB_DIR/$key.png"
   if [[ ! -f "$thumb" ]] && command -v magick >/dev/null 2>&1; then
-    magick "$img[0]" -auto-orient -thumbnail "240x140^" -gravity center -background "$wal_bg" -extent 240x140 "$thumb" >/dev/null 2>&1 || true
+    src="$img"
+    tmpframe=""
+    # ImageMagick umí mp4 jen přes ffmpeg delegáta, který nemusí být k dispozici —
+    # u videa si snímek vytáhneme sami.
+    if is_video "$img"; then
+      if command -v ffmpeg >/dev/null 2>&1; then
+        tmpframe="$THUMB_DIR/$key.src.png"
+        # thumbnail=100 vybere reprezentativní snímek — u videí s fade-in z černé
+        # by prostý první snímek dal černý náhled.
+        ffmpeg -y -v error -i "$img" -vf "thumbnail=100" -frames:v 1 -f image2 "$tmpframe" >/dev/null 2>&1 \
+          || ffmpeg -y -v error -i "$img" -frames:v 1 -f image2 "$tmpframe" >/dev/null 2>&1 \
+          || tmpframe=""
+        [[ -n "$tmpframe" && -f "$tmpframe" ]] && src="$tmpframe" || src=""
+      else
+        src=""
+      fi
+    fi
+    if [[ -n "$src" ]]; then
+      magick "$src[0]" -auto-orient -thumbnail "240x140^" -gravity center -background "$wal_bg" -extent 240x140 "$thumb" >/dev/null 2>&1 || true
+    fi
+    [[ -n "$tmpframe" ]] && rm -f "$tmpframe"
   fi
   if [[ -f "$thumb" ]]; then
     echo "$thumb"
@@ -41,7 +71,7 @@ make_thumb() {
 pick_wallpaper() {
   local selected=""
   if command -v rofi >/dev/null 2>&1; then
-    mapfile -d '' files < <(find "$WALL_DIR" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' \) -print0 | sort -z)
+    mapfile -d '' files < <(find "$WALL_DIR" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' -o -iname '*.mp4' -o -iname '*.mkv' -o -iname '*.webm' \) -print0 | sort -z)
     [[ "${#files[@]}" -gt 0 ]] || { echo ""; return; }
     local current_src=""
     local current_index=""
@@ -100,10 +130,10 @@ pick_wallpaper() {
       selected="$WALL_DIR/$selected"
     fi
   elif command -v zenity >/dev/null 2>&1; then
-    selected="$(zenity --file-selection --title="Vyber tapetu" --filename="$WALL_DIR/" --file-filter="Images | *.jpg *.jpeg *.png *.webp *.gif" 2>/dev/null || true)"
+    selected="$(zenity --file-selection --title="Vyber tapetu" --filename="$WALL_DIR/" --file-filter="Wallpapers | *.jpg *.jpeg *.png *.webp *.gif *.mp4 *.mkv *.webm" 2>/dev/null || true)"
   elif command -v fuzzel >/dev/null 2>&1; then
     local choice
-    choice="$(find "$WALL_DIR" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' \) -printf '%f\n' | sort | fuzzel --dmenu --prompt='Wallpaper: ' || true)"
+    choice="$(find "$WALL_DIR" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' -o -iname '*.mp4' -o -iname '*.mkv' -o -iname '*.webm' \) -printf '%f\n' | sort | fuzzel --dmenu --prompt='Wallpaper: ' || true)"
     if [[ -n "${choice:-}" ]]; then
       selected="$WALL_DIR/$choice"
     fi
