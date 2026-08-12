@@ -3,7 +3,7 @@
 #
 #   rp-power battery    šetřicí: CPU powersave, dGPU odemčená a nechaná spát
 #   rp-power balanced   běžná práce (výchozí)
-#   rp-power gaming     plný výkon + zámek spodního taktu dGPU, animace beze změny
+#   rp-power gaming     plný výkon + zámek taktu dGPU + uspaná video tapeta
 #   rp-power turbo      jako gaming, navíc vypnuté animace niri
 #   rp-power status     co je teď nastavené
 #
@@ -14,6 +14,19 @@ set -uo pipefail
 HELPER=/usr/local/bin/rp-power-apply
 NIRI_KDL="$HOME/.config/niri/power-mode.kdl"
 STATE_FILE=/var/lib/rp-power/mode
+VIDEO_CTL="$HOME/.local/bin/wallpaper-video-ctl.sh"
+
+# Video tapeta se dekóduje a překresluje na iGPU — tedy na té samé, která zároveň
+# přebírá každý snímek hry z dGPU. Ve výkonnostních režimech ji proto uspíme;
+# statická awww vrstva zůstane, takže plocha jen zamrzne na prvním snímku.
+switch_wallpaper_video() {
+    [[ -x "$VIDEO_CTL" ]] || return 0
+    case "$1" in
+        gaming|turbo) "$VIDEO_CTL" inhibit   >/dev/null 2>&1 && echo "  video tapeta uspaná" ;;
+        *)            "$VIDEO_CTL" uninhibit >/dev/null 2>&1 && echo "  video tapeta obnovená" ;;
+    esac
+    return 0
+}
 
 write_animations() {
     local mode=$1 tmp
@@ -78,6 +91,15 @@ status() {
     echo "ACPI profil:      $prof"
     echo "CPU governor:     $gov (EPP: $epp)"
 
+    local inh="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/video-inhibit"
+    if [[ -f "$inh" ]]; then
+        echo "video tapeta:     uspaná"
+    elif pgrep -x mpvpaper >/dev/null 2>&1; then
+        echo "video tapeta:     přehrává se"
+    else
+        echo "video tapeta:     žádná"
+    fi
+
     local rt
     rt=$(cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status 2>/dev/null)
     if [[ "$rt" == "suspended" ]]; then
@@ -93,6 +115,7 @@ case "${1:-status}" in
         ;;
     battery|balanced|gaming|turbo)
         write_animations "$1"
+        switch_wallpaper_video "$1"
         sudo -n "$HELPER" "$1" || {
             echo "  !! sudo selhalo — je nainstalované /etc/sudoers.d/rp-power?" >&2
             exit 1

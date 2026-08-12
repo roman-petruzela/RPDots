@@ -123,6 +123,7 @@ iGPU** — the dGPU has no outputs and is render-offload only.
 | CPU governor | TLP | TLP | performance | performance |
 | dGPU power limit | 40 W | 60 W | 85 W | 85 W |
 | dGPU clock floor | — | — | 800 MHz | 800 MHz |
+| video wallpaper | on | on | **suspended** | **suspended** |
 | niri animations | on | on | on | **off** |
 
 ```bash
@@ -137,6 +138,17 @@ which wrecks frametime consistency under PRIME offload.
 
 **CPU is deliberately left to TLP** except in `gaming`/`turbo`. TLP is installed
 and already switches on AC/battery events; two governor managers would fight.
+
+**Video wallpaper** is suspended in `gaming`/`turbo` via
+`wallpaper-video-ctl.sh inhibit`, which drops a flag at
+`~/.cache/niri-rice/video-inhibit` and kills mpvpaper. The static awww layer
+stays up, so the desktop just freezes on the video's first frame instead of
+going blank. The flag is honoured inside `wallpaper-video-ctl.sh` rather than by
+the caller — otherwise the healthcheck timer (`OnUnitActiveSec=2min`) would call
+`ensure` and resurrect the video mid-game. Reason for suspending it at all: the
+video decodes and composites on the **iGPU**, which is the same GPU that takes
+every game frame off the dGPU, so the two contend for the one path that is
+already the bottleneck.
 
 **Animations** live in `.config/niri/power-mode.kdl`, pulled in by `config.kdl`
 via `include optional=true`. The file is generated (gitignored, like
