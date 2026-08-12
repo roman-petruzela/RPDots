@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# rp-power-apply — privilegovaná část přepínání power režimů.
+# Volá se přes sudo z ~/.local/bin/rp-power, nebo jako "auto" z udev při
+# změně napájení. Animace niri řeší uživatelský skript, sem nepatří.
+#
+# Režimy: battery | balanced | gaming | turbo | auto
+# gaming a turbo se po hardwarové stránce neliší — turbo navíc vypíná animace,
+# což je čistě věc session a řeší to uživatelský skript.
+set -uo pipefail
+
+STATE_DIR=/var/lib/rp-power
+STATE_FILE="$STATE_DIR/mode"
+
+# Spodní zámek taktu dGPU v režimu gaming. Smysl je zabránit propadu na
+# 210 MHz, který rozbíjí frametime — není to overclock, napětí zůstává
+# na tovární V/F křivce.
+GPU_FLOOR_MHZ=800
+GPU_TOP_MHZ=2100
+GPU_PL_GAMING=85
+GPU_PL_BALANCED=60
+GPU_PL_BATTERY=40
+
+on_ac() {
+    [[ "$(cat /sys/class/power_supply/ACAD/online 2>/dev/null || echo 0)" == "1" ]]
+}
+
+# dGPU je runtime-suspendovaná? Pak na ni NESAHAT — každé volání nvidia-smi
+# ji probudí a sežere baterku, což je přesně to, čemu se chceme vyhnout.
+dgpu_suspended() {
+    [[ "$(cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status 2>/dev/null)" == "suspended" ]]
+}
+
+set_platform_profile() {
+    local p=$1
+    [[ -e /sys/firmware/acpi/platform_profile ]] || return 0
+    grep -qw "$p" /sys/firmware/acpi/platform_profile_choices 2>/dev/null || return 0
+    echo "$p" > /sys/firmware/acpi/platform_profile 2>/dev/null || true
+}
+
+set_cpu() {
+    local gov=$1 epp=$2 c
+    for c in /sys/devices/system/cpu/cpu*/cpufreq; do
+        [[ -e "$c/scaling_governor" ]] && echo "$gov" > "$c/scaling_governor" 2>/dev/null
+        [[ -e "$c/energy_performance_preference" ]] && echo "$epp" > "$c/energy_performance_preference" 2>/dev/null
+    done
+    return 0
+}
+
+set_gpu() {
+    local mode=$1
+    command -v nvidia-smi >/dev/null 2>&1 || return 0
+
+    if dgpu_suspended; then
+        echo "  dGPU spí — nechávám ji spát (nvidia-smi by ji probudil)"
+        return 0
+    fi
+
+    case "$mode" in
+        gaming)
+            nvidia-smi -pl "$GPU_PL_GAMING"  >/dev/null 2>&1 || true
+            nvidia-smi -lgc "${GPU_FLOOR_MHZ},${GPU_TOP_MHZ}" >/dev/null 2>&1 || true
+            ;;
+        balanced)
+            nvidia-smi -rgc >/dev/null 2>&1 || true
+            nvidia-smi -pl "$GPU_PL_BALANCED" >/dev/null 2>&1 || true
+            ;;
+        battery)
+            nvidia-smi -rgc >/dev/null 2>&1 || true
+            nvidia-smi -pl "$GPU_PL_BATTERY" >/dev/null 2>&1 || true
+            ;;
+    esac
+}
+
+apply() {
+    case "$1" in
+        gaming|turbo)
+            set_platform_profile performance
+            set_cpu performance performance
+            set_gpu gaming
+            ;;
+        balanced)
+            set_platform_profile balanced
+            # CPU záměrně neřešíme — vlastní ho TLP, dva správci by se přebíjeli.
+            set_gpu balanced
+            ;;
+        battery)
+            set_platform_profile low-power
+            # CPU nechává na TLP (viz výše).
+            set_gpu battery
+            ;;
+        *)
+            echo "neznámý režim: $1" >&2
+            return 1
+            ;;
+    esac
+    echo "  režim '$1' aplikován"
+}
+
+mkdir -p "$STATE_DIR"
+
+case "${1:-auto}" in
+    auto)
+        # Na baterce vždy shodit dolů, bez ohledu na uloženou volbu.
+        # Po zapojení do sítě se obnoví to, co si uživatel zvolil.
+        chosen=$(cat "$STATE_FILE" 2>/dev/null || echo balanced)
+        if on_ac; then
+            apply "$chosen"
+        else
+            apply battery
+        fi
+        ;;
+    battery|balanced|gaming|turbo)
+        echo "$1" > "$STATE_FILE"
+        apply "$1"
+        ;;
+    *)
+        echo "použití: $0 {battery|balanced|gaming|turbo|auto}" >&2
+        exit 1
+        ;;
+esac

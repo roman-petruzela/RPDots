@@ -111,6 +111,57 @@ configured in `.config/xfce4/helpers.rc`), `tumbler` for thumbnails
 (`ffmpegthumbnailer` for video, `poppler-glib` for PDF, `libgsf` for documents),
 and `gvfs` + `gvfs-smb` / `gvfs-afc` for mounting.
 
+## Power modes
+
+`rp-power` switches CPU / dGPU / animation profiles in one step. This laptop is
+Optimus (AMD Cezanne iGPU + RTX 3050 Mobile) and **both displays hang off the
+iGPU** — the dGPU has no outputs and is render-offload only.
+
+| | `battery` | `balanced` | `gaming` | `turbo` |
+|---|---|---|---|---|
+| ACPI platform profile | low-power | balanced | performance | performance |
+| CPU governor | TLP | TLP | performance | performance |
+| dGPU power limit | 40 W | 60 W | 85 W | 85 W |
+| dGPU clock floor | — | — | 800 MHz | 800 MHz |
+| niri animations | on | on | on | **off** |
+
+```bash
+rp-power gaming      # or battery / balanced / turbo
+rp-power status
+```
+
+`gaming` and `turbo` are hardware-identical; `turbo` additionally kills desktop
+animations. The clock floor is **not** an overclock — voltage stays on the stock
+V/F curve. Its purpose is to stop the dGPU collapsing to 210 MHz mid-frame,
+which wrecks frametime consistency under PRIME offload.
+
+**CPU is deliberately left to TLP** except in `gaming`/`turbo`. TLP is installed
+and already switches on AC/battery events; two governor managers would fight.
+
+**Animations** live in `.config/niri/power-mode.kdl`, pulled in by `config.kdl`
+via `include optional=true`. The file is generated (gitignored, like
+`theme-colors.kdl`) — the canonical content is the heredoc in `.local/bin/rp-power`,
+and it is materialised on the first `rp-power` run. Every write is checked with
+`niri validate` and rolled back on failure, so a bad write cannot take the
+desktop down.
+
+The privileged half lives in `.local/share/rp-power/`:
+
+```bash
+sudo ~/.local/share/rp-power/install.sh
+```
+
+It installs `/usr/local/bin/rp-power-apply`, a NOPASSWD sudoers rule scoped to
+that one binary, a udev rule on `ACAD`, and a oneshot unit. Unplugging drops to
+`battery` regardless of the selected mode; plugging back in restores the choice
+(persisted in `/var/lib/rp-power/mode`).
+
+> The dGPU only reaches 0 W when it runtime-suspends, which needs *nothing*
+> holding a context on it — `nvidia-smi` itself wakes it, so the script skips it
+> while suspended. niri, Steam and browsers do hold contexts; pinning niri to the
+> iGPU with `debug { render-drm-device "/dev/dri/renderD128" }` is the lever if
+> battery life matters more than whatever niri gains from the dGPU.
+
 ## Keybindings
 
 | | |
@@ -149,9 +200,11 @@ dotfiles/
 │   ├── gtk-3.0/       # theme, icons, cursor
 │   └── xfce4/         # helpers.rc
 ├── .local/
-│   ├── bin/           # theming, OSD, wallpaper scripts
+│   ├── bin/           # theming, OSD, wallpaper scripts, rp-power
 │   │   └── theme-modules/   # NN-*.sh, run in order after matugen
-│   └── share/themes/  # RPRice GTK3 theme
+│   └── share/
+│       ├── themes/    # RPRice GTK3 theme
+│       └── rp-power/  # root half of power modes (install.sh + helper)
 ├── .zshrc
 ├── .p10k.zsh
 └── install.sh

@@ -65,25 +65,8 @@ hotkey-overlay {
 }
 prefer-no-csd
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
-animations {
-    slowdown 1.5
-    window-open {
-        duration-ms 250
-        curve "ease-out-expo"
-    }
-    window-close {
-        duration-ms 250
-        curve "ease-out-expo"
-    }
-    window-resize {
-        duration-ms 150
-        curve "ease-out-expo"
-    }
-    workspace-switch {
-        duration-ms 250
-        curve "ease-out-expo"
-    }
-}
+// Animace žijí v power-mode.kdl, přepíná je rp-power (režim gaming je vypíná).
+include optional=true "~/.config/niri/power-mode.kdl"
 layer-rule {
     match namespace="^wallpaper$"
     place-within-backdrop true

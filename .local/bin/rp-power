@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# rp-power — přepínání power režimů RPRice.
+#
+#   rp-power battery    šetřicí: CPU powersave, dGPU odemčená a nechaná spát
+#   rp-power balanced   běžná práce (výchozí)
+#   rp-power gaming     plný výkon + zámek spodního taktu dGPU, animace beze změny
+#   rp-power turbo      jako gaming, navíc vypnuté animace niri
+#   rp-power status     co je teď nastavené
+#
+# Privilegovanou část (CPU, ACPI profil, nvidia-smi) dělá /usr/local/bin/rp-power-apply
+# přes sudo. Tady zůstávají jen věci ze session — hlavně animace niri.
+set -uo pipefail
+
+HELPER=/usr/local/bin/rp-power-apply
+NIRI_KDL="$HOME/.config/niri/power-mode.kdl"
+STATE_FILE=/var/lib/rp-power/mode
+
+write_animations() {
+    local mode=$1 tmp
+    tmp=$(mktemp)
+    {
+        echo "// Generováno skriptem rp-power — needitovat ručně."
+        echo "// Přepíná se přes: rp-power battery|balanced|gaming|turbo"
+        if [[ "$mode" == "turbo" ]]; then
+            printf 'animations {\n    off\n}\n'
+        else
+            cat <<'KDL'
+animations {
+    slowdown 1.5
+    window-open {
+        duration-ms 250
+        curve "ease-out-expo"
+    }
+    window-close {
+        duration-ms 250
+        curve "ease-out-expo"
+    }
+    window-resize {
+        duration-ms 150
+        curve "ease-out-expo"
+    }
+    workspace-switch {
+        duration-ms 250
+        curve "ease-out-expo"
+    }
+}
+KDL
+        fi
+    } > "$tmp"
+
+    # Nikdy nenechat rozbitý config — niri ho hot-reloaduje a rozsypal by se
+    # celý desktop. Zapisovat až po validaci.
+    local backup
+    backup=$(mktemp)
+    cp "$NIRI_KDL" "$backup" 2>/dev/null || true
+    cp "$tmp" "$NIRI_KDL"
+    if ! niri validate >/dev/null 2>&1; then
+        echo "  !! niri config by byl neplatný, vracím původní animace" >&2
+        cp "$backup" "$NIRI_KDL" 2>/dev/null || true
+        rm -f "$tmp" "$backup"
+        return 1
+    fi
+    rm -f "$tmp" "$backup"
+    [[ "$mode" == "turbo" ]] && echo "  animace niri vypnuté" || echo "  animace niri zapnuté"
+    return 0
+}
+
+status() {
+    local ac gov epp prof mode
+    ac=$(cat /sys/class/power_supply/ACAD/online 2>/dev/null)
+    gov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)
+    epp=$(cat /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference 2>/dev/null)
+    prof=$(cat /sys/firmware/acpi/platform_profile 2>/dev/null)
+    mode=$(cat "$STATE_FILE" 2>/dev/null || echo "?")
+
+    echo "režim:            $mode"
+    echo "napájení:         $([[ "$ac" == "1" ]] && echo 'síť' || echo 'baterie')"
+    echo "ACPI profil:      $prof"
+    echo "CPU governor:     $gov (EPP: $epp)"
+
+    local rt
+    rt=$(cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status 2>/dev/null)
+    if [[ "$rt" == "suspended" ]]; then
+        echo "dGPU:             spí (0 W)"
+    elif command -v nvidia-smi >/dev/null 2>&1; then
+        echo "dGPU:             $(nvidia-smi --query-gpu=pstate,clocks.gr,power.draw,power.limit --format=csv,noheader 2>/dev/null)"
+    fi
+}
+
+case "${1:-status}" in
+    status)
+        status
+        ;;
+    battery|balanced|gaming|turbo)
+        write_animations "$1"
+        sudo -n "$HELPER" "$1" || {
+            echo "  !! sudo selhalo — je nainstalované /etc/sudoers.d/rp-power?" >&2
+            exit 1
+        }
+        ;;
+    *)
+        echo "použití: rp-power {battery|balanced|gaming|turbo|status}" >&2
+        exit 1
+        ;;
+esac

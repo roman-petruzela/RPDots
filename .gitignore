@@ -21,5 +21,8 @@
 *.log
 __pycache__/
 
+# Generované skriptem rp-power (kanonický obsah je v .local/bin/rp-power)
+.config/niri/power-mode.kdl
+
 # Osobní / lokální
 .config/niri/theme-colors.kdl
