@@ -48,6 +48,29 @@ The same `set_lightness` / `set_saturation` pairs appear in **three** templates:
 three. matugen has no `mix()` filter, so a shared expression is the only way to
 keep the apps byte-identical.
 
+### Black-and-white wallpapers
+
+A monochrome wallpaper has no hue to derive anything from, and matugen's
+quantizer then seeds the scheme from a near-black pixel whose channels differ by
+a unit or two of compression noise — `saturn-monochrome.mp4` seeds `#040206`,
+which is hue 270 at 2.4 % value, and Material You expands that into a full purple
+palette. `apply-wallpaper-theme.sh` measures how much of the image actually
+carries colour (pixels with `S ≥ 0.15` and `V ≥ 0.12`) and switches matugen to
+`scheme-monochrome` below 2 %. Measured over the collection the two groups are
+far apart: monochrome wallpapers land at 0.00 %, the darkest still-colourful one
+at 5.19 %.
+
+`scheme-monochrome` returns true greys, which the pinned `set_saturation: 30`
+would repaint red-brown (a grey resolves to hue 0). matugen has no conditionals,
+so a grey copy of every template containing `set_saturation` is generated into
+`~/.cache/niri-rice/templates-mono/` along with a rewritten `config.toml`. The
+templates in `.config/matugen/templates/` stay the single source of truth.
+
+It also flips `primary_container` from a dark tone to a light one (`#d4d4d4`
+instead of `#583a6f`). Templates that pin lightness do not care; `kitty-theme.conf`
+uses it raw as a background, which is why the postprocess targets an absolute
+value instead of halving whatever it finds.
+
 ## Tuning
 
 | What | Where | Now |
@@ -57,7 +80,9 @@ keep the apps byte-identical.
 | GTK / Thunar alphas | `.local/share/themes/RPRice/gtk-3.0/widgets.css` (top of file) | `rp_window` 0.55, `rp_view` 0.46 |
 | Zed alphas | `.config/matugen/templates/zed-theme.json` → `set_alpha` | 0.55 / 0.46 |
 | Surface tones | `templates/gtk3-dark.css`, `zed-theme.json`, `spicetify-user.css` | `set_lightness` / `set_saturation` |
-| kitty background darkening | `.local/bin/kitty-theme-postprocess.sh` | 50 % HSV value |
+| kitty background | `KITTY_BG_VALUE` in `.local/bin/kitty-theme-postprocess.sh` | `0.23` HSV value |
+| kitty ANSI legibility floor | `KITTY_MIN_CONTRAST`, same script | `2.5` : 1 vs background |
+| Monochrome cutoff | `THEME_MONO_THRESHOLD` (`THEME_MONO_MODE=on\|off\|auto` forces it) | `2.0` % |
 
 GTK alphas stack (the window sits under everything), so the effective opacity is
 `1-(1-0.55)(1-0.46) ≈ 0.76` for the file list and `≈ 0.80` for chrome — both aimed

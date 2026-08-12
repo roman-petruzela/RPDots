@@ -389,14 +389,107 @@ if command -v magick >/dev/null 2>&1; then
     [[ -f "$matugen_png" ]] && wal_input="$matugen_png"
 fi
 
+# Black-and-white wallpapers have no hue to derive anything from, and matugen's
+# quantizer then seeds the scheme from a near-black pixel whose channels differ by
+# a unit or two of compression noise. saturn-monochrome.mp4 seeds #040206 — that is
+# hue 270 at 2.4 % value, and Material You blows it up into a full purple palette.
+# Detect the case and ask for scheme-monochrome instead of guessing a hue.
+is_mono_wallpaper() {
+    local img="$1"
+    command -v python3 >/dev/null 2>&1 || return 1
+    command -v magick >/dev/null 2>&1 || return 1
+    [[ -f "$img" ]] || return 1
+    THEME_MONO_THRESHOLD="${THEME_MONO_THRESHOLD:-2.0}" python3 - "$img" <<'PY'
+import colorsys, os, re, subprocess, sys
+
+proc = subprocess.run(
+    ["magick", f"{sys.argv[1]}[0]", "-auto-orient", "-resize", "320x320>",
+     "-colors", "64", "-format", "%c\n", "histogram:info:-"],
+    capture_output=True, text=True,
+)
+if proc.returncode != 0:
+    sys.exit(1)
+
+total = colored = 0
+for line in proc.stdout.splitlines():
+    m = re.match(r'^\s*(\d+):.*#([0-9A-Fa-f]{6})(?:[0-9A-Fa-f]{2})?\b', line)
+    if not m:
+        continue
+    count = int(m.group(1))
+    hexv = m.group(2)
+    r, g, b = (int(hexv[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+    _, s, v = colorsys.rgb_to_hsv(r, g, b)
+    total += count
+    # Near-black and near-white pixels carry no usable hue, so they count towards
+    # the total but never towards "this image has colour".
+    if s >= 0.15 and v >= 0.12:
+        colored += count
+
+if not total:
+    sys.exit(1)
+pct = colored / total * 100.0
+sys.exit(0 if pct < float(os.environ["THEME_MONO_THRESHOLD"]) else 1)
+PY
+}
+
+# Measured over the wallpaper collection, the two groups sit far apart: the
+# monochrome ones land at 0.00 %, the darkest still-colourful one (void-space-
+# black-hole) at 5.19 %, everything else well above. 2 % separates them cleanly.
+MONO_MODE="${THEME_MONO_MODE:-auto}"
+MATUGEN_ARGS=()
+case "$MONO_MODE" in
+on) IS_MONO=1 ;;
+off) IS_MONO=0 ;;
+*) if is_mono_wallpaper "$wal_input"; then IS_MONO=1; else IS_MONO=0; fi ;;
+esac
+
+if [[ "$IS_MONO" == "1" ]]; then
+    MATUGEN_ARGS+=(-t scheme-monochrome)
+    # scheme-monochrome hands back true greys, but the templates pin saturation
+    # (`set_saturation: 30`) to keep surfaces coloured — on a grey that resolves to
+    # hue 0 and repaints everything red-brown (#d4d4d4 -> #3c2020). matugen has no
+    # conditionals, so generate a grey variant of those templates and point a copy
+    # of the config at it. The templates stay the single source of truth.
+    mono_cfg="$(MONO_DIR="$STATE_DIR/templates-mono" python3 - <<'PY' 2>/dev/null || true
+import os, pathlib, re, sys
+
+cfg = pathlib.Path(os.path.expanduser("~/.config/matugen/config.toml"))
+if not cfg.is_file():
+    sys.exit(1)
+mono_dir = pathlib.Path(os.environ["MONO_DIR"])
+mono_dir.mkdir(parents=True, exist_ok=True)
+
+out = []
+for line in cfg.read_text().splitlines():
+    m = re.match(r'^(\s*input_path\s*=\s*")(.+)(")\s*$', line)
+    if m:
+        src = pathlib.Path(os.path.expanduser(m.group(2)))
+        if src.is_file():
+            text = src.read_text()
+            if "set_saturation" in text:
+                dst = mono_dir / src.name
+                dst.write_text(re.sub(r'set_saturation:\s*\d+(\.\d+)?', 'set_saturation: 0', text))
+                line = f"{m.group(1)}{dst}{m.group(3)}"
+    out.append(line)
+
+dst_cfg = mono_dir / "config.toml"
+dst_cfg.write_text("\n".join(out) + "\n")
+print(dst_cfg)
+PY
+)"
+    if [[ -n "$mono_cfg" && -f "$mono_cfg" ]]; then
+        MATUGEN_ARGS+=(-c "$mono_cfg")
+    fi
+fi
+
 # Generate color scheme with matugen: templates first (Colors.js, waybar, kitty, gtk…),
 # then extract JSON for the bash color variables used by the remaining modules.
 if command -v matugen >/dev/null 2>&1 && [[ -f "$wal_input" ]]; then
-    matugen image "$wal_input" --source-color-index 0 2>/dev/null || true
+    matugen "${MATUGEN_ARGS[@]}" image "$wal_input" --source-color-index 0 2>/dev/null || true
 fi
 _matugen_json=""
 if command -v matugen >/dev/null 2>&1; then
-    _matugen_json="$(matugen image "$wal_input" --source-color-index 0 -j hex 2>/dev/null || true)"
+    _matugen_json="$(matugen "${MATUGEN_ARGS[@]}" image "$wal_input" --source-color-index 0 -j hex 2>/dev/null || true)"
 fi
 
 # Extract matugen colors into pywal-compatible shell variables
