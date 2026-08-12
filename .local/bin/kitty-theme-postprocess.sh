@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Darkens the kitty theme background to 50% brightness of primary_container
 set -euo pipefail
 
 THEME="$HOME/.config/kitty/current-theme.conf"

@@ -58,7 +58,6 @@ Item {
         border.width: 1
         clip: true
 
-        // Full-width album art banner
         Rectangle {
             id: artBanner
             visible: hasArt
@@ -74,7 +73,6 @@ Item {
                 asynchronous: true
             }
 
-            // Bottom gradient over art
             Rectangle {
                 anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
                 height: 72
@@ -89,7 +87,6 @@ Item {
                 }
             }
 
-            // Track info overlaid on gradient
             Column {
                 anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
                 anchors.leftMargin: 14; anchors.rightMargin: 14; anchors.bottomMargin: 10
@@ -113,7 +110,6 @@ Item {
             }
         }
 
-        // Controls + progress section
         Column {
             anchors {
                 left: parent.left; right: parent.right
@@ -122,7 +118,6 @@ Item {
             }
             spacing: 8
 
-            // Track info when no art
             Column {
                 visible: !hasArt
                 width: parent.width
@@ -145,7 +140,6 @@ Item {
                 }
             }
 
-            // Progress bar + time
             Column {
                 width: parent.width
                 spacing: 4
@@ -184,7 +178,6 @@ Item {
                 }
             }
 
-            // Controls
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 4

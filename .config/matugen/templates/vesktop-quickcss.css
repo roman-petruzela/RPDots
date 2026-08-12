@@ -58,13 +58,11 @@ body,
   --mention-background: color-mix(in srgb, var(--rp-primary) 18%, var(--rp-bg)) !important;
 }
 
-/* Brand buttons */
 [class*="lookFilled"][class*="colorBrand"] {
   background: linear-gradient(140deg, var(--rp-primary), var(--rp-tertiary)) !important;
   border: none !important;
 }
 
-/* Sidebar channel active */
 [class*="selected"] [class*="channelName"] {
   color: var(--rp-primary) !important;
 }

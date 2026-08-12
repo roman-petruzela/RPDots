@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Steam launcher — Wayland + NVIDIA optimized
 exec env \
     SDL_VIDEODRIVER=wayland \
     STEAM_FRAME_FORCE_CLOSE=1 \

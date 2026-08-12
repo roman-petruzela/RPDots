@@ -3,7 +3,6 @@ set -euo pipefail
 
 DOTFILES="$(cd "$(dirname "$0")" && pwd)"
 
-# Packages to install (pacman)
 PKGS=(
     niri
     waybar
@@ -34,8 +33,6 @@ PKGS=(
     nwg-look
     qt5ct
     qt6ct
-    # Thunar + to, co potřebuje: xfce4-settings dodává xfce4-mime-helper,
-    # bez kterého Thunar neumí "Open Terminal Here"
     thunar
     thunar-archive-plugin
     thunar-volman
@@ -48,36 +45,36 @@ PKGS=(
 )
 
 install_packages() {
-    echo "Instaluji balíčky..."
+    echo "Installing packages..."
     local missing=()
     for pkg in "${PKGS[@]}"; do
         pacman -Qi "$pkg" &>/dev/null || missing+=("$pkg")
     done
     if [[ ${#missing[@]} -gt 0 ]]; then
-        echo "Chybějící: ${missing[*]}"
+        echo "Missing: ${missing[*]}"
         sudo pacman -S --needed "${missing[@]}"
     else
-        echo "Všechny balíčky jsou nainstalované."
+        echo "All packages are already installed."
     fi
 }
 
 stow_dotfiles() {
-    echo "Symlinkuji konfigurace pomocí stow..."
+    echo "Symlinking configs with stow..."
     cd "$DOTFILES"
     stow --target="$HOME" --restow .
-    echo "Hotovo."
+    echo "Done."
 }
 
 echo "=== Dotfiles install ==="
 echo "Dotfiles: $DOTFILES"
 echo ""
 
-echo "Co chceš udělat?"
-select action in "Instalovat balíčky" "Symlinkovat konfigurace (stow)" "Oboje" "Zrušit"; do
+echo "What do you want to do?"
+select action in "Install packages" "Symlink configs (stow)" "Both" "Cancel"; do
     case "$action" in
-        "Instalovat balíčky") install_packages; break ;;
-        "Symlinkovat konfigurace (stow)") stow_dotfiles; break ;;
-        "Oboje") install_packages; stow_dotfiles; break ;;
-        "Zrušit") exit 0 ;;
+        "Install packages") install_packages; break ;;
+        "Symlink configs (stow)") stow_dotfiles; break ;;
+        "Both") install_packages; stow_dotfiles; break ;;
+        "Cancel") exit 0 ;;
     esac
 done

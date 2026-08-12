@@ -10,7 +10,6 @@ r=$((16#${hex:0:2}))
 g=$((16#${hex:2:2}))
 b=$((16#${hex:4:2}))
 
-# Relative luminance proxy for dark/light detection.
 lum=$(( (2126 * r + 7152 * g + 722 * b) / 10000 ))
 
 if (( lum >= 140 )); then

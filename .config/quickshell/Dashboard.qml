@@ -37,7 +37,6 @@ PanelWindow {
         }
     }
 
-    // Dismiss on click outside panel
     MouseArea {
         anchors.fill: parent
         onClicked: root.visible = false
@@ -54,7 +53,6 @@ PanelWindow {
                        Qt.color(Colors.surfaceContainer).g,
                        Qt.color(Colors.surfaceContainer).b, 0.90)
 
-        // Left border
         Rectangle {
             x: 0; y: 0; width: 1; height: parent.height
             color: Colors.outlineVariant
@@ -63,7 +61,6 @@ PanelWindow {
 
         MouseArea { anchors.fill: parent }
 
-        // Content with fade-in
         Item {
             anchors.fill: parent
             opacity: 1.0 - (slideX / 380) * 0.4
@@ -86,19 +83,16 @@ PanelWindow {
                     width: parent.width
                     spacing: 0
 
-                    // ── Clock ──────────────────────────────────────
                     ClockWidget { width: parent.width }
 
                     Item { width: parent.width; height: 12 }
 
-                    // ── Network ────────────────────────────────────
                     NetworkWidget { width: parent.width }
 
                     Item { width: parent.width; height: 20 }
                     Divider { width: parent.width }
                     Item { width: parent.width; height: 16 }
 
-                    // ── System ─────────────────────────────────────
                     SectionLabel { title: "System" }
                     Item { width: parent.width; height: 10 }
                     SystemWidget { width: parent.width }
@@ -107,7 +101,6 @@ PanelWindow {
                     Divider { width: parent.width; visible: mediaWidget.visible }
                     Item { width: parent.width; height: mediaWidget.visible ? 16 : 0; visible: mediaWidget.visible }
 
-                    // ── Media ──────────────────────────────────────
                     SectionLabel { title: "Now Playing"; visible: mediaWidget.visible }
                     Item { width: parent.width; height: mediaWidget.visible ? 10 : 0; visible: mediaWidget.visible }
                     MediaWidget { id: mediaWidget; width: parent.width }
@@ -116,7 +109,6 @@ PanelWindow {
                     Divider { width: parent.width }
                     Item { width: parent.width; height: 16 }
 
-                    // ── Calendar ───────────────────────────────────
                     SectionLabel { title: "Calendar" }
                     Item { width: parent.width; height: 10 }
                     CalendarWidget { width: parent.width }
@@ -125,7 +117,6 @@ PanelWindow {
                     Divider { width: parent.width }
                     Item { width: parent.width; height: 14 }
 
-                    // ── Quick Actions ──────────────────────────────
                     QuickActionsWidget { width: parent.width }
 
                     Item { width: parent.width; height: 8 }
