@@ -7,7 +7,7 @@ Item {
     implicitWidth: 340
     implicitHeight: 44
 
-    Process { id: shotProc;  command: ["bash", "-c", "~/.local/bin/screenshot-area.sh"] }
+    Process { id: shotProc;  command: ["niri", "msg", "action", "screenshot"] }
     Process { id: lockProc;  command: ["swaylock"] }
     Process { id: quitProc;  command: ["niri", "msg", "action", "quit"] }
 

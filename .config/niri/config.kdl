@@ -114,9 +114,45 @@ window-rule {
     match app-id=r#"^blueman-manager$"#
     open-floating true
 }
+// Pozor na velikost písmen: skutečné app-id je "Spotify", ne "spotify",
+// a niri porovnává regexem citlivým na velikost — bez (?i) pravidlo nesedlo.
+// (Pod nativním Waylandem hlásí Spotify "spotify" malým, takže (?i) drží obojí.)
+//
+// Průhlednost tady musí dělat kompozitor, na rozdíl od Vesktopu. Vesktop je
+// Electron a v settings.json má `transparent: true`, čímž si sám vyrobí okno
+// s alfa kanálem; CSS pak jen odkryje kořenové plochy. Spotify je CEF a žádný
+// takový přepínač nemá — změřeno na třech cestách, ve všech zůstalo okno krycí
+// (korelace pixelů s tapetou r ≈ -0,06, čili nula):
+//   1) X11/XWayland + --enable-transparent-visuals
+//   2) nativní Wayland (--ozone-platform=wayland)
+//   3) --default-background-color=00000000 na obou
+// Kontrola, že CSS vůbec zabírá, proběhla přes dočasné #ff0000 — okno zčervenalo.
+//
+// Zbývá tedy `opacity`, a ta má jednu daň: prosvítí celé okno včetně textu,
+// ne jen pozadí jako v GTK. Rozdělit to nejde — kompozitor vidí jen hotové
+// pixely okna a text od pozadí v nich nerozezná. Hodnota je schválně stejná
+// jako `background_opacity` v kitty, aby rice držel jednu průhlednost.
+//
+// Zkoušelo se i obejít to rozmazanou tapetou vepsanou do CSS (okno by zůstalo
+// krycí a průhledné by vypadalo jen pozadí). Text tak sice ostrý byl, ale
+// celkově to vypadalo hůř, tak se to zahodilo.
 window-rule {
-    match app-id="^spotify$"
-    open-on-workspace "spotify"
+    match app-id="(?i)^spotify$"
+    opacity 0.75
+    draw-border-with-background false
+}
+// niri kreslí focus-ring za oknem, a u oken s CSD jako vyplněný obdélník, ne
+// jako dutý prstenec. Zed má průhledné pozadí, takže se skrz něj místo tapety
+// dívá právě ten obdélník — a protože je aktivní barva jasný gradient
+// (#7aa2ff → #9d7cff) a neaktivní tmavá (#4f4568), vypadá to, jako by
+// průhlednost mizela přesně ve chvíli, kdy okno dostane focus.
+// Thunar se to netýká: prefer-no-csd + MiscUseCsd=FALSE mu dávají SSD.
+// Vesktop má stejný problém ze stejného důvodu — frameless:true v jeho
+// nastavení znamená CSD, takže mu focus-ring prosvítá průhledným pozadím.
+window-rule {
+    match app-id=r#"^dev\.zed\.Zed$"#
+    match app-id=r#"^vesktop$"#
+    draw-border-with-background false
 }
 /-window-rule {
     match app-id=r#"^org\.keepassxc\.KeePassXC$"#
@@ -278,10 +314,13 @@ binds {
     Mod+Shift+V { switch-focus-between-floating-and-tiling; }
     Mod+W { toggle-column-tabbed-display; }
     Mod+Space       { switch-layout "next"; }
-    Print { spawn-sh "~/.local/bin/screenshot-area.sh"; }
-    Mod+Shift+S { spawn-sh "~/.local/bin/screenshot-area.sh"; }
-    Ctrl+Print { spawn-sh "~/.local/bin/screenshot-area.sh"; }
-    Alt+Print { spawn-sh "~/.local/bin/screenshot-area.sh"; }
+    // niri's own screenshot UI instead of slurp+grim: it renders a captured
+    // snapshot, so the screen is frozen while you drag out the region. Saves to
+    // screenshot-path and copies to the clipboard, same as the old script did.
+    Print { screenshot; }
+    Mod+Shift+S { screenshot; }
+    Ctrl+Print { screenshot; }
+    Alt+Print { screenshot; }
     Mod+Shift+W { spawn-sh "~/.local/bin/pick-wallpaper.sh"; }
     Mod+Shift+D hotkey-overlay-title="Dashboard: quickshell" { spawn "qs" "ipc" "call" "dashboard" "toggle"; }
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }

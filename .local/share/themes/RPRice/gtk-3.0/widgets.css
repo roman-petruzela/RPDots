@@ -1,41 +1,58 @@
-/* RPRice — GTK3 widget rules.
- *
- * Static: it only ever references @-color names. The palette behind those names
- * is generated per wallpaper by matugen into gtk.css / gtk-dark.css, which
- * import Adwaita first, then define the colors, then import this file.
- *
- * Adwaita in GTK 3.24 bakes most of its colors in as literals rather than
- * reading @theme_* colors, so overriding the @define-colors is not enough —
- * anything that should follow the wallpaper needs an explicit rule here.
- */
+@define-color rp_tint        mix(@m3_primary_container, @m3_primary, 0.18);
 
-/* --- tint & transparency -------------------------------------------------
- * Two knobs, both here:
- *
- *   mix(..., @m3_primary, N)  how much of the wallpaper's primary is mixed into
- *                             the surface. Higher = more colourful. 0 = plain M3.
- *   alpha(..., N)             opacity. 1.0 = solid. Menus and popovers stay near
- *                             opaque on purpose so text over the wallpaper is
- *                             still readable.
- *
- * Selections keep alpha 1.0 — a translucent selection over a busy wallpaper is
- * unreadable.
- */
-@define-color rp_window      alpha(mix(@theme_bg_color, @m3_primary, 0.14), 0.86);
-@define-color rp_surface     alpha(mix(@m3_surface_container, @m3_primary, 0.22), 0.80);
-@define-color rp_surface_hi  alpha(mix(@m3_surface_container_high, @m3_primary, 0.22), 0.88);
-@define-color rp_surface_hii alpha(mix(@m3_surface_container_highest, @m3_primary, 0.22), 0.92);
-@define-color rp_view        alpha(mix(@m3_surface_container_lowest, @m3_primary, 0.10), 0.78);
-@define-color rp_base        alpha(mix(@theme_base_color, @m3_primary, 0.18), 0.90);
-@define-color rp_popover     alpha(mix(@m3_surface_container_high, @m3_primary, 0.22), 0.97);
-@define-color rp_sel         mix(@m3_primary_container, @m3_primary, 0.45);
-@define-color rp_sel_soft    mix(@m3_secondary_container, @m3_primary, 0.38);
+/* Alphas are tuned so the *effective* opacity lands on kitty's 0.75, since the
+ * window sits behind everything else and the two multiply out:
+ *   file list  1-(1-0.55)(1-0.46) = 0.76
+ *   chrome     1-(1-0.55)(1-0.55) = 0.80
+ * Anything that carries text directly on its own background — dialogs, menus,
+ * popovers — stays near opaque instead; at 0.75 that text is unreadable over a
+ * busy wallpaper. */
+/* The colours themselves come from the matugen template (rp_*_base), which pins
+ * lightness and saturation and takes only the hue from the wallpaper. That is
+ * what lets the Zed theme emit byte-identical surfaces from the same
+ * expressions — see the comment in templates/gtk3-dark.css. Only the alphas
+ * are decided here. */
+@define-color rp_window      alpha(@rp_window_base, 0.55);
+@define-color rp_surface     alpha(@rp_surface_base, 0.55);
+@define-color rp_surface_hi  alpha(@rp_surface_hi_base, 0.62);
+@define-color rp_surface_hii alpha(@rp_surface_hii_base, 0.72);
+@define-color rp_view        alpha(@rp_view_base, 0.46);
+@define-color rp_base        alpha(@rp_entry_base, 0.65);
+@define-color rp_popover     alpha(@rp_surface_hi_base, 0.97);
+@define-color rp_dialog      alpha(@rp_window_base, 0.96);
+/* Selections stay near the container tone. Pulling them further towards
+ * @m3_primary looks punchier but lifts the background luminance under
+ * @m3_on_primary_container text: at 0.42 the contrast is only ~3.2:1, at 0.20
+ * it is ~4.9:1. Treat 0.25 as the ceiling. */
+@define-color rp_sel         @rp_sel_base;
+@define-color rp_sel_soft    @rp_sel_soft_base;
 
-/* --- surfaces ----------------------------------------------------------- */
+@define-color borders        mix(@m3_outline, @rp_tint, 0.55);
+
+/* Split view, inactive pane. Thunar loads its own stylesheet above the theme
+ * with `.split-view-inactive-pane .view { background-color: @theme_unfocused_bg_color; }`,
+ * and provider priority beats specificity — no selector here can outrank it.
+ * The rule resolves the colour by name though, and Adwaita only defines
+ * @theme_unfocused_bg_color without ever using it, so redefining it is the way
+ * in and touches nothing else. Lighter and more opaque than @rp_view so the
+ * pane still reads as inactive. */
+@define-color theme_unfocused_bg_color alpha(@rp_unfocused_base, 0.52);
+
 window,
-dialog,
 .background {
   background-color: @rp_window;
+  color: @theme_fg_color;
+}
+
+/* Dialogs put label text straight onto the window background, so they get their
+ * own near-opaque colour. GTK3 really does name these nodes `dialog` and
+ * `messagedialog`, and `.background` matches them too — hence the qualified
+ * selectors, which outrank it (0,1,1 vs 0,1,0) instead of relying on order. */
+dialog,
+dialog.background,
+messagedialog,
+messagedialog.background {
+  background-color: @rp_dialog;
   color: @theme_fg_color;
 }
 
@@ -82,7 +99,6 @@ paned > separator {
   background-image: none;
 }
 
-/* Sidebar — Thunar's shortcuts pane and tree pane both carry .sidebar */
 .sidebar,
 .sidebar .view,
 .sidebar treeview.view,
@@ -93,8 +109,6 @@ paned > separator {
   color: @theme_fg_color;
 }
 
-/* --- selection ---------------------------------------------------------- */
-/* Adwaita hardcodes #3584e4 here, so every selectable node is restated. */
 treeview.view:selected,
 treeview.view:selected:focus,
 treeview.view:selected:hover,
@@ -112,7 +126,6 @@ textview text selection {
   color: @m3_on_primary_container;
 }
 
-/* Sidebar selection gets the softer secondary tone so it reads as chrome. */
 .sidebar treeview.view:selected,
 .sidebar treeview.view:selected:focus,
 .sidebar .view:selected,
@@ -125,7 +138,7 @@ textview text selection {
 treeview.view:hover,
 iconview:hover,
 list row:hover {
-  background-color: alpha(@m3_primary, 0.10);
+  background-color: alpha(@m3_primary, 0.20);
 }
 
 menuitem:hover,
@@ -135,7 +148,6 @@ menu menuitem:hover {
   color: @m3_on_primary_container;
 }
 
-/* --- controls ----------------------------------------------------------- */
 button {
   background-image: none;
   background-color: @rp_surface_hi;
@@ -200,8 +212,6 @@ radio:checked {
   border-color: @m3_primary;
 }
 
-/* --- Thunar ------------------------------------------------------------- */
-/* .standard-view is the file area (icon / detailed / compact view). */
 .standard-view,
 .standard-view.view,
 .standard-view treeview.view,
@@ -210,9 +220,6 @@ radio:checked {
   color: @theme_fg_color;
 }
 
-/* Thunar's icon view is ExoIconView, not GtkIconView, so its CSS node is not
- * called "iconview" — the .standard-view class is the only reliable handle.
- * It renders items through the view's own style context, hence :selected here. */
 .standard-view:selected,
 .standard-view:selected:focus,
 .standard-view .view:selected,
@@ -221,7 +228,20 @@ radio:checked {
   color: @m3_on_primary_container;
 }
 
-/* Column headers of the detailed list view */
+/* Standalone image preview pane (MiscImagePreviewMode=..._STANDALONE). */
+.preview-pane,
+.preview-pane .view,
+.preview-pane scrolledwindow {
+  background-color: @rp_surface;
+  color: @theme_fg_color;
+}
+
+.preview-pane:backdrop,
+.preview-pane .view:backdrop {
+  background-color: @rp_surface;
+  color: @theme_fg_color;
+}
+
 .standard-view treeview.view header button,
 treeview.view header button {
   background-image: none;
@@ -230,7 +250,6 @@ treeview.view header button {
   border-color: @borders;
 }
 
-/* Breadcrumb path bar */
 .path-bar,
 .path-bar button,
 .location-button {
@@ -242,7 +261,7 @@ treeview.view header button {
 
 .path-bar button:hover,
 .location-button:hover {
-  background-color: alpha(@m3_primary, 0.14);
+  background-color: alpha(@m3_primary, 0.24);
   color: @theme_fg_color;
 }
 
@@ -252,15 +271,18 @@ treeview.view header button {
   color: @m3_on_primary_container;
 }
 
-/* --- backdrop ------------------------------------------------------------ */
-/* Adwaita ships :backdrop variants, and element:backdrop (0,1,1) outranks a
- * plain element selector (0,0,1) — without these an unfocused window silently
- * falls back to Adwaita's greys. Thunar's window carries the .thunar class. */
 window:backdrop,
-dialog:backdrop,
 .background:backdrop,
 window.thunar:backdrop {
   background-color: @rp_window;
+  color: @theme_fg_color;
+}
+
+/* Needs the class too: `.background:backdrop` is (0,2,0) and would otherwise
+ * outrank a plain `dialog:backdrop` (0,1,1). */
+dialog.background:backdrop,
+messagedialog.background:backdrop {
+  background-color: @rp_dialog;
   color: @theme_fg_color;
 }
 

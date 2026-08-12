@@ -66,4 +66,18 @@
 @define-color m3_surface_container_high {{colors.surface_container_high.light.hex}};
 @define-color m3_surface_container_highest {{colors.surface_container_highest.light.hex}};
 
+/* --- RPRice surfaces -----------------------------------------------------
+ * Same construction as gtk3-dark.css, light lightness values. See the comment
+ * there for why the formula lives in the template and not in widgets.css.
+ */
+@define-color rp_window_base     {{ colors.primary_container.light.hex | to_color | set_lightness: 93 | set_saturation: 57 }};
+@define-color rp_surface_base    {{ colors.primary_container.light.hex | to_color | set_lightness: 89 | set_saturation: 45 }};
+@define-color rp_surface_hi_base {{ colors.primary_container.light.hex | to_color | set_lightness: 88 | set_saturation: 42 }};
+@define-color rp_surface_hii_base {{ colors.primary_container.light.hex | to_color | set_lightness: 87 | set_saturation: 39 }};
+@define-color rp_view_base       {{ colors.primary_container.light.hex | to_color | set_lightness: 94 | set_saturation: 53 }};
+@define-color rp_entry_base      {{ colors.primary_container.light.hex | to_color | set_lightness: 92 | set_saturation: 49 }};
+@define-color rp_unfocused_base  {{ colors.primary_container.light.hex | to_color | set_lightness: 92 | set_saturation: 38 }};
+@define-color rp_sel_base        {{ colors.primary_container.light.hex | to_color | set_lightness: 83 | set_saturation: 51 }};
+@define-color rp_sel_soft_base   {{ colors.secondary_container.light.hex | to_color | set_lightness: 83 | set_saturation: 43 }};
+
 @import url("widgets.css");

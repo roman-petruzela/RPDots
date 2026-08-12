@@ -1,19 +1,29 @@
+/* Povrchy se počítají stejnými výrazy jako v gtk3-dark.css a zed-theme.json —
+ * z primary_container se napevno určí světlost a sytost a z tapety se bere jen
+ * odstín. M3 povrchy (surface_container_*) jsou v tmavém schématu skoro
+ * neutrální, takže Spotify vycházelo téměř černé, zatímco zbytek rice byl
+ * probarvený. Dvojice set_lightness / set_saturation musí zůstat shodné se
+ * zbylými dvěma šablonami — když se mění, mění se na všech třech místech.
+ *
+ * Tóny jsou tady plné, bez alfy. Průhlednost Spotify nedělá CSS, ale kompozitor
+ * (`opacity` ve window-rule v niri) — proč to jinak nejde, viz komentář tamtéž.
+ */
 :root {
-  --spice-text:              {{colors.on_surface.default.hex}};
-  --spice-subtext:           {{colors.on_surface_variant.default.hex}};
-  --spice-main:              {{colors.surface_container_lowest.default.hex}};
-  --spice-main-elevated:     {{colors.surface_container.default.hex}};
-  --spice-sidebar:           {{colors.surface_container_high.default.hex}};
-  --spice-player:            {{colors.surface_container_lowest.default.hex}};
-  --spice-card:              {{colors.surface_container.default.hex}};
-  --spice-button:            {{colors.primary.default.hex}};
-  --spice-button-active:     {{colors.tertiary.default.hex}};
-  --spice-button-disabled:   {{colors.outline.default.hex}};
-  --spice-tab-active:        {{colors.secondary.default.hex}};
-  --spice-notification:      {{colors.primary.default.hex}};
-  --spice-notification-error:{{colors.error.default.hex}};
-  --spice-misc:              {{colors.primary.default.hex}};
-  --spice-selected-row:      {{colors.primary_container.default.hex}};
+  --spice-text:              {{colors.on_surface.dark.hex}};
+  --spice-subtext:           {{colors.on_surface_variant.dark.hex}};
+  --spice-main:              {{ colors.primary_container.dark.hex | to_color | set_lightness: 18 | set_saturation: 30 }};
+  --spice-main-elevated:     {{ colors.primary_container.dark.hex | to_color | set_lightness: 28 | set_saturation: 29 }};
+  --spice-sidebar:           {{ colors.primary_container.dark.hex | to_color | set_lightness: 28 | set_saturation: 29 }};
+  --spice-player:            {{ colors.primary_container.dark.hex | to_color | set_lightness: 21 | set_saturation: 29 }};
+  --spice-card:              {{ colors.primary_container.dark.hex | to_color | set_lightness: 30 | set_saturation: 27 }};
+  --spice-button:            {{colors.primary.dark.hex}};
+  --spice-button-active:     {{colors.tertiary.dark.hex}};
+  --spice-button-disabled:   {{colors.outline.dark.hex}};
+  --spice-tab-active:        {{colors.secondary.dark.hex}};
+  --spice-notification:      {{colors.primary.dark.hex}};
+  --spice-notification-error:{{colors.error.dark.hex}};
+  --spice-misc:              {{colors.primary.dark.hex}};
+  --spice-selected-row:      {{ colors.primary_container.dark.hex | to_color | set_lightness: 43 | set_saturation: 33 }};
   --spice-shadow:            #000000;
-  --spice-border:            {{colors.outline_variant.default.hex}};
+  --spice-border:            {{colors.outline_variant.dark.hex}};
 }
