@@ -1,27 +1,44 @@
 import QtQuick
 import "Colors.js" as Colors
 
+// Řádek statistiky: název, doplňující údaj, proužek a procenta.
+// `detail` nese to, co samotné procento neřekne — teplota, zaplněné GiB,
+// zbývající čas baterie.
 Item {
     property string label:    ""
+    property string detail:   ""
     property real   value:    0.0
     property color  barColor: Colors.primary
 
     implicitWidth:  300
-    implicitHeight: 36
+    implicitHeight: 30
 
     Row {
         anchors.fill: parent
+        spacing: 8
 
         Text {
-            width: 52
+            width: 42
             anchors.verticalCenter: parent.verticalCenter
             text: label
             font.pixelSize: 12
+            font.family: "JetBrainsMono Nerd Font"
             color: Colors.onSurfaceVariant
         }
 
+        Text {
+            width: 96
+            anchors.verticalCenter: parent.verticalCenter
+            text: detail
+            elide: Text.ElideRight
+            horizontalAlignment: Text.AlignRight
+            font.pixelSize: 10
+            font.family: "JetBrainsMono Nerd Font"
+            color: Colors.outline
+        }
+
         Item {
-            width: parent.width - 52 - 40
+            width: parent.width - 42 - 96 - 42 - 24
             height: parent.height
 
             Rectangle {
@@ -43,12 +60,12 @@ Item {
         }
 
         Text {
-            width: 40
+            width: 42
             anchors.verticalCenter: parent.verticalCenter
-            text: Math.round(value) + "%"
+            text: Math.round(value) + " %"
             font.pixelSize: 12
             font.weight: Font.Medium
-            font.family: "JetBrains Mono"
+            font.family: "JetBrainsMono Nerd Font"
             color: Colors.onSurface
             horizontalAlignment: Text.AlignRight
         }
