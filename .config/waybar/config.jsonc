@@ -51,7 +51,14 @@
     "format": "{icon} {volume}%",
     "format-muted": " ",
     "format-icons": { "default": ["", "", ""] },
-    "on-click": "~/.local/bin/control-panel.sh",
+    "tooltip-format": "{desc}\n{volume} %",
+    // levý = přepínač výstupů, pravý = pavucontrol, prostřední = ztlumit
+    "on-click": "qs ipc call audio toggle",
+    "on-click-right": "pavucontrol",
+    "on-click-middle": "~/.local/bin/rp-audio mute",
+    // kolečko mění hlasitost na všech výstupech naráz
+    "on-scroll-up": "~/.local/bin/rp-audio volume up",
+    "on-scroll-down": "~/.local/bin/rp-audio volume down",
   },
   "backlight": { "format": "󰃟 {percent}%" },
   "network": {

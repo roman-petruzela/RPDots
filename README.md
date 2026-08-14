@@ -8,7 +8,7 @@ Niri rice for Arch / CachyOS. Glassmorphism, Material You colors generated from 
 |---|---|
 | Compositor | [niri](https://github.com/YaLTeR/niri) |
 | Bar | [waybar](https://github.com/Alexays/Waybar) |
-| Dashboard / OSD | [quickshell](https://quickshell.outfoxxed.me/) |
+| Dashboard / OSD / audio switcher | [quickshell](https://quickshell.outfoxxed.me/) |
 | Terminal | [kitty](https://github.com/kovidgoyal/kitty) |
 | Launcher | [fuzzel](https://codeberg.org/dnkl/fuzzel) |
 | Notifications | [mako](https://github.com/emersion/mako) |
@@ -136,6 +136,47 @@ configured in `.config/xfce4/helpers.rc`), `tumbler` for thumbnails
 (`ffmpegthumbnailer` for video, `poppler-glib` for PDF, `libgsf` for documents),
 and `gvfs` + `gvfs-smb` / `gvfs-afc` for mounting.
 
+## Audio
+
+One output for everything, switchable from the bar. Three parts:
+
+**WirePlumber** (`.config/wireplumber/wireplumber.conf.d/51-rp-audio.conf`) sets
+`node.stream.restore-target = false` and `linking.follow-default-target = true`:
+apps never remember which device they last played on, and running streams move
+along when the default output changes. Streams that request a target *themselves*
+(OBS monitoring) are unaffected — this only governs streams that asked for
+nothing.
+
+**`rp-audio`** is the single entry point for volume (`switch`, `cycle`, `volume`,
+`mute`, `unpin`, `sync`, `list`, `daemon`). It always writes volume and mute to
+**every** sink, so switching outputs is never audible as a jump.
+`niri-rice-audio-sync.service` runs `rp-audio daemon`, which watches
+`pactl subscribe` and mirrors any volume change — including ones made in
+pavucontrol — onto the other outputs, and frees newly appeared streams so they
+follow the default.
+
+`unpin` clears a stream's explicit target via `pw-metadata … target.object -1`.
+Note that `pactl move-sink-input` does the opposite: it *pins* the stream, which
+is why `qs-cycle-sink.sh` no longer uses it.
+
+Streams listed in `.config/rp-audio/blacklist.conf` (substring match against
+`application.process.binary` / `application.name` / `node.name`) are never
+touched. Capture streams are never touched either, so screen sharing with audio
+in Vesktop and capturing in OBS are unaffected by switching. **Caveat:** if OBS
+captures "Monitor of \<a specific card\>" rather than the default, switching the
+output moves the audio out from under it. Set OBS to the default device.
+
+**AudioSwitcher.qml** is the Windows-style flyout under the bar (volume icon,
+`Mod+Shift+O`, or `qs ipc call audio toggle`). It talks to
+`Quickshell.Services.Pipewire` directly rather than shelling out, and opens on
+whichever monitor niri has focused.
+
+An IpcHandler function must **not** be named `show` — it collides with the
+`qs ipc show` subcommand, and the call silently prints the signature instead of
+running. `qs ipc call` in quickshell 0.3.0 also cannot pass arguments at all,
+so the OSD reads its own value (PipeWire for volume, `brightnessctl` for
+brightness) instead of receiving one.
+
 ## Power modes
 
 `rp-power` switches CPU / dGPU / animation profiles in one step. This laptop is
@@ -209,6 +250,8 @@ that one binary, a udev rule on `ACAD`, and a oneshot unit. Unplugging drops to
 | `Mod+Q` | Close window |
 | `Mod+Shift+W` | Pick wallpaper + apply theme |
 | `Mod+Shift+D` | Dashboard |
+| `Mod+Shift+O` | Audio output switcher |
+| `Mod+Ctrl+O` | Next audio output |
 | `Mod+Shift+S` | Screenshot |
 | `Super+Alt+L` | Lock |
 | `Mod+H/J/K/L` | Focus windows |
@@ -229,7 +272,10 @@ dotfiles/
 ├── .config/
 │   ├── niri/          # compositor
 │   ├── waybar/        # bar
-│   ├── quickshell/    # dashboard + OSD
+│   ├── quickshell/    # dashboard + OSD + audio switcher
+│   ├── wireplumber/   # one output for all apps
+│   ├── rp-audio/      # blacklist for the output switcher
+│   ├── systemd/user/  # quickshell + audio sync units
 │   ├── matugen/       # color pipeline (templates)
 │   ├── kitty/  mako/  fuzzel/  swaylock/  kanshi/
 │   ├── cava/  btop/  fastfetch/

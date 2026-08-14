@@ -1,0 +1,15 @@
+[Unit]
+Description=Niri rice — společná hlasitost všech výstupů
+PartOf=graphical-session.target
+After=graphical-session.target pipewire.service wireplumber.service
+Wants=wireplumber.service
+
+[Service]
+ExecStart=%h/.local/bin/rp-audio daemon
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,9 +1,14 @@
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Services.Pipewire
 import QtQuick
 import "Colors.js" as Colors
 
+// Pozn.: IPC funkce se NESMÍ jmenovat `show` — koliduje s podpříkazem
+// `qs ipc show` a volání se pak jen vypíše místo provedení. Proto `trigger`.
+// Zároveň `qs ipc call` v quickshellu 0.3.0 neumí předat argument, takže si
+// OSD hodnotu načítá samo — hlasitost z PipeWire, jas z brightnessctl.
 Item {
     id: root
 
@@ -12,12 +17,16 @@ Item {
     property bool osdMuted: false
     property bool showing: false
 
+    readonly property PwNode sink: Pipewire.defaultAudioSink
+    PwObjectTracker { objects: root.sink ? [root.sink] : [] }
+
     IpcHandler {
         target: "osd-volume"
-        function show(value: string): void {
+        function trigger(): void {
+            if (!root.sink || !root.sink.audio) return
             root.osdType = "volume"
-            root.osdMuted = (value === "muted")
-            if (value !== "muted") root.osdValue = parseFloat(value) || 0
+            root.osdMuted = root.sink.audio.muted
+            root.osdValue = Math.round(root.sink.audio.volume * 100)
             root.showing = true
             hideTimer.restart()
         }
@@ -25,12 +34,26 @@ Item {
 
     IpcHandler {
         target: "osd-brightness"
-        function show(value: string): void {
-            root.osdType = "brightness"
-            root.osdValue = parseFloat(value) || 0
-            root.osdMuted = false
-            root.showing = true
-            hideTimer.restart()
+        function trigger(): void {
+            brightnessProc.running = false
+            brightnessProc.running = true
+        }
+    }
+
+    Process {
+        id: brightnessProc
+        command: ["brightnessctl", "--class=backlight", "-m"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                // formát: název,typ,aktuální,XX%,max
+                const pct = parseFloat((text.split(",")[3] || "").replace("%", ""))
+                if (isNaN(pct)) return
+                root.osdType = "brightness"
+                root.osdValue = pct
+                root.osdMuted = false
+                root.showing = true
+                hideTimer.restart()
+            }
         }
     }
 

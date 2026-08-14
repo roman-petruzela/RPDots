@@ -90,7 +90,11 @@ start_waybar_with_retry || true
 
 start_user_unit niri-rice-playerctld.service >/dev/null 2>&1 || true
 start_user_unit niri-rice-wallpaper-healthcheck.service >/dev/null 2>&1 || true
-start_user_unit niri-rice-waybar.service >/dev/null 2>&1 || true
+# quickshell = OSD, dashboard a přepínač zvuku (barem zůstává waybar)
+start_user_unit niri-rice-quickshell.service >/dev/null 2>&1 || true
+# společná hlasitost všech výstupů
+start_user_unit niri-rice-audio-sync.service >/dev/null 2>&1 || true
+# niri-rice-waybar.service také zakázán
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user start niri-rice-wallpaper-healthcheck.timer >/dev/null 2>&1 || true
   systemctl --user start niri-rice-waybar.timer >/dev/null 2>&1 || true
@@ -117,13 +121,8 @@ if command -v kanshi >/dev/null 2>&1; then
   ensure_pidfile_running "$PID_DIR/kanshi.pid" kanshi kanshi
 fi
 
-if command -v qs >/dev/null 2>&1; then
-  pkill -x qs 2>/dev/null || true
-  sleep 0.2
-  qs >/dev/null 2>&1 &
-  echo $! > "$PID_DIR/quickshell.pid"
-  log "quickshell started"
-fi
+# QuickShell běží jako systemd unit (viz start_user_unit výše).
+# Bar je v shell.qml vypnutý přepínačem useBar — barem je waybar.
 
 ensure_pidfile_running \
   "$PID_DIR/swayidle.pid" swayidle \

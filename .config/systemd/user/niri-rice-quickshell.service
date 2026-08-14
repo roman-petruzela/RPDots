@@ -1,0 +1,16 @@
+[Unit]
+Description=Niri rice quickshell (OSD, dashboard, přepínač zvuku)
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/qs
+ExecReload=/usr/bin/qs ipc call shell reload
+Restart=on-failure
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical-session.target
