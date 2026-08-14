@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# rp-net — podklady pro síťové okno v quickshellu.
+#
+#   rp-net status          stav sítě jako JSON
+#   rp-net wifi on|off     zapne/vypne wifi rádio
+#   rp-net connect <ssid>  připojí uloženou nebo otevřenou síť
+#   rp-net disconnect      odpojí wifi
+#   rp-net rescan          vynutí sken okolních sítí
+#
+# Parsování drží stranou od QML — okno jen konzumuje JSON.
+set -uo pipefail
+
+command -v nmcli >/dev/null 2>&1 || { echo '{"error":"nmcli není k dispozici"}'; exit 0; }
+
+# nmcli -t odděluje pole dvojtečkou a ty ve jménech escapuje zpětným lomítkem.
+# Prohodí se za \x01, rozsekají pole a vrátí zpátky — jinak by se SSID
+# s dvojtečkou rozpadlo na dva sloupce.
+# Pozn.: tr nezná \xNN, jen osmičkové \NNN — s '\x01' by nahrazovalo znaky x, 0 a 1.
+detabify() { sed 's/\\:/\x01/g'; }
+retabify() { tr '\001' ':'; }
+
+wifi_dev() {
+    nmcli -t -f DEVICE,TYPE device status 2>/dev/null |
+        awk -F: '$2 == "wifi" { print $1; exit }'
+}
+
+cmd_status() {
+    local wdev; wdev=$(wifi_dev)
+    local radio; radio=$(nmcli radio wifi 2>/dev/null)
+
+    local devices networks saved
+    devices=$(
+        nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device status 2>/dev/null | detabify |
+        awk -F: -v OFS='\t' '{ print $1, $2, $3, $4 }' | retabify |
+        jq -R -s 'split("\n") | map(select(length > 0)) | map(split("\t"))
+                  | map({ device: .[0], type: .[1], state: .[2], connection: .[3] })'
+    )
+
+    saved=$(
+        nmcli -t -f NAME,TYPE connection show 2>/dev/null | detabify |
+        awk -F: '$2 == "802-11-wireless" { print $1 }' | retabify |
+        jq -R -s 'split("\n") | map(select(length > 0))'
+    )
+
+    if [[ -n "$wdev" && "$radio" == "enabled" ]]; then
+        networks=$(
+            nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY device wifi list ifname "$wdev" 2>/dev/null | detabify |
+            awk -F: -v OFS='\t' '$2 != "" { print $1, $2, $3, $4 }' | retabify |
+            jq -R -s --argjson saved "$saved" '
+                split("\n") | map(select(length > 0)) | map(split("\t"))
+                | map({ active:   (.[0] == "*"),
+                        ssid:     .[1],
+                        signal:   ((.[2] | tonumber?) // 0),
+                        secured:  ((.[3] // "") | length > 0),
+                        saved:    (. as $r | $saved | index($r[1]) != null) })
+                # stejné SSID vysílá víc AP — nechat to s nejlepším signálem
+                | group_by(.ssid) | map(max_by(.signal))
+                | sort_by(-.signal)'
+        )
+    else
+        networks='[]'
+    fi
+
+    # IP se bere z výchozí trasy, ať sedí s tím, co ukazuje waybar
+    local route_dev route_ip
+    route_dev=$(ip route show default 2>/dev/null | awk '{print $5; exit}')
+    route_ip=$(ip -brief addr show "$route_dev" 2>/dev/null | awk '{print $3; exit}')
+
+    jq -n --argjson devices "$devices" \
+          --argjson networks "$networks" \
+          --arg radio "$radio" \
+          --arg wdev "${wdev:-}" \
+          --arg routeDev "${route_dev:-}" \
+          --arg routeIp "${route_ip:-}" '
+        {
+            wifiEnabled: ($radio == "enabled"),
+            wifiDevice:  $wdev,
+            routeDevice: $routeDev,
+            routeIp:     $routeIp,
+            ethernet:    ($devices | map(select(.type == "ethernet")) | first // null),
+            wifi:        ($devices | map(select(.type == "wifi")) | first // null),
+            networks:    $networks
+        }'
+}
+
+# Heslo se čte ze stdin a předává nmcli přes jeho vlastní dotaz (--ask), takže
+# se nikdy neobjeví v argv, kam vidí každý přes /proc. Se správným heslem se
+# připojí napoprvé; při špatném se nmcli ptá pořád dokola, proto ten timeout.
+cmd_connect() {
+    local ssid="$1" out rc
+    if [[ -t 0 ]]; then
+        out=$(timeout 25 nmcli device wifi connect "$ssid" 2>&1); rc=$?
+    else
+        out=$(timeout 25 nmcli --ask device wifi connect "$ssid" 2>&1 <&0); rc=$?
+    fi
+
+    if (( rc == 0 )); then
+        jq -n --arg ssid "$ssid" '{ ok: true, ssid: $ssid, message: "connected" }'
+    else
+        # z nmcli chodí i řádky s dotazem na heslo, ty do hlášky nepatří
+        local msg
+        msg=$(printf '%s' "$out" | grep -viE '^password|encryption keys are required' |
+              tail -n1 | sed 's/^Error: //')
+        (( rc == 124 )) && msg="wrong password or timed out"
+        jq -n --arg ssid "$ssid" --arg msg "${msg:-connection failed}" \
+              '{ ok: false, ssid: $ssid, message: $msg }'
+    fi
+}
+
+case "${1:-status}" in
+    status)     cmd_status ;;
+    wifi)       nmcli radio wifi "${2:-on}" >/dev/null 2>&1 ;;
+    connect)    shift; cmd_connect "$*" ;;
+    disconnect) nmcli device disconnect "$(wifi_dev)" >/dev/null 2>&1 ;;
+    rescan)     nmcli device wifi rescan >/dev/null 2>&1 ;;
+    *)          echo "použití: rp-net {status|wifi on|off|connect <ssid>|disconnect|rescan}" >&2; exit 1 ;;
+esac
