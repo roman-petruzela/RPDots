@@ -11,14 +11,16 @@ PanelWindow {
     visible: false
     color: "transparent"
 
-    anchors { right: true; top: true; bottom: true }
-    implicitWidth: 380
-    margins.right: 0; margins.top: 0; margins.bottom: 0
+    // Okno drží celou plochu, aby se dalo zavřít kliknutím kamkoliv mimo panel.
+    // Panel samotný zůstává 380 px vpravo.
+    anchors { left: true; right: true; top: true; bottom: true }
 
-    exclusionMode: ExclusionMode.Normal
+    exclusionMode: ExclusionMode.Ignore
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: visible
+        ? WlrKeyboardFocus.OnDemand
+        : WlrKeyboardFocus.None
 
     BackgroundEffect.blurRegion: Region { item: panel }
 
@@ -37,9 +39,22 @@ PanelWindow {
         }
     }
 
+    // U více monitorů vyjede na tom, na kterém zrovna pracuješ.
+    FocusedOutput { id: opener; window: root }
+
+    function open()   { opener.show() }
+    function toggle() { if (root.visible) root.visible = false; else root.open() }
+
+    // Zavření kliknutím mimo panel
     MouseArea {
         anchors.fill: parent
         onClicked: root.visible = false
+    }
+
+    Item {
+        anchors.fill: parent
+        focus: root.visible
+        Keys.onEscapePressed: root.visible = false
     }
 
     Rectangle {
@@ -53,6 +68,7 @@ PanelWindow {
                        Qt.color(Colors.surfaceContainer).g,
                        Qt.color(Colors.surfaceContainer).b, 0.90)
 
+        // Left border
         Rectangle {
             x: 0; y: 0; width: 1; height: parent.height
             color: Colors.outlineVariant
@@ -61,6 +77,7 @@ PanelWindow {
 
         MouseArea { anchors.fill: parent }
 
+        // Content with fade-in
         Item {
             anchors.fill: parent
             opacity: 1.0 - (slideX / 380) * 0.4
@@ -83,16 +100,19 @@ PanelWindow {
                     width: parent.width
                     spacing: 0
 
+                    // ── Clock ──────────────────────────────────────
                     ClockWidget { width: parent.width }
 
                     Item { width: parent.width; height: 12 }
 
+                    // ── Network ────────────────────────────────────
                     NetworkWidget { width: parent.width }
 
                     Item { width: parent.width; height: 20 }
                     Divider { width: parent.width }
                     Item { width: parent.width; height: 16 }
 
+                    // ── System ─────────────────────────────────────
                     SectionLabel { title: "System" }
                     Item { width: parent.width; height: 10 }
                     SystemWidget { width: parent.width }
@@ -101,6 +121,7 @@ PanelWindow {
                     Divider { width: parent.width; visible: mediaWidget.visible }
                     Item { width: parent.width; height: mediaWidget.visible ? 16 : 0; visible: mediaWidget.visible }
 
+                    // ── Media ──────────────────────────────────────
                     SectionLabel { title: "Now Playing"; visible: mediaWidget.visible }
                     Item { width: parent.width; height: mediaWidget.visible ? 10 : 0; visible: mediaWidget.visible }
                     MediaWidget { id: mediaWidget; width: parent.width }
@@ -109,6 +130,7 @@ PanelWindow {
                     Divider { width: parent.width }
                     Item { width: parent.width; height: 16 }
 
+                    // ── Calendar ───────────────────────────────────
                     SectionLabel { title: "Calendar" }
                     Item { width: parent.width; height: 10 }
                     CalendarWidget { width: parent.width }
@@ -117,7 +139,8 @@ PanelWindow {
                     Divider { width: parent.width }
                     Item { width: parent.width; height: 14 }
 
-                    QuickActionsWidget { width: parent.width }
+                    // ── Quick Actions ──────────────────────────────
+                    QuickActionsWidget { id: quickActions; width: parent.width }
 
                     Item { width: parent.width; height: 8 }
                 }
