@@ -184,7 +184,35 @@ cmd_list() {
 
 # ── daemon ─────────────────────────────────────────────────────────────────
 
+# Čerstvě přidané zařízení chvíli generuje `change` události, jak si dotahuje
+# svoje uložené hodnoty — typicky naplno. Bez téhle karantény by daemon takový
+# náběh považoval za ruční změnu a stoprocentní hlasitost roztáhl na všechno.
+SETTLE_SECS=4
+SETTLE_DIR="$STATE_DIR/settling"
+
+mark_settling() { mkdir -p "$SETTLE_DIR"; : > "$SETTLE_DIR/$1"; }
+
+is_settling() {
+    local f="$SETTLE_DIR/$1" mtime
+    [[ -e "$f" ]] || return 1
+    mtime=$(stat -c %Y "$f" 2>/dev/null || echo 0)
+    if (( $(date +%s) - mtime > SETTLE_SECS )); then
+        rm -f "$f"
+        return 1
+    fi
+    return 0
+}
+
+apply_global_to() {
+    local id="$1" flag
+    [[ "$(global_mute)" == "yes" ]] && flag=1 || flag=0
+    pactl set-sink-volume "$id" "$(global_vol)" 2>/dev/null || true
+    pactl set-sink-mute   "$id" "$flag"         2>/dev/null || true
+}
+
 cmd_daemon() {
+    rm -rf "$SETTLE_DIR"; mkdir -p "$SETTLE_DIR"
+
     # Startovní srovnání podle právě zvoleného výchozího výstupu.
     echo "$(raw_of  @DEFAULT_SINK@)" > "$VOL_STATE"
     echo "$(mute_of @DEFAULT_SINK@)" > "$MUTE_STATE"
@@ -202,15 +230,23 @@ cmd_daemon() {
             sink)
                 case "$ev" in
                     new)
-                        # nové zařízení rovnou srovnat s ostatními
-                        pactl set-sink-volume "$id" "$(global_vol)"  2>/dev/null || true
-                        pactl set-sink-mute   "$id" "$([[ "$(global_mute)" == yes ]] && echo 1 || echo 0)" 2>/dev/null || true
+                        mark_settling "$id"
+                        apply_global_to "$id"
                         ;;
                     change)
+                        # Během náběhu zařízení se jeho hodnoty nepřebírají,
+                        # jen se mu vnucují ty společné.
+                        if is_settling "$id"; then
+                            apply_global_to "$id"
+                            continue
+                        fi
                         raw=$(raw_of "$id")
                         mute=$(mute_of "$id")
                         [[ -n "$raw"  && "$raw"  != "$(global_vol)"  ]] && set_all_raw  "$raw"
                         [[ -n "$mute" && "$mute" != "$(global_mute)" ]] && set_all_mute "$mute"
+                        ;;
+                    remove)
+                        rm -f "$SETTLE_DIR/$id"
                         ;;
                 esac
                 ;;
