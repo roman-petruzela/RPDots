@@ -4,33 +4,26 @@ set -euo pipefail
 CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/fastfetch"
 CFG_FILE="$CFG_DIR/config.jsonc"
-BASE_IMG="$CFG_DIR/Profilovka01kolecko.png"
-LOGO_OUT="$CACHE_DIR/dynamic_logo.png"
+BASE_IMG="$CFG_DIR/rplogo.png"
+LOGO_OUT="$CACHE_DIR/rplogo-small.png"
+# Terminal logo only ever displays at --logo-width 16 cells; the source PNG is
+# 2000x2000, and sending that much data over the kitty graphics protocol on
+# every run silently fails (fastfetch reserves no space for it at all).
+LOGO_TARGET_SIZE=256
 mkdir -p "$CACHE_DIR"
 
-# Generate recolored logo using matugen colors available in module env
-generate_logo() {
-    [[ -f "$BASE_IMG" ]] || return 1
-    command -v magick >/dev/null 2>&1 || return 1
-    [[ -n "${color7:-}" && -n "${color1:-}" ]] || return 1
-
-    local w
-    w="$(magick identify -format "%w" "$BASE_IMG" 2>/dev/null)" || return 1
-    local r=$(( w / 2 ))
-
-    magick -size "${w}x${w}" xc:transparent \
-        -fill "${color7}" -draw "circle ${r},${r} ${r},0" \
-        \( "$BASE_IMG" -negate -transparent black -fill "${color1}" -colorize 100% \) \
-        -composite "$LOGO_OUT" 2>/dev/null
-}
-
 logo_source="$BASE_IMG"
-logo_type="kitty"
+# fastfetch's own kitty-protocol implementation ("kitty") renders nothing on this
+# setup; kitty-icat shells out to kitty's own `kitten icat`, which is the
+# reference implementation and far less likely to have protocol edge cases.
+logo_type="kitty-icat"
 
-if generate_logo; then
-    logo_source="$LOGO_OUT"
-elif [[ -f "$LOGO_OUT" ]]; then
-    logo_source="$LOGO_OUT"
+if command -v magick >/dev/null 2>&1 && [[ -f "$BASE_IMG" ]]; then
+    if magick "$BASE_IMG" -resize "${LOGO_TARGET_SIZE}x${LOGO_TARGET_SIZE}" -depth 8 "$LOGO_OUT" 2>/dev/null; then
+        logo_source="$LOGO_OUT"
+    elif [[ -f "$LOGO_OUT" ]]; then
+        logo_source="$LOGO_OUT"
+    fi
 fi
 
 cat > "$CFG_FILE" <<'EOF'
@@ -39,7 +32,7 @@ cat > "$CFG_FILE" <<'EOF'
   "logo": {
     "source": "__LOGO_SOURCE__",
     "type": "__LOGO_TYPE__",
-    "width": 16
+    "width": 24
   },
   "display": {
     "separator": " : ",
@@ -49,7 +42,7 @@ cat > "$CFG_FILE" <<'EOF'
       "type": "command",
       "key": "  ",
       "keyColor": "blue",
-      "text": "if command -v hyprctl >/dev/null 2>&1; then hyprctl splash 2>/dev/null || echo 'Niri Rice'; else echo 'Niri Rice'; fi"
+      "text": "if command -v hyprctl >/dev/null 2>&1; then hyprctl splash 2>/dev/null || echo 'RPRice'; else echo 'RPRice'; fi"
     },
     {
       "type": "custom",
