@@ -7,6 +7,7 @@
 .config/swaylock/config
 .config/cava/config
 .config/fuzzel/fuzzel.ini
+.config/nvim/lua/matugen_colors.lua
 
 # GTK témata generovaná matugenem (šablony jsou v .config/matugen/templates/)
 .local/share/themes/RPRice/gtk-3.0/gtk.css

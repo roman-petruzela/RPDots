@@ -99,3 +99,7 @@ output_path = "~/.cache/niri-rice/colors.sh"
 [templates.fuzzel]
 input_path = "~/.config/matugen/templates/fuzzel.ini"
 output_path = "~/.config/fuzzel/fuzzel.ini"
+
+[templates.nvim-colors]
+input_path = "~/.config/matugen/templates/nvim-colors.lua"
+output_path = "~/.config/nvim/lua/matugen_colors.lua"
