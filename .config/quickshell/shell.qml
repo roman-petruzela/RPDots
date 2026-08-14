@@ -8,9 +8,7 @@ ShellRoot {
     id: root
 
     // Barem je waybar — quickshell tu jede jen kvůli OSD, dashboardu
-    // a přepínači zvuku. Přepni na true, pokud chceš zpátky qs bar.
-    property bool useBar: false
-
+    // a přepínačům pod barem.
     IpcHandler {
         target: "dashboard"
         function toggle(): void { root.openFlyout(dashboard, true) }
@@ -56,12 +54,6 @@ ShellRoot {
         function reload(): void {
             Quickshell.reload(true)
         }
-    }
-
-    // Bar on every connected screen
-    Variants {
-        model: root.useBar ? Quickshell.screens : []
-        delegate: Bar {}
     }
 
     Dashboard {
