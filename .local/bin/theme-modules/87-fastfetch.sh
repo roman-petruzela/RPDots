@@ -2,32 +2,44 @@
 set -euo pipefail
 
 CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/fastfetch"
 CFG_FILE="$CFG_DIR/config.jsonc"
-LOGO_HELPER="$HOME/.local/bin/fastfetch-logo.sh"
-logo_source=""
+BASE_IMG="$CFG_DIR/Profilovka01kolecko.png"
+LOGO_OUT="$CACHE_DIR/dynamic_logo.png"
+mkdir -p "$CACHE_DIR"
+
+# Generate recolored logo using matugen colors available in module env
+generate_logo() {
+    [[ -f "$BASE_IMG" ]] || return 1
+    command -v magick >/dev/null 2>&1 || return 1
+    [[ -n "${color7:-}" && -n "${color1:-}" ]] || return 1
+
+    local w
+    w="$(magick identify -format "%w" "$BASE_IMG" 2>/dev/null)" || return 1
+    local r=$(( w / 2 ))
+
+    magick -size "${w}x${w}" xc:transparent \
+        -fill "${color7}" -draw "circle ${r},${r} ${r},0" \
+        \( "$BASE_IMG" -negate -transparent black -fill "${color1}" -colorize 100% \) \
+        -composite "$LOGO_OUT" 2>/dev/null
+}
+
+logo_source="$BASE_IMG"
 logo_type="kitty"
 
-# Prioritně zkusíme načíst náš dynamický pywal smajlík
-if [[ -x "$LOGO_HELPER" ]]; then
-    logo_source="$("$LOGO_HELPER" logo --dynamic 2>/dev/null || true)"
-    if [[ -z "$logo_source" ]]; then
-        logo_source="$("$LOGO_HELPER" logo --local 2>/dev/null || true)"
-    fi
+if generate_logo; then
+    logo_source="$LOGO_OUT"
+elif [[ -f "$LOGO_OUT" ]]; then
+    logo_source="$LOGO_OUT"
 fi
 
-# Fallback, pokud skript neexistuje nebo nenašel obrázek
-if [[ -z "$logo_source" || ! -f "$logo_source" ]]; then
-    logo_source="arch"
-    logo_type="auto"
-fi
-
-# HLAVNÍ KONFIGURACE
-cat >"$CFG_FILE" <<'EOF'
+cat > "$CFG_FILE" <<'EOF'
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
   "logo": {
     "source": "__LOGO_SOURCE__",
-    "type": "__LOGO_TYPE__"
+    "type": "__LOGO_TYPE__",
+    "width": 16
   },
   "display": {
     "separator": " : ",
@@ -145,10 +157,9 @@ cat >"$CFG_FILE" <<'EOF'
 }
 EOF
 
-# Nahrazení placeholderů
 sed -i \
-    -e "s|__LOGO_SOURCE__|$logo_source|g" \
-    -e "s|__LOGO_TYPE__|$logo_type|g" \
+    -e "s|__LOGO_SOURCE__|${logo_source}|g" \
+    -e "s|__LOGO_TYPE__|${logo_type}|g" \
     "$CFG_FILE"
 
 chmod 0644 "$CFG_FILE"

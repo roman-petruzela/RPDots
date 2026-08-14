@@ -202,7 +202,7 @@ trap 'on_err $?' ERR
 
 is_heavy_module() {
     case "$1" in
-    65-vscode.sh | 66-browser.sh | 67-fastfetch-logo-recolor.sh | 70-vesktop.sh | 80-spicetify.sh | 87-fastfetch.sh)
+    65-vscode.sh | 66-browser.sh | 70-vesktop.sh | 80-spicetify.sh | 87-fastfetch.sh)
         return 0
         ;;
     *)
