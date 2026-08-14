@@ -45,6 +45,13 @@ PKGS=(
     gvfs-afc
     tumbler
     ffmpegthumbnailer
+    poppler-glib
+    libgsf
+)
+
+# AUR — instalují se přes paru, pacman je nevidí
+AUR_PKGS=(
+    bibata-cursor-theme-bin
 )
 
 install_packages() {
@@ -58,6 +65,19 @@ install_packages() {
         sudo pacman -S --needed "${missing[@]}"
     else
         echo "All packages are already installed."
+    fi
+
+    local missing_aur=()
+    for pkg in "${AUR_PKGS[@]}"; do
+        pacman -Qi "$pkg" &>/dev/null || missing_aur+=("$pkg")
+    done
+    if [[ ${#missing_aur[@]} -gt 0 ]]; then
+        if command -v paru &>/dev/null; then
+            echo "Missing (AUR): ${missing_aur[*]}"
+            paru -S --needed "${missing_aur[@]}"
+        else
+            echo "Missing (AUR, install manually — no AUR helper found): ${missing_aur[*]}"
+        fi
     fi
 }
 
