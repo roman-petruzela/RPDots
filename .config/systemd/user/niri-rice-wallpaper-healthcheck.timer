@@ -1,0 +1,11 @@
+[Unit]
+Description=Run wallpaper daemon healthcheck periodically
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=2min
+Unit=niri-rice-wallpaper-healthcheck.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

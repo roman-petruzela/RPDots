@@ -344,7 +344,7 @@ dotfiles/
 │   ├── quickshell/    # dashboard + OSD + audio switcher
 │   ├── wireplumber/   # one output for all apps
 │   ├── rp-audio/      # blacklist for the output switcher
-│   ├── systemd/user/  # quickshell + audio sync units
+│   ├── systemd/user/  # quickshell, audio sync, waybar/theme/healthcheck units
 │   ├── matugen/       # color pipeline (templates)
 │   ├── kitty/  mako/  fuzzel/  swaylock/  kanshi/
 │   ├── cava/  btop/  fastfetch/

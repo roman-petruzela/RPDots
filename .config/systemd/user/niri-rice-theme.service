@@ -1,0 +1,12 @@
+[Unit]
+Description=Niri rice theme apply
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/apply-wallpaper-theme.sh --no-daemon-restart
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

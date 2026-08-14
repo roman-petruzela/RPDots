@@ -1,0 +1,9 @@
+[Unit]
+Description=Niri rice wallpaper daemon healthcheck
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/wallpaper-daemon-healthcheck.sh
+StandardOutput=journal
+StandardError=journal
