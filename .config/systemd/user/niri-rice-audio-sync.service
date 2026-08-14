@@ -1,5 +1,5 @@
 [Unit]
-Description=Niri rice — společná hlasitost všech výstupů
+Description=Niri rice — shared volume across all outputs
 PartOf=graphical-session.target
 After=graphical-session.target pipewire.service wireplumber.service
 Wants=wireplumber.service

@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# rp-audio — jednotné ovládání zvukových výstupů pro RPRice.
+# rp-audio — unified audio output control for RPRice.
 #
-#   rp-audio switch <sink>   přepne výchozí výstup (jméno nebo index)
-#   rp-audio cycle           přepne na další výstup v pořadí
+#   rp-audio switch <sink>   switch the default output (name or index)
+#   rp-audio cycle           switch to the next output in order
 #   rp-audio volume up|down|set <0-100>
 #   rp-audio mute [on|off|toggle]
-#   rp-audio unpin           uvolní všechny streamy zpět na výchozí výstup
-#   rp-audio sync            srovná hlasitost všech výstupů podle výchozího
-#   rp-audio list            vypíše výstupy (JSON)
-#   rp-audio daemon          hlídá hlasitost a nové streamy (systemd unit)
+#   rp-audio unpin           release all streams back to the default output
+#   rp-audio sync            match the volume of all outputs to the default one
+#   rp-audio list            list outputs (JSON)
+#   rp-audio daemon          watch volume and new streams (systemd unit)
 #
-# Hlasitost se vždy nastavuje na VŠECHNY výstupy naráz, aby přepnutí mezi nimi
-# nebylo slyšet jako skok. Streamy z blacklistu (~/.config/rp-audio/blacklist.conf)
-# zůstávají tam, kam si je nasměrovala sama aplikace.
+# Volume is always set on ALL outputs at once, so switching between them
+# isn't heard as a jump. Streams from the blacklist (~/.config/rp-audio/blacklist.conf)
+# stay wherever the app itself routed them.
 
 set -uo pipefail
 
@@ -23,14 +23,14 @@ VOL_STATE="$STATE_DIR/volume"
 MUTE_STATE="$STATE_DIR/mute"
 APPLY_LOCK="$STATE_DIR/applying"
 
-MAX_VOL=65536                    # 100 %
-STEP=$(( MAX_VOL * 2 / 100 ))    # krok 2 %
+MAX_VOL=65536                    # 100%
+STEP=$(( MAX_VOL * 2 / 100 ))    # 2% step
 
 DEFAULT_BLACKLIST=(obs easyeffects)
 
 mkdir -p "$STATE_DIR"
 
-# ── pomocné ────────────────────────────────────────────────────────────────
+# ── helpers ──────────────────────────────────────────────────────────────
 
 sink_ids()   { pactl list short sinks 2>/dev/null | awk '{print $1}'; }
 sink_names() { pactl list short sinks 2>/dev/null | awk '{print $2}'; }
@@ -51,15 +51,15 @@ read_blacklist() {
     fi | tr -d ' \t' | tr '[:upper:]' '[:lower:]' | grep -v '^$'
 }
 
-# Hodnotu si OSD načte samo z PipeWire — `qs ipc call` v 0.3.0 neumí
-# předat argument.
+# The OSD reads the value from PipeWire itself — `qs ipc call` in 0.3.0
+# can't pass an argument.
 osd() {
     command -v qs >/dev/null 2>&1 || return 0
     qs ipc call osd-volume trigger >/dev/null 2>&1 || true
 }
 
-# ── zápis na všechny výstupy ───────────────────────────────────────────────
-# APPLY_LOCK drží daemon zticha, dokud probíhá naše vlastní dávka zápisů.
+# ── writing to all outputs ─────────────────────────────────────────────
+# APPLY_LOCK keeps the daemon quiet while our own batch of writes is in flight.
 
 set_all_raw() {
     local raw="$1" id
@@ -86,9 +86,9 @@ set_all_mute() {
     rm -f "$APPLY_LOCK"
 }
 
-# ── uvolnění streamů ───────────────────────────────────────────────────────
-# Smaže explicitní cíl streamu, takže ho WirePlumber pošle na výchozí výstup
-# a nechá ho výchozí výstup i nadále následovat.
+# ── releasing streams ───────────────────────────────────────────────────
+# Clears the stream's explicit target, so WirePlumber sends it to the
+# default output and keeps it following the default output from then on.
 
 unpin_streams() {
     local bl ids
@@ -115,11 +115,11 @@ unpin_streams() {
     done
 }
 
-# ── příkazy ────────────────────────────────────────────────────────────────
+# ── commands ───────────────────────────────────────────────────────────
 
 cmd_switch() {
     local target="${1:-}"
-    [[ -n "$target" ]] || { echo "rp-audio: chybí výstup" >&2; return 1; }
+    [[ -n "$target" ]] || { echo "rp-audio: missing output" >&2; return 1; }
     pactl set-default-sink "$target" 2>/dev/null || return 1
     unpin_streams
     set_all_raw "$(global_vol)"
@@ -146,7 +146,7 @@ cmd_volume() {
         up)   new=$(( cur + STEP )) ;;
         down) new=$(( cur - STEP )) ;;
         set)  new=$(( MAX_VOL * ${2:-0} / 100 )) ;;
-        *)    echo "rp-audio: neznámý argument '$action'" >&2; return 1 ;;
+        *)    echo "rp-audio: unknown argument '$action'" >&2; return 1 ;;
     esac
     set_all_raw "$new"
     osd
@@ -158,7 +158,7 @@ cmd_mute() {
         on)     new=yes ;;
         off)    new=no ;;
         toggle) [[ "$(global_mute)" == "yes" ]] && new=no || new=yes ;;
-        *)      echo "rp-audio: neznámý argument '$action'" >&2; return 1 ;;
+        *)      echo "rp-audio: unknown argument '$action'" >&2; return 1 ;;
     esac
     set_all_mute "$new"
     osd
@@ -182,11 +182,12 @@ cmd_list() {
         ]'
 }
 
-# ── daemon ─────────────────────────────────────────────────────────────────
+# ── daemon ───────────────────────────────────────────────────────────────
 
-# Čerstvě přidané zařízení chvíli generuje `change` události, jak si dotahuje
-# svoje uložené hodnoty — typicky naplno. Bez téhle karantény by daemon takový
-# náběh považoval za ruční změnu a stoprocentní hlasitost roztáhl na všechno.
+# A freshly added device generates `change` events for a moment while it
+# catches up with its stored values — typically at full volume. Without
+# this quarantine, the daemon would treat that startup as a manual change
+# and stretch 100% volume onto everything.
 SETTLE_SECS=4
 SETTLE_DIR="$STATE_DIR/settling"
 
@@ -213,7 +214,7 @@ apply_global_to() {
 cmd_daemon() {
     rm -rf "$SETTLE_DIR"; mkdir -p "$SETTLE_DIR"
 
-    # Startovní srovnání podle právě zvoleného výchozího výstupu.
+    # Initial sync based on the currently selected default output.
     echo "$(raw_of  @DEFAULT_SINK@)" > "$VOL_STATE"
     echo "$(mute_of @DEFAULT_SINK@)" > "$MUTE_STATE"
     set_all_raw  "$(global_vol)"
@@ -234,8 +235,8 @@ cmd_daemon() {
                         apply_global_to "$id"
                         ;;
                     change)
-                        # Během náběhu zařízení se jeho hodnoty nepřebírají,
-                        # jen se mu vnucují ty společné.
+                        # While a device is settling in, its values aren't
+                        # adopted — it's just forced to match the shared ones.
                         if is_settling "$id"; then
                             apply_global_to "$id"
                             continue
@@ -251,14 +252,14 @@ cmd_daemon() {
                 esac
                 ;;
             sink-input)
-                # Nový stream nesmí zůstat přilepený na jiném zařízení.
+                # A new stream must not stay stuck on another device.
                 [[ "$ev" == "new" ]] && unpin_streams
                 ;;
         esac
     done
 }
 
-# ── rozcestník ─────────────────────────────────────────────────────────────
+# ── dispatcher ───────────────────────────────────────────────────────────
 
 case "${1:-}" in
     switch) shift; cmd_switch "$@" ;;
