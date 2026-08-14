@@ -8,7 +8,7 @@ Niri rice for Arch / CachyOS. Glassmorphism, Material You colors generated from 
 |---|---|
 | Compositor | [niri](https://github.com/YaLTeR/niri) |
 | Bar | [waybar](https://github.com/Alexays/Waybar) |
-| Dashboard / OSD / audio switcher | [quickshell](https://quickshell.outfoxxed.me/) |
+| Dashboard / OSD / bar flyouts | [quickshell](https://quickshell.outfoxxed.me/) |
 | Terminal | [kitty](https://github.com/kovidgoyal/kitty) |
 | Launcher | [fuzzel](https://codeberg.org/dnkl/fuzzel) |
 | Notifications | [mako](https://github.com/emersion/mako) |
@@ -168,14 +168,83 @@ output moves the audio out from under it. Set OBS to the default device.
 
 **AudioSwitcher.qml** is the Windows-style flyout under the bar (volume icon,
 `Mod+Shift+O`, or `qs ipc call audio toggle`). It talks to
-`Quickshell.Services.Pipewire` directly rather than shelling out, and opens on
-whichever monitor niri has focused.
+`Quickshell.Services.Pipewire` directly rather than shelling out.
 
 An IpcHandler function must **not** be named `show` — it collides with the
 `qs ipc show` subcommand, and the call silently prints the signature instead of
 running. `qs ipc call` in quickshell 0.3.0 also cannot pass arguments at all,
 so the OSD reads its own value (PipeWire for volume, `brightnessctl` for
 brightness) instead of receiving one.
+
+## Bar flyouts
+
+Clicking a waybar module opens a quickshell card under the bar. `Flyout.qml` is
+the shared shell: card chrome, slide-in, click-outside/Esc to dismiss, and the
+jump to whichever monitor niri has focused. Content goes in as plain children —
+the default property is the inner Column. Clicking inside never dismisses, so
+you can switch several times in a row.
+
+`FocusedOutput.qml` is the bit that asks niri which output is focused, assigns it
+to the window and only *then* makes it visible — set the screen after showing and
+the window visibly jumps to another monitor. The dashboard uses it too, and
+covers the full screen (not just its 380 px panel) so a click anywhere outside
+closes it.
+
+| Module | Flyout | IPC |
+|---|---|---|
+| Volume | `AudioSwitcher.qml` | `qs ipc call audio toggle` |
+| Battery | `PowerSwitcher.qml` | `qs ipc call power toggle` |
+| Network | `NetworkSwitcher.qml` | `qs ipc call network toggle` |
+
+Only one is open at a time — they share the same spot, so `shell.qml`'s
+`openFlyout()` hides the others.
+
+`PowerSwitcher` drives `rp-power` and parses `rp-power status`, whose labels are
+Czech; the window translates the values it displays. `NetworkSwitcher` gets
+everything from **`rp-net`** (`status` as JSON, plus `wifi`, `connect`,
+`disconnect`, `rescan`), keeping nmcli parsing out of QML. A Wi-Fi password is
+handed to `nmcli --ask` over **stdin**, never in argv where any local process
+could read it off `/proc`; that costs a retry loop on a wrong password, hence
+the `timeout`. Note that `nmcli -t` escapes colons inside SSIDs, and `tr` has no
+`\xNN` escape — `tr '\x01'` would mangle every `x`, `0` and `1`.
+
+The GPU module is `waybar-gpu.sh`: dGPU load in the bar, both cards in the
+tooltip. It only runs `nvidia-smi` when the dGPU is awake — polling it every
+3 s would otherwise keep the card from ever suspending in battery mode, the same
+reason `rp-power status` checks `runtime_status` first.
+
+## Dashboard
+
+**Now Playing** talks to `Quickshell.Services.Mpris`. Two things it is easy to
+get wrong: the properties are `position` and `length` (**seconds**, already
+converted from the DBus microseconds) — there is no `trackPosition` or
+`trackLength`, and reading names that do not exist silently yields 0, which looks
+exactly like a stuck progress bar. And `position` does not tick on its own: a
+`Timer` has to call `player.positionChanged()` while playing.
+
+`playerctld` also sits on the bus as a proxy alongside the real player, and it
+**keeps reporting the last track after that player exits** — the widget looked
+alive, the bar was even scrubbable, but every button went nowhere. So the proxy
+is filtered out entirely, not just deprioritised: no real player means no widget.
+
+Not every player fills in the metadata. Firefox publishes no `mpris:length`
+(`lengthSupported` is false) and quickshell then returns the *position* as the
+length, which pins the progress ratio at 1.0 — so with no known length the bar
+stays empty and dimmed and the duration reads "live". It is *not* hidden:
+removing it shifts everything below and reads as the bar randomly vanishing. The
+last known length is also kept until the track changes, so a momentary gap from
+the player cannot blank the bar either. Firefox also publishes no
+`mpris:artUrl`, so for a YouTube tab the thumbnail is derived from the video id
+in `xesam:url` instead.
+
+Nerd Font glyphs in QML are private-use codepoints that do not survive every
+edit — the media buttons silently ended up as empty strings once. The ones in
+`MediaWidget` are written as `\uf04b`-style escapes for that reason.
+
+**Quick actions** are Lock / Restart / Shut down. Restart and shut down arm an
+inline confirmation first (clicking the button again cancels); lock fires
+straight away, since it costs nothing to undo. Shut down is `systemctl poweroff`
+— it used to be `niri msg action quit`, which only ended the session.
 
 ## Power modes
 
