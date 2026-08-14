@@ -62,14 +62,17 @@
   },
   "backlight": { "format": "󰃟 {percent}%" },
   "network": {
-    "interface": "wlo1",
+    // Bez "interface" se sleduje rozhraní s výchozí trasou, takže se modul
+    // sám přepne mezi wifi a ethernetem. ProtonVPN routuje přes vlastní
+    // tabulku, takže proton0 výchozí trasu v main nepřebíjí a neobjeví se tu.
     "interval": 2,
     "format-wifi": "  󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
-    "format-ethernet": "󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
+    "format-ethernet": "󰌘  󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
+    "format-linked": "󰌘 {ifname} (bez IP)",
     "format-disconnected": "󰖪 offline",
-    "max-length": 26,
+    "max-length": 30,
     "tooltip-format-wifi": "  {essid}\n{ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}\nSignal {signalStrength}%",
-    "tooltip-format-ethernet": "{ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}",
+    "tooltip-format-ethernet": "󰌘 {ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}",
   },
   "custom/vpn": {
     "exec": "~/.local/bin/waybar-vpn.sh",
