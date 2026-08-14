@@ -68,13 +68,15 @@
     "interval": 2,
     "format-wifi": "  󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
     "format-ethernet": "󰌘  󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
-    "format-linked": "󰌘 {ifname} (bez IP)",
+    "format-linked": "󰌘 {ifname} (no IP)",
     "format-disconnected": "󰖪 offline",
+    "on-click": "qs ipc call network toggle",
     "max-length": 30,
     "tooltip-format-wifi": "  {essid}\n{ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}\nSignal {signalStrength}%",
     "tooltip-format-ethernet": "󰌘 {ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}",
   },
   "custom/vpn": {
+    "on-click": "~/.local/bin/protonvpn-app",
     "exec": "~/.local/bin/waybar-vpn.sh",
     "interval": 5,
     "return-type": "json",
@@ -85,6 +87,9 @@
   },
   "battery": {
     "states": { "warning": 30, "critical": 15 },
+    // levý klik = přepínač power režimů (rp-power)
+    "on-click": "qs ipc call power toggle",
+    "tooltip-format": "{capacity} % {time}\nClick to switch power mode",
     "format": "{icon} {capacity}%",
     "format-charging": " {capacity}%",
     "format-icons": ["", "", "", "", ""],
@@ -116,10 +121,10 @@
     "tooltip": false,
   },
   "custom/gpu": {
-    "exec-if": "command -v nvidia-smi >/dev/null 2>&1",
-    "exec": "bash -lc 'read -r util <<< \"$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n1 | tr -d \",\")\"; printf \"󰢮 %s%%\" \"$util\"'",
+    "exec": "~/.local/bin/waybar-gpu.sh",
+    "return-type": "json",
     "interval": 3,
-    "tooltip": false,
+    "tooltip": true,
   },
   "custom/power": {
     "format": "",

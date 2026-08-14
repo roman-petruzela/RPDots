@@ -23,6 +23,8 @@ PKGS=(
     playerctl
     brightnessctl
     wireplumber
+    pavucontrol
+    nm-connection-editor
     jq
     eza
     zsh
