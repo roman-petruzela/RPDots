@@ -27,3 +27,6 @@ __pycache__/
 
 # Osobní / lokální
 .config/niri/theme-colors.kdl
+
+# Claude Code guidance, lokální pro tento stroj
+CLAUDE.md
