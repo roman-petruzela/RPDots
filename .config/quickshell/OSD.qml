@@ -14,6 +14,7 @@ Item {
 
     property string osdType: ""
     property real osdValue: 0.0
+    property string osdLabel: ""
     property bool osdMuted: false
     property bool showing: false
 
@@ -50,6 +51,32 @@ Item {
                 if (isNaN(pct)) return
                 root.osdType = "brightness"
                 root.osdValue = pct
+                root.osdMuted = false
+                root.showing = true
+                hideTimer.restart()
+            }
+        }
+    }
+
+    IpcHandler {
+        target: "osd-keyboard-layout"
+        function trigger(): void {
+            keyboardLayoutProc.running = false
+            keyboardLayoutProc.running = true
+        }
+    }
+
+    Process {
+        id: keyboardLayoutProc
+        command: ["niri", "msg", "--json", "keyboard-layouts"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let data
+                try { data = JSON.parse(text) } catch (e) { return }
+                const name = data.names ? data.names[data.current_idx] : undefined
+                if (!name) return
+                root.osdType = "keyboard"
+                root.osdLabel = name
                 root.osdMuted = false
                 root.showing = true
                 hideTimer.restart()
@@ -109,6 +136,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: {
                         if (osdType === "brightness") return "󰃟"
+                        if (osdType === "keyboard") return "󰌌"
                         if (osdMuted) return ""
                         if (osdValue > 66) return ""
                         if (osdValue > 33) return ""
@@ -124,13 +152,17 @@ Item {
                     spacing: 8
 
                     Text {
-                        text: osdMuted ? "Ztlumeno" : Math.round(osdValue) + " %"
+                        text: {
+                            if (osdType === "keyboard") return osdLabel
+                            return osdMuted ? "Ztlumeno" : Math.round(osdValue) + " %"
+                        }
                         font.pixelSize: 13
                         font.weight: Font.Medium
                         color: Colors.onSurface
                     }
 
                     Rectangle {
+                        visible: osdType !== "keyboard"
                         width: parent.width
                         height: 4
                         radius: 2

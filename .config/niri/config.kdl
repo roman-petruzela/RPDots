@@ -298,7 +298,7 @@ binds {
     Mod+V       { toggle-window-floating; }
     Mod+Shift+V { switch-focus-between-floating-and-tiling; }
     Mod+W { toggle-column-tabbed-display; }
-    Mod+Space       { switch-layout "next"; }
+    Mod+Space       { spawn "~/.local/bin/keyboard-layout-osd.sh" "next"; }
     // niri's own screenshot UI instead of slurp+grim: it renders a captured
     // snapshot, so the screen is frozen while you drag out the region. Saves to
     // screenshot-path and copies to the clipboard, same as the old script did.
