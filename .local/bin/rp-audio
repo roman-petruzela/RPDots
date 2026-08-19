@@ -70,8 +70,10 @@ set_all_raw() {
         pactl set-sink-volume "$id" "$raw" 2>/dev/null || true
     done
     echo "$raw" > "$VOL_STATE"
-    sleep 0.15
-    rm -f "$APPLY_LOCK"
+    # Lock release doesn't need to block the caller (osd() included) — the
+    # audio is already at its final value once the loop above returns.
+    ( sleep 0.15; rm -f "$APPLY_LOCK" ) &
+    disown
 }
 
 set_all_mute() {
@@ -82,8 +84,8 @@ set_all_mute() {
         pactl set-sink-mute "$id" "$flag" 2>/dev/null || true
     done
     echo "$state" > "$MUTE_STATE"
-    sleep 0.15
-    rm -f "$APPLY_LOCK"
+    ( sleep 0.15; rm -f "$APPLY_LOCK" ) &
+    disown
 }
 
 # ── releasing streams ───────────────────────────────────────────────────
