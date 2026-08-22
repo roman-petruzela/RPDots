@@ -1,0 +1,8 @@
+#:schema https://yazi-rs.github.io/schemas/theme.json
+
+[mgr]
+cwd          = { fg = "{{colors.primary.default.hex}}" }
+border_style = { fg = "{{colors.outline.default.hex}}" }
+
+[tabs]
+active = { fg = "{{colors.on_primary.default.hex}}", bg = "{{colors.primary.default.hex}}", bold = true }

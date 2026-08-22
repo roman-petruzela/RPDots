@@ -130,6 +130,7 @@ $HOME/.config/niri/theme-colors.kdl
 $HOME/.config/mako/config
 $HOME/.config/fuzzel/fuzzel.ini
 $HOME/.config/rofi/pywal-dynamic.rasi
+$HOME/.config/yazi/theme.toml
 $HOME/.config/gtk-3.0/gtk.css
 $HOME/.config/gtk-4.0/gtk.css
 $HOME/.config/gtk-3.0/settings.ini

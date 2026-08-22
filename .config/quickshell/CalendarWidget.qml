@@ -19,7 +19,7 @@ Item {
     function build() {
         calModel.clear()
         var first = new Date(viewYear, viewMonth, 1).getDay()
-        first = first === 0 ? 7 : first
+        first = first === 0 ? 7 : first          // Mon=1 … Sun=7
         var dim  = new Date(viewYear, viewMonth + 1, 0).getDate()
         var prev = new Date(viewYear, viewMonth, 0).getDate()
 
@@ -49,6 +49,7 @@ Item {
 
     Component.onCompleted: build()
 
+    // Header
     Item {
         id: headerRow
         width: parent.width
@@ -85,6 +86,7 @@ Item {
         }
     }
 
+    // Day name headers
     Row {
         id: dayNamesRow
         anchors.top: headerRow.bottom
@@ -104,6 +106,7 @@ Item {
         }
     }
 
+    // Day grid
     Grid {
         id: calGrid
         anchors.top: dayNamesRow.bottom

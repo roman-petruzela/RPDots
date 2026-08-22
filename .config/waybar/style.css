@@ -11,10 +11,10 @@
 }
 
 window#waybar {
-    background: alpha(@background, 0.65);
     color: @on_surface;
 }
 
+/* ── Shared pill base ─────────────────────────────────────── */
 #workspaces,
 #window,
 #clock,
@@ -25,12 +25,12 @@ window#waybar {
 #custom-power,
 #custom-start-menu,
 #custom-niri-settings {
-    background: alpha(@surface_container, 0.72);
-    border: 1px solid alpha(@outline_variant, 0.35);
+    background: alpha(@primary_container, 0.22);
+    border: 1px solid alpha(@primary, 0.20);
     border-radius: 16px;
     margin: 4px 2px;
     padding: 0 6px;
-    color: @on_surface_variant;
+    color: @on_surface;
     transition: all 0.25s ease;
 }
 
@@ -42,51 +42,73 @@ window#waybar {
     min-width: 0;
 }
 
-#workspaces { padding: 0 4px; }
+/* ── Workspaces ───────────────────────────────────────────── */
+#workspaces {
+    padding: 0 4px;
+    background: alpha(@surface_container, 0.60);
+    border-color: alpha(@outline_variant, 0.40);
+}
 
 #workspaces button {
-    color: alpha(@on_surface_variant, 0.5);
+    color: alpha(@on_surface_variant, 0.45);
     background: transparent;
-    padding: 0 4px 0 0;
-    margin: 0 2px;
+    padding: 0 5px 0 0;
+    margin: 0 1px;
     border-radius: 12px;
     transition: all 0.2s ease;
 }
 
-#workspaces button.active { color: @primary; }
-#workspaces button:hover  { color: @on_surface; }
-
-#clock {
-    color: @primary;
-    font-weight: 600;
-    padding: 0 10px;
-    border-color: alpha(@primary, 0.25);
+#workspaces button.active {
+    color: @on_primary_container;
+    background: alpha(@primary_container, 0.85);
+    border-radius: 10px;
+    padding: 0 6px 0 5px;
 }
 
+#workspaces button:hover {
+    color: @primary;
+    background: alpha(@primary, 0.12);
+}
+
+/* ── Clock ────────────────────────────────────────────────── */
+#clock {
+    color: @on_primary_container;
+    font-weight: 700;
+    padding: 0 12px;
+    background: alpha(@primary_container, 0.65);
+    border-color: alpha(@primary, 0.45);
+    letter-spacing: 0.5px;
+}
+
+/* ── Power button ─────────────────────────────────────────── */
 #custom-power {
     color: @error;
     font-size: 15px;
     padding: 0 8px 0 6px;
-    border-color: alpha(@error, 0.25);
+    background: alpha(@error_container, 0.30);
+    border-color: alpha(@error, 0.35);
 }
 #custom-power:hover {
-    background: alpha(@error, 0.18);
-    border-color: alpha(@error, 0.5);
+    background: alpha(@error, 0.25);
+    border-color: alpha(@error, 0.65);
 }
 
+/* ── Start / settings buttons ─────────────────────────────── */
 #custom-start-menu,
 #custom-niri-settings {
     color: @secondary;
     font-size: 15px;
     padding: 0 8px;
-    border-color: alpha(@secondary, 0.25);
+    background: alpha(@secondary_container, 0.35);
+    border-color: alpha(@secondary, 0.30);
 }
 #custom-start-menu:hover,
 #custom-niri-settings:hover {
-    background: alpha(@secondary, 0.18);
-    border-color: alpha(@secondary, 0.5);
+    background: alpha(@secondary_container, 0.60);
+    border-color: alpha(@secondary, 0.60);
 }
 
+/* ── Network / VPN ────────────────────────────────────────── */
 #network,
 #custom-vpn {
     font-size: 12px;
@@ -94,9 +116,10 @@ window#waybar {
     min-width: 0;
     color: @tertiary;
 }
-#custom-vpn            { color: alpha(@tertiary, 0.45); }
+#custom-vpn            { color: alpha(@tertiary, 0.40); }
 #custom-vpn.active     { color: @tertiary; }
 
+/* ── Media player ─────────────────────────────────────────── */
 #custom-cava-music,
 #custom-player {
     font-size: 12px;
@@ -104,6 +127,7 @@ window#waybar {
     color: @primary;
 }
 
+/* ── System stats ─────────────────────────────────────────── */
 #cpu,
 #memory,
 #custom-gpu {
@@ -118,10 +142,11 @@ window#waybar {
     border: none;
     margin: 0;
     padding: 0 3px;
-    color: @on_surface_variant;
+    color: @tertiary;
 }
 #temperature.critical { color: @error; }
 
+/* ── Audio / backlight ────────────────────────────────────── */
 #pulseaudio,
 #backlight {
     background: transparent;
@@ -130,14 +155,15 @@ window#waybar {
     padding: 0 3px;
     color: @on_surface_variant;
 }
-#pulseaudio.muted { color: alpha(@on_surface_variant, 0.4); }
+#pulseaudio.muted { color: alpha(@on_surface_variant, 0.35); }
 
+/* ── Battery ──────────────────────────────────────────────── */
 #battery {
     background: transparent;
     border: none;
     margin: 0;
     padding: 0 3px;
-    color: @on_surface_variant;
+    color: @tertiary;
 }
 #battery.charging             { color: @tertiary; }
 #battery.warning:not(.charging) {
@@ -151,11 +177,13 @@ window#waybar {
 
 @keyframes blink { 50% { opacity: 0.4; } }
 
+/* ── Tray ─────────────────────────────────────────────────── */
 #tray { padding: 0 8px; }
 
+/* ── Tooltip ──────────────────────────────────────────────── */
 tooltip {
     background: @surface_container_high;
-    border: 1px solid alpha(@outline, 0.5);
+    border: 1px solid alpha(@primary, 0.40);
     border-radius: 10px;
     color: @on_surface;
     padding: 4px 8px;

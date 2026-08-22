@@ -103,3 +103,7 @@ output_path = "~/.config/fuzzel/fuzzel.ini"
 [templates.nvim-colors]
 input_path = "~/.config/matugen/templates/nvim-colors.lua"
 output_path = "~/.config/nvim/lua/matugen_colors.lua"
+
+[templates.yazi-theme]
+input_path = "~/.config/matugen/templates/yazi-theme.toml"
+output_path = "~/.config/yazi/theme.toml"

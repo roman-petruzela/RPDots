@@ -8,6 +8,7 @@
 .config/cava/config
 .config/fuzzel/fuzzel.ini
 .config/nvim/lua/matugen_colors.lua
+.config/yazi/theme.toml
 
 # GTK témata generovaná matugenem (šablony jsou v .config/matugen/templates/)
 .local/share/themes/RPRice/gtk-3.0/gtk.css
@@ -27,6 +28,9 @@ __pycache__/
 
 # Osobní / lokální
 .config/niri/theme-colors.kdl
+
+# Yazi plugins nainstalované přes `ya pkg install` (viz .config/yazi/package.toml)
+.config/yazi/plugins/
 
 # Claude Code guidance, lokální pro tento stroj
 CLAUDE.md

@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-exec env \
-    SDL_VIDEODRIVER=wayland \
+# Steam launcher — Wayland + NVIDIA optimized
+# SDL_VIDEODRIVER se záměrně nenastavuje: Steam si sám nastaví "wayland,x11",
+# což má x11 fallback. Natvrdo "wayland" ten fallback bral a rozbíjelo to
+# overlay u nativních SDL her.
+# PROTON_ENABLE_WAYLAND se unsetuje: Protonův nativní Wayland backend
+# nepodporuje Steam overlay. Jednotlivé hry si ho můžou zapnout v launch options.
+exec env -u PROTON_ENABLE_WAYLAND \
     STEAM_FRAME_FORCE_CLOSE=1 \
     STEAM_DISABLE_BROWSER_SANDBOX=0 \
     __GL_SHADER_DISK_CACHE=1 \
     __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 \
-    DXVK_ASYNC=1 \
+    __NV_PRIME_RENDER_OFFLOAD=1 \
+    __GLX_VENDOR_LIBRARY_NAME=nvidia \
+    __VK_LAYER_NV_optimus=NVIDIA_only \
+    VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json \
     /usr/bin/steam "$@"

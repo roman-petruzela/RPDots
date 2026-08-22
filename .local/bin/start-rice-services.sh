@@ -121,6 +121,11 @@ if command -v kanshi >/dev/null 2>&1; then
   ensure_pidfile_running "$PID_DIR/kanshi.pid" kanshi kanshi
 fi
 
+# VNC server jen na loopbacku, vzdálený přístup je přes SSH tunel (viz ~/.config/wayvnc/config)
+if command -v wayvnc >/dev/null 2>&1; then
+  ensure_pidfile_running "$PID_DIR/wayvnc.pid" wayvnc wayvnc 127.0.0.1 5900
+fi
+
 # QuickShell běží jako systemd unit (viz start_user_unit výše).
 # Bar je v shell.qml vypnutý přepínačem useBar — barem je waybar.
 

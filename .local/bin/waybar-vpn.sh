@@ -23,6 +23,7 @@ label="$(printf '%s\n' "${vpn_lines[0]}" | awk -F'|' '{print $1}')"
 if [[ "$label" =~ ([A-Z]{2}-?FREE#[0-9]+|PRO#[0-9]+) ]]; then
   label="${BASH_REMATCH[1]}"
 else
+  # Extract last part after last space
   label="${label##* }"
 fi
 tooltip="$(printf '%s\n' "${details[@]}")"

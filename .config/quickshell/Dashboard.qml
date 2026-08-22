@@ -24,6 +24,7 @@ PanelWindow {
 
     BackgroundEffect.blurRegion: Region { item: panel }
 
+    property int barHeight: 36     // výška waybaru
     property real slideX: 380
 
     Behavior on slideX {
@@ -60,9 +61,9 @@ PanelWindow {
     Rectangle {
         id: panel
         x: parent.width - width + slideX
-        y: 0
+        y: root.barHeight
         width: 380
-        height: parent.height
+        height: parent.height - root.barHeight
 
         color: Qt.rgba(Qt.color(Colors.surfaceContainer).r,
                        Qt.color(Colors.surfaceContainer).g,

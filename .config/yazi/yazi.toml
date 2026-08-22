@@ -1,0 +1,15 @@
+#:schema https://yazi-rs.github.io/schemas/yazi.json
+
+[mgr]
+linemode = "size"
+sort_by  = "natural"
+
+[[plugin.prepend_fetchers]]
+url   = "*"
+run   = "git"
+group = "git"
+
+[[plugin.prepend_fetchers]]
+url   = "*/"
+run   = "git"
+group = "git"

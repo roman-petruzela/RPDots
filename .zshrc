@@ -100,11 +100,11 @@ source $ZSH/oh-my-zsh.sh
 # export LANG=en_US.UTF-8
 
 # Preferred editor for local and remote sessions
-# if [[ -n $SSH_CONNECTION ]]; then
-#   export EDITOR='vim'
-# else
-#   export EDITOR='nvim'
-# fi
+if [[ -n $SSH_CONNECTION ]]; then
+  export EDITOR='vim'
+else
+  export EDITOR='nvim'
+fi
 
 # Compilation flags
 # export ARCHFLAGS="-arch $(uname -m)"
@@ -123,6 +123,7 @@ source $ZSH/oh-my-zsh.sh
 alias ls="eza --icons --group-directories-first"
 alias fetch="fastfetch"
 
+# Powerlevel10k prompt — layout
 typeset -g POWERLEVEL9K_MODE=nerdfont-complete
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
 typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(os_icon dir vcs newline prompt_char)
@@ -147,11 +148,13 @@ eval "$(zoxide init zsh)"
 eval "$(atuin init zsh)"
 export PATH="$HOME/.local/bin:$PATH"
 
+# Kitty modifier-arrow bindings
 bindkey '^[[1;6D' backward-word
 bindkey '^[[1;6C' forward-word
 bindkey '^[[1;2D' backward-char
 bindkey '^[[1;2C' forward-char
 
+# Keep CLI color env (gh / gh copilot) synced with pywal without shell restart.
 autoload -Uz add-zsh-hook
 __rice_sync_cli_theme_env() {
   local env_file="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/theme-env.sh"
@@ -159,3 +162,7 @@ __rice_sync_cli_theme_env() {
 }
 add-zsh-hook precmd __rice_sync_cli_theme_env
 add-zsh-hook preexec __rice_sync_cli_theme_env
+
+#THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
+export SDKMAN_DIR="/home/roman/.sdkman"
+[[ -s "/home/roman/.sdkman/bin/sdkman-init.sh" ]] && source "/home/roman/.sdkman/bin/sdkman-init.sh"

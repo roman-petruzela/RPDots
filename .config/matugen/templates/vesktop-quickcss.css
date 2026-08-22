@@ -4,6 +4,10 @@
   --rp-tertiary:           {{colors.tertiary.default.hex}};
   --rp-error:              {{colors.error.default.hex}};
   --rp-bg:                 {{colors.surface_container_lowest.default.hex}};
+  /* Stejne role, jake pouziva gtk.css: window_bg_color a view_bg_color.
+     Diky nim ma Discord stejny zaklad jako GTK aplikace. */
+  --rp-surface:            {{colors.surface.default.hex}};
+  --rp-view:               {{colors.surface_container_low.default.hex}};
   --rp-bg-container:       {{colors.surface_container.default.hex}};
   --rp-bg-high:            {{colors.surface_container_high.default.hex}};
   --rp-bg-highest:         {{colors.surface_container_highest.default.hex}};
@@ -12,18 +16,32 @@
   --rp-fg-muted:           {{colors.on_surface_variant.default.hex}};
   --rp-outline:            {{colors.outline.default.hex}};
   --rp-outline-variant:    {{colors.outline_variant.default.hex}};
-  --font-primary: "Inter", "Noto Sans", "Noto Color Emoji", "Symbols Nerd Font", sans-serif;
-  --font-code: "JetBrainsMono Nerd Font", "Noto Sans Mono", monospace;
+
+  /* Odvozene vrstvy musi byt v :root, protoze na ne saha i #app-mount,
+     ktery neni potomkem pravidla pro body. */
+  --rp-tint-color: color-mix(in srgb, var(--rp-primary) 18%, var(--rp-primary-container));
+  --rp-window: color-mix(in srgb,
+      color-mix(in srgb, var(--rp-tint-color) 38%, var(--rp-surface)) 40%, transparent);
+  --rp-view-bg: color-mix(in srgb,
+      color-mix(in srgb, var(--rp-tint-color) 34%, var(--rp-bg)) 32%, transparent);
+  --rp-popover: color-mix(in srgb,
+      color-mix(in srgb, var(--rp-tint-color) 52%, var(--rp-bg-high)) 92%, transparent);
+  /* Pozor: nesmi se jmenovat --font-primary / --font-code. Prirazeni
+     --font-primary: var(--font-primary) nize by byl odkaz sam na sebe
+     (cyklus), promenna by se vyhodnotila jako invalid a font-family by
+     spadl na vychozi serif prohlizece. */
+  --rp-font: "Aller", "Inter", "Noto Sans", "Noto Color Emoji", "Symbols Nerd Font", sans-serif;
+  --rp-font-code: "JetBrainsMono Nerd Font", "Noto Sans Mono", monospace;
 }
 
 body,
 .theme-dark,
 .theme-light {
-  --font-primary: var(--font-primary) !important;
-  --font-display: var(--font-primary) !important;
-  --font-headline: var(--font-primary) !important;
-  --font-code: var(--font-code) !important;
-  --font-clan-signature: var(--font-primary) !important;
+  --font-primary: var(--rp-font) !important;
+  --font-display: var(--rp-font) !important;
+  --font-headline: var(--rp-font) !important;
+  --font-code: var(--rp-font-code) !important;
+  --font-clan-signature: var(--rp-font) !important;
 
   --background-primary: var(--rp-bg) !important;
   --background-secondary: var(--rp-bg-container) !important;
@@ -56,13 +74,94 @@ body,
 
   --mention-foreground: var(--rp-primary) !important;
   --mention-background: color-mix(in srgb, var(--rp-primary) 18%, var(--rp-bg)) !important;
+
+  /* --- Aktualni design system (Discord 2025+). Vyse uvedene --background-*
+     tokeny uz nova UI necte, proto byla appka seda. --- */
+  /* Overeno mapovanim: base-lowest = sidebar kanalu + panel uzivatele,
+     base-lower = chat + horni lista + seznam clenu, base-low = popovery.
+     Hodnoty odpovidaji gtk.css (window_bg_color / view_bg_color). */
+  /* --rp-alpha ladi prusvitnost okna (waybar jede na 0.82, kitty na 0.75).
+     Aby se projevila, musi platit VSECHNY tri podminky:
+       1) transparent: true v ~/.config/vesktop/settings.json
+       2) hardwareAcceleration: true tamtez  <- bez toho okno zustane cerne
+       3) zprusvitnene korenove plochy Discordu (blok na konci souboru)
+     Zmena 1) i 2) se projevi az po plnem restartu Vesktopu, ne po Ctrl+R. */
+  /* Prevzato 1:1 z GTK temataku RPRice (themes/RPRice/gtk-3.0/widgets.css),
+     aby Discord vypadal stejne jako Thunar:
+       rp_tint   = mix(primary_container, primary, 0.18)
+       rp_window = alpha(mix(theme_bg,  rp_tint, 0.38), 0.55)
+       rp_view   = alpha(mix(surf_lowest, rp_tint, 0.34), 0.46)
+     Alfy se v GTK NASOBI pres vrstvy, proto je kazda jednotlivo nizsi nez
+     vysledny dojem: file list vychazi 1-(1-0.55)(1-0.46) = 0.76 = kitty.
+     Stejne vrstveni delame nize i tady (korenova plocha + panel nad ni).
+     Popovery a karty zustavaji temer nepruhledne — pri 0.76 uz je text
+     na rusne tapete necitelny. */
+  --background-base-lowest: var(--rp-window) !important;
+  --background-base-lower: var(--rp-view-bg) !important;
+  --background-base-low: var(--rp-popover) !important;
+  --background-secondary: var(--rp-popover) !important;
+  --card-background-default: var(--rp-popover) !important;
+
+  --background-mod-subtle: color-mix(in srgb, var(--rp-primary) 10%, transparent) !important;
+  --background-mod-normal: color-mix(in srgb, var(--rp-primary) 18%, transparent) !important;
+  --background-mod-strong: color-mix(in srgb, var(--rp-primary) 26%, transparent) !important;
+  --message-background-hover: color-mix(in srgb, var(--rp-primary) 7%, transparent) !important;
+
+  --card-background-default: var(--rp-bg-container) !important;
+  --input-background-default: var(--rp-bg-container) !important;
+  --input-border-default: var(--rp-outline-variant) !important;
+
+  --text-default: var(--rp-fg) !important;
+  --text-strong: var(--rp-fg) !important;
+  --text-muted: var(--rp-fg-muted) !important;
+  --text-link: var(--rp-tertiary) !important;
+  --text-brand: var(--rp-primary) !important;
+  --channels-default: var(--rp-fg-muted) !important;
+
+  --border-subtle: var(--rp-outline-variant) !important;
+  --border-normal: var(--rp-outline-variant) !important;
+  --border-muted: var(--rp-outline-variant) !important;
+  --border-strong: var(--rp-outline) !important;
+  --border-focus: var(--rp-primary) !important;
+
+  --icon-muted: var(--rp-fg-muted) !important;
+  --interactive-icon-default: var(--rp-fg-muted) !important;
+  --interactive-icon-hover: var(--rp-fg) !important;
+  --interactive-icon-active: var(--rp-primary) !important;
+  --interactive-muted: var(--rp-outline) !important;
+
+  --primary-400: var(--rp-fg-muted) !important;
+  --user-profile-border: var(--rp-outline-variant) !important;
+  --user-profile-background-hover: color-mix(in srgb, var(--rp-primary) 12%, transparent) !important;
 }
 
+/* Brand buttons */
 [class*="lookFilled"][class*="colorBrand"] {
   background: linear-gradient(140deg, var(--rp-primary), var(--rp-tertiary)) !important;
   border: none !important;
 }
 
+/* Sidebar channel active */
 [class*="selected"] [class*="channelName"] {
   color: var(--rp-primary) !important;
+}
+
+/* Prusvitnost okna: Discord si sam vykresluje neprusvitne korenove plochy.
+   Bez jejich zprusvitneni nema alfa v --background-base-* co propustit. */
+/* Spodni vrstvu nese JEDINE #app-mount. Kdyby ji dostaly i obalove prvky,
+   alfy se pres ne vynasobi a okno zesle temer nepruhlednym. Zbytek se proto
+   explicitne zprusvitnuje, aby zustalo u dvou vrstev jako v GTK:
+     chrome    #app-mount 0.40 + base-lowest 0.40 -> 0.64
+     obsah     #app-mount 0.40 + base-lower  0.32 -> 0.59 */
+html, body,
+[class*="appAsidePanelWrapper"],
+[class*="notAppAsidePanel"],
+[class*="app_"],
+[class*="layers_"],
+[class*="baseLayer"] {
+  background-color: transparent !important;
+}
+
+#app-mount {
+  background-color: var(--rp-window) !important;
 }
