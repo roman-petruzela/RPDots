@@ -80,24 +80,39 @@ make_thumb() {
   fi
 }
 
-# Interní režim: vygeneruje jeden náhled na pozadí a skončí. Volá se sama sebe
-# (viz warm_missing_thumbs) přes setsid, aby přežila i po exec na konci skriptu.
-if [[ "${1:-}" == "--warm-thumb" ]]; then
-  [[ -n "${2:-}" ]] && make_thumb "$2" >/dev/null
+# Interní režim: sériově vygeneruje chybějící náhledy na pozadí a skončí.
+# Zámek přes mkdir (atomický) zaručuje, že běží nanejvýš jeden dispatcher
+# najednou — bez něj by opakované spuštění pick-wallpaper.sh (např. víc
+# stisků Mod+Shift+W dřív, než doběhne první vlna) odpálilo další a další
+# souběžné vlny ffmpeg/magick přes desítky video tapet najednou a spolehlivě
+# to sundá celý systém (přesně tohle se stalo — proto sériově, ne paralelně,
+# a proto zámek, ne jen "spustit na pozadí").
+if [[ "${1:-}" == "--warm-dispatch" ]]; then
+  shift
+  lock="$THUMB_DIR/.warm-dispatch.lock"
+  mkdir "$lock" 2>/dev/null || exit 0
+  trap 'rmdir "$lock" 2>/dev/null' EXIT
+  for file in "$@"; do
+    make_thumb "$file" >/dev/null
+  done
   exit 0
 fi
 
-# Rozjede generování chybějících náhledů na pozadí, nečeká na ně. Menu se tak
-# otevře okamžitě s tím, co je v cache — chybějící náhledy dotáhne příště.
-# Priorita je název (vidíš ho hned), náhled je jen bonus, který se nesmí stát
-# blokující operací (u videa je to plný ffmpeg decode + magick resize).
+# Rozjede generování chybějících náhledů jedním low-priority procesem na
+# pozadí, nečeká na něj. Menu se tak otevře okamžitě s tím, co je v cache —
+# chybějící náhledy se dotáhnou postupně, jeden po druhém, příště. Priorita
+# je název (vidíš ho hned), náhled je jen bonus.
 warm_missing_thumbs() {
-  local file thumb
+  local file thumb missing=()
   for file in "$@"; do
     thumb="$(thumb_path_for "$file")"
-    [[ -f "$thumb" ]] && continue
-    setsid "$0" --warm-thumb "$file" >/dev/null 2>&1 </dev/null &
+    [[ -f "$thumb" ]] || missing+=("$file")
   done
+  [[ "${#missing[@]}" -gt 0 ]] || return 0
+  local prefix=()
+  command -v ionice >/dev/null 2>&1 && prefix+=(ionice -c3)
+  command -v nice >/dev/null 2>&1 && prefix+=(nice -n 19)
+  setsid "${prefix[@]}" "$0" --warm-dispatch "${missing[@]}" >/dev/null 2>&1 </dev/null &
 }
 
 pick_wallpaper() {
