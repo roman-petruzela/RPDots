@@ -32,12 +32,24 @@ is_video() {
   esac
 }
 
+# Cesta k náhledu je odvozená jen z cesty/mtimu/velikosti souboru — žádné IO,
+# žádná závislost na aktuální barvě motivu. Dřív byl v klíči i wal_bg, jenže
+# -background se u neprůhledných zdrojů (drtivá většina) vůbec neprojeví
+# (thumbnail ...^ + -extent vždy zaplní celou plochu, není co podbarvovat) —
+# takže každá změna tapety kvůli barvě motivu zneplatnila cache úplně všem
+# ostatním tapetám a picker je musel při příštím otevření přegenerovat znovu.
+thumb_path_for() {
+  local img="$1" sig key
+  sig="$(stat -c '%Y_%s' "$img" 2>/dev/null || echo "0_0")"
+  key="$(printf 'v3|%s|%s' "$img" "$sig" | md5sum | awk '{print $1}')"
+  echo "$THUMB_DIR/$key.png"
+}
+
 make_thumb() {
   local img="$1"
-  local sig key thumb src tmpframe
-  sig="$(stat -c '%Y_%s' "$img" 2>/dev/null || echo "0_0")"
-  key="$(printf 'v2|%s|%s|%s' "$img" "$sig" "$wal_bg" | md5sum | awk '{print $1}')"
-  thumb="$THUMB_DIR/$key.png"
+  local thumb src tmpframe key
+  thumb="$(thumb_path_for "$img")"
+  key="$(basename "$thumb" .png)"
   if [[ ! -f "$thumb" ]] && command -v magick >/dev/null 2>&1; then
     src="$img"
     tmpframe=""
@@ -68,6 +80,26 @@ make_thumb() {
   fi
 }
 
+# Interní režim: vygeneruje jeden náhled na pozadí a skončí. Volá se sama sebe
+# (viz warm_missing_thumbs) přes setsid, aby přežila i po exec na konci skriptu.
+if [[ "${1:-}" == "--warm-thumb" ]]; then
+  [[ -n "${2:-}" ]] && make_thumb "$2" >/dev/null
+  exit 0
+fi
+
+# Rozjede generování chybějících náhledů na pozadí, nečeká na ně. Menu se tak
+# otevře okamžitě s tím, co je v cache — chybějící náhledy dotáhne příště.
+# Priorita je název (vidíš ho hned), náhled je jen bonus, který se nesmí stát
+# blokující operací (u videa je to plný ffmpeg decode + magick resize).
+warm_missing_thumbs() {
+  local file thumb
+  for file in "$@"; do
+    thumb="$(thumb_path_for "$file")"
+    [[ -f "$thumb" ]] && continue
+    setsid "$0" --warm-thumb "$file" >/dev/null 2>&1 </dev/null &
+  done
+}
+
 pick_wallpaper() {
   local selected=""
   if command -v rofi >/dev/null 2>&1; then
@@ -78,7 +110,7 @@ pick_wallpaper() {
     if [[ -f "${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/current-wallpaper-source" ]]; then
       current_src="$(cat "${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/current-wallpaper-source" 2>/dev/null || true)"
     fi
-    local rofi_theme
+    local rofi_theme rofi_entries
     rofi_theme='
       * {
         bg: '"${wal_bg}"'ee;
@@ -107,24 +139,26 @@ pick_wallpaper() {
         current_index="$i"
       fi
     done
+    warm_missing_thumbs "${files[@]}"
+    # Jen z cache, bez volání make_thumb — název je vždy hned k dispozici,
+    # náhled se přidá jen když je už hotový (viz warm_missing_thumbs výš).
+    rofi_entries="$(
+      for file in "${files[@]}"; do
+        base="$(basename "$file")"
+        thumb="$(thumb_path_for "$file")"
+        if [[ -f "$thumb" ]]; then
+          printf '%s\0icon\x1f%s\n' "$base" "$thumb"
+        else
+          printf '%s\n' "$base"
+        fi
+      done
+    )"
     if [[ -n "$current_index" ]]; then
-      selected="$(
-        for file in "${files[@]}"; do
-          base="$(basename "$file")"
-          thumb="$(make_thumb "$file")"
-          printf '%s\0icon\x1f%s\n' "$base" "$thumb"
-        done | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
-          -show-icons -no-config -theme-str "$rofi_theme" -a "$current_index"
-      )"
+      selected="$(printf '%s' "$rofi_entries" | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
+          -show-icons -no-config -theme-str "$rofi_theme" -a "$current_index")"
     else
-      selected="$(
-        for file in "${files[@]}"; do
-          base="$(basename "$file")"
-          thumb="$(make_thumb "$file")"
-          printf '%s\0icon\x1f%s\n' "$base" "$thumb"
-        done | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
-          -show-icons -no-config -theme-str "$rofi_theme"
-      )"
+      selected="$(printf '%s' "$rofi_entries" | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
+          -show-icons -no-config -theme-str "$rofi_theme")"
     fi
     if [[ -n "${selected:-}" ]]; then
       selected="$WALL_DIR/$selected"

@@ -25,8 +25,15 @@ LAYER="${WALL_VIDEO_LAYER:-bottom}"
 # no-audio       — tapeta nikdy nehraje zvuk
 # loop-file=inf  — nekonečná smyčka
 # hwdec          — hardwarový dekód, jinak by 60fps 4K žralo CPU
+# profile=fast   — mpv defaultně škáluje přehraný snímek na výstup drahým
+#                  polárním filtrem (ewa_lanczos apod.); to běží každý frame na
+#                  iGPU, která si ho dělí se zbytkem DE. U 4K tapety na FHD
+#                  výstupu je tenhle scale-down krok dost velký, aby to sekalo
+#                  celý desktop, i když samotný dekód je hardwarový. profile=fast
+#                  je vestavěný mpv profil (bilineární scale/cscale/dscale,
+#                  vypnutý dither/deband/sigmoid-upscaling) přesně pro tenhle případ.
 # vo=libmpv      — mpvpaper vyžaduje
-MPV_OPTS="${WALL_VIDEO_MPV_OPTS:-no-audio loop-file=inf hwdec=auto-safe video-sync=display-resample panscan=1.0}"
+MPV_OPTS="${WALL_VIDEO_MPV_OPTS:-no-audio loop-file=inf hwdec=auto-safe profile=fast video-sync=display-resample panscan=1.0}"
 
 have_mpvpaper() { command -v mpvpaper >/dev/null 2>&1; }
 
