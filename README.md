@@ -136,6 +136,23 @@ configured in `.config/xfce4/helpers.rc`), `tumbler` for thumbnails
 (`ffmpegthumbnailer` for video, `poppler-glib` for PDF, `libgsf` for documents),
 and `gvfs` + `gvfs-smb` / `gvfs-afc` for mounting.
 
+**LightDM greeter** (login screen) mirrors the RPRice GTK3 theme and the
+current wallpaper. `lightdm-gtk-greeter` runs as its own user and can't read
+`/home/roman` (chmod 700), so `theme-modules/84-lightdm.sh` shells out to a
+privileged helper that copies both into `/usr/share/themes/` and
+`/usr/share/backgrounds/` and points `lightdm-gtk-greeter.conf` at them. Same
+pattern as [power modes](#power-modes) below: install once with
+
+```bash
+sudo ~/.local/share/rp-lightdm-sync/install.sh
+```
+
+which drops `/usr/local/bin/rp-lightdm-sync-apply` and a NOPASSWD sudoers rule
+scoped to that one binary. Until it's installed, `requires=` in
+`.config/niri-rice/modules.conf` makes the module a silent no-op. The greeter
+itself isn't restarted (that would kill the running graphical session) — the
+new theme just takes effect next time it's shown.
+
 ## Audio
 
 One output for everything, switchable from the bar. Three parts:

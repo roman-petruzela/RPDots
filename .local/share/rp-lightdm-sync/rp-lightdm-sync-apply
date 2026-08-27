@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# Kopíruje aktuální RPRice GTK3 téma + tapetu do systémových cest, které vidí
-# uživatel lightdm (/home/roman je 700), a nastaví je v lightdm-gtk-greeter.conf.
-# Spouštět s: sudo ~/.local/bin/sync-lightdm-theme.sh
+# rp-lightdm-sync-apply — privilegovaná část synchronizace login screenu.
+# Volá se přes sudo z theme-modules/84-lightdm.sh při každé změně tapety.
+# lightdm-gtk-greeter běží pod vlastním uživatelem a nedostane se do
+# /home/roman (chmod 700), takže mu GTK3 téma a current wallpaper kopírujeme
+# do systémových cest, které přečte kdokoli.
 set -euo pipefail
-
-if [[ $EUID -ne 0 ]]; then
-    echo "Spusť s sudo: sudo $0" >&2
-    exit 1
-fi
 
 USER_HOME="/home/${SUDO_USER:-roman}"
 SRC_THEME="$USER_HOME/.local/share/themes/RPRice"
@@ -16,18 +13,13 @@ DST_THEME="/usr/share/themes/RPRice"
 DST_WALLPAPER="/usr/share/backgrounds/rprice-current.jpg"
 GREETER_CONF="/etc/lightdm/lightdm-gtk-greeter.conf"
 
-if [[ ! -d "$SRC_THEME" ]]; then
-    echo "Nenalezeno: $SRC_THEME (matugen ještě negeneroval GTK3 téma?)" >&2
-    exit 1
-fi
-if [[ ! -f "$SRC_WALLPAPER" ]]; then
-    echo "Nenalezeno: $SRC_WALLPAPER" >&2
-    exit 1
-fi
+# Matugen ještě neproběhlo / žádná tapeta zatím není — nic k synchronizaci.
+[[ -d "$SRC_THEME" ]] || exit 0
+[[ -f "$SRC_WALLPAPER" ]] || exit 0
 
 mkdir -p "$DST_THEME" /usr/share/backgrounds
 rsync -a --delete "$SRC_THEME"/ "$DST_THEME"/
-cp "$SRC_WALLPAPER" "$DST_WALLPAPER"
+cp -f "$SRC_WALLPAPER" "$DST_WALLPAPER"
 chmod -R a+rX "$DST_THEME"
 chmod a+r "$DST_WALLPAPER"
 
@@ -47,5 +39,3 @@ set_key "icon-theme-name" "Papirus-Dark"
 set_key "cursor-theme-name" "Bibata-Modern-Ice"
 set_key "font-name" "Adwaita Sans 11"
 set_key "background" "$DST_WALLPAPER"
-
-echo "Hotovo. Restartuj lightdm (sudo systemctl restart lightdm) nebo se odhlas pro náhled."
