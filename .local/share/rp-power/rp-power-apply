@@ -82,14 +82,18 @@ apply() {
             ;;
         balanced)
             set_platform_profile balanced
-            # CPU záměrně neřešíme — vlastní ho TLP, dva správci by se přebíjeli.
+            # CPU se dřív záměrně nechával na TLP, ale governor/EPP je globální
+            # sysfs stav, který přežívá do dalšího módu beze změny, dokud
+            # nenastane AC událost — po battery/gaming tak "balanced" tiše
+            # zůstávalo na powersave/performance z předchozího módu místo na
+            # tom, co zrovna nastavilo TLP. Radši nastavujeme explicitně.
+            set_cpu performance performance
             set_gpu balanced
             ;;
         battery)
             set_platform_profile low-power
-            # Tady TLP záměrně přebíjíme: battery je explicitní "chci teď co
-            # nejdéle vydržet" a nemá čekat na to, jestli/kdy TLP zrovna
-            # přepne svůj vlastní AC/BAT profil.
+            # Battery je explicitní "chci teď co nejdéle vydržet" a nemá
+            # čekat na to, jestli/kdy TLP zrovna přepne svůj AC/BAT profil.
             set_cpu powersave power
             set_gpu battery
             ;;

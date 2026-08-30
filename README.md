@@ -272,8 +272,8 @@ iGPU** — the dGPU has no outputs and is render-offload only.
 | | `battery` | `balanced` | `gaming` |
 |---|---|---|---|
 | ACPI platform profile | low-power | balanced | performance |
-| CPU governor | **powersave** | TLP | performance |
-| CPU EPP | **power** | TLP | performance |
+| CPU governor | **powersave** | performance | performance |
+| CPU EPP | **power** | performance | performance |
 | dGPU power limit | 40 W | 60 W | 85 W |
 | dGPU clock floor | — | — | 800 MHz |
 | video wallpaper | **suspended** | on | **suspended** |
@@ -288,13 +288,16 @@ The clock floor is **not** an overclock — voltage stays on the stock V/F
 curve. Its purpose is to stop the dGPU collapsing to 210 MHz mid-frame, which
 wrecks frametime consistency under PRIME offload.
 
-**CPU is deliberately left to TLP** in `balanced`. TLP is installed and
-already switches on AC/battery events; two governor managers would fight.
-`battery` is the one exception: it's an explicit "save power now" request, so
-it clamps governor/EPP straight to `powersave`/`power` instead of waiting on
-whichever AC/battery profile TLP happens to have picked — same direction TLP
-would go anyway, just guaranteed instead of racy. `gaming` sets `performance`
-outright since it isn't something TLP manages towards.
+**All three modes set CPU governor/EPP explicitly** — `balanced` used to
+leave it to TLP, but governor/EPP is global sysfs state that persists across
+mode switches until something writes it again: after `battery` or `gaming`,
+`balanced` would silently keep whatever the *previous* mode had set
+(`powersave`/`power`, or `performance`/`performance`) instead of what TLP
+would actually pick, since no AC event fired in between to make TLP re-apply
+anything. Explicit beats implicit here: `balanced`/`gaming` both pin
+`performance`/`performance` (they differ in ACPI profile, dGPU power limit
+and clock lock, not CPU), and `battery` pins `powersave`/`power` for the
+"save power now" case.
 
 **Video wallpaper** is suspended in `battery` and `gaming` via
 `wallpaper-video-ctl.sh inhibit`, which drops a flag at
