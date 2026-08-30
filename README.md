@@ -269,38 +269,53 @@ straight away, since it costs nothing to undo. Shut down is `systemctl poweroff`
 Optimus (AMD Cezanne iGPU + RTX 3050 Mobile) and **both displays hang off the
 iGPU** — the dGPU has no outputs and is render-offload only.
 
-| | `battery` | `balanced` | `gaming` | `turbo` |
-|---|---|---|---|---|
-| ACPI platform profile | low-power | balanced | performance | performance |
-| CPU governor | TLP | TLP | performance | performance |
-| dGPU power limit | 40 W | 60 W | 85 W | 85 W |
-| dGPU clock floor | — | — | 800 MHz | 800 MHz |
-| video wallpaper | on | on | **suspended** | **suspended** |
-| niri animations | on | on | on | **off** |
+| | `battery` | `balanced` | `gaming` |
+|---|---|---|---|
+| ACPI platform profile | low-power | balanced | performance |
+| CPU governor | **powersave** | TLP | performance |
+| CPU EPP | **power** | TLP | performance |
+| dGPU power limit | 40 W | 60 W | 85 W |
+| dGPU clock floor | — | — | 800 MHz |
+| video wallpaper | **suspended** | on | **suspended** |
+| niri animations | on | on | on |
 
 ```bash
-rp-power gaming      # or battery / balanced / turbo
+rp-power gaming      # or battery / balanced
 rp-power status
 ```
 
-`gaming` and `turbo` are hardware-identical; `turbo` additionally kills desktop
-animations. The clock floor is **not** an overclock — voltage stays on the stock
-V/F curve. Its purpose is to stop the dGPU collapsing to 210 MHz mid-frame,
-which wrecks frametime consistency under PRIME offload.
+The clock floor is **not** an overclock — voltage stays on the stock V/F
+curve. Its purpose is to stop the dGPU collapsing to 210 MHz mid-frame, which
+wrecks frametime consistency under PRIME offload.
 
-**CPU is deliberately left to TLP** except in `gaming`/`turbo`. TLP is installed
-and already switches on AC/battery events; two governor managers would fight.
+**CPU is deliberately left to TLP** in `balanced`. TLP is installed and
+already switches on AC/battery events; two governor managers would fight.
+`battery` is the one exception: it's an explicit "save power now" request, so
+it clamps governor/EPP straight to `powersave`/`power` instead of waiting on
+whichever AC/battery profile TLP happens to have picked — same direction TLP
+would go anyway, just guaranteed instead of racy. `gaming` sets `performance`
+outright since it isn't something TLP manages towards.
 
-**Video wallpaper** is suspended in `gaming`/`turbo` via
+**Video wallpaper** is suspended in `battery` and `gaming` via
 `wallpaper-video-ctl.sh inhibit`, which drops a flag at
 `~/.cache/niri-rice/video-inhibit` and kills mpvpaper. The static awww layer
 stays up, so the desktop just freezes on the video's first frame instead of
 going blank. The flag is honoured inside `wallpaper-video-ctl.sh` rather than by
 the caller — otherwise the healthcheck timer (`OnUnitActiveSec=2min`) would call
-`ensure` and resurrect the video mid-game. Reason for suspending it at all: the
-video decodes and composites on the **iGPU**, which is the same GPU that takes
-every game frame off the dGPU, so the two contend for the one path that is
-already the bottleneck.
+`ensure` and resurrect the video mid-game/mid-battery. Reason for suspending it
+in `gaming`: the video decodes and composites on the **iGPU**, which is the
+same GPU that takes every game frame off the dGPU, so the two contend for the
+one path that is already the bottleneck. Reason for suspending it in
+`battery`: video decode draws noticeably more power than a static image.
+
+Unplugging AC (or the periodic guard timer, see below) only ever touches the
+*hardware* knobs through the root helper — it has no session to run
+`wallpaper-video-ctl.sh` in. The wallpaper suspend/resume above is applied by
+`~/.local/bin/rp-power` itself when you run it manually, and by
+`niri-rice-power-sync.path`/`.service` (a `systemd --user` path unit, same
+pattern as `niri-rice-theme.path`) when the root side changes
+`/var/lib/rp-power/effective` — so unplugging while in `balanced` (video
+playing) also suspends the wallpaper, not just an explicit `rp-power battery`.
 
 **Animations** live in `.config/niri/power-mode.kdl`, pulled in by `config.kdl`
 via `include optional=true`. The file is generated (gitignored, like
@@ -316,9 +331,28 @@ sudo ~/.local/share/rp-power/install.sh
 ```
 
 It installs `/usr/local/bin/rp-power-apply`, a NOPASSWD sudoers rule scoped to
-that one binary, a udev rule on `ACAD`, and a oneshot unit. Unplugging drops to
-`battery` regardless of the selected mode; plugging back in restores the choice
-(persisted in `/var/lib/rp-power/mode`).
+that one binary, a udev rule on `ACAD`, an AC-change oneshot unit, and
+`rp-power-gpu-guard.timer` (every 2 min). Unplugging drops to `battery`
+regardless of the selected mode; plugging back in restores the choice
+(persisted in `/var/lib/rp-power/mode`, mirrored to `/var/lib/rp-power/effective`
+for whichever mode is *actually* applied right now — see the wallpaper-sync
+note above).
+
+The guard timer exists because `nvidia-smi -pl`/`-lgc` don't survive the dGPU
+going through a runtime suspend/resume cycle — the driver resets to its own
+default limit on wake, so a battery-mode session that wakes the dGPU
+mid-session (a browser tab, a game) would otherwise silently sit at the
+driver default (measured: 60-70 W) instead of the intended 40 W cap until the
+next AC event. The timer just re-runs the same idempotent `auto` apply; it's
+a no-op while the dGPU is suspended, so it never wakes it just to check.
+
+`rp-power-auto.service` intentionally has no `After=tlp.service` — this
+system's `tlp.service` is itself `After=multi-user.target`, and combining
+that with our own `WantedBy=multi-user.target` created an ordering cycle
+systemd broke arbitrarily on every boot (`Found ordering cycle` in the
+journal). Dropping the ordering edge fixes the cycle; the two units don't
+actually need boot-order coordination, since `battery`'s explicit CPU clamp
+above is what makes the mode not depend on TLP having already run.
 
 > The dGPU only reaches 0 W when it runtime-suspends, which needs *nothing*
 > holding a context on it — `nvidia-smi` itself wakes it, so the script skips it
