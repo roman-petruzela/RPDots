@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch RPRice effective power mode for AC-driven changes
+
+[Path]
+PathChanged=/var/lib/rp-power/effective
+Unit=niri-rice-power-sync.service
+
+[Install]
+WantedBy=default.target

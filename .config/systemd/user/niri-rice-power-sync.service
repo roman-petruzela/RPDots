@@ -1,0 +1,9 @@
+[Unit]
+Description=Niri rice power-mode session sync (video wallpaper)
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/rp-power sync
+StandardOutput=journal
+StandardError=journal
