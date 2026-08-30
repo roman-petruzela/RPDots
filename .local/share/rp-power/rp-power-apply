@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # rp-power-apply — privilegovaná část přepínání power režimů.
-# Volá se přes sudo z ~/.local/bin/rp-power, nebo jako "auto" z udev při
-# změně napájení. Animace niri řeší uživatelský skript, sem nepatří.
+# Volá se přes sudo z ~/.local/bin/rp-power, nebo jako "auto" z udev/timeru při
+# změně napájení či periodické kontroly. Animace niri a video tapetu řeší
+# uživatelský skript, sem nepatří.
 #
-# Režimy: battery | balanced | gaming | turbo | auto
-# gaming a turbo se po hardwarové stránce neliší — turbo navíc vypíná animace,
-# což je čistě věc session a řeší to uživatelský skript.
+# Režimy: battery | balanced | gaming | auto
 set -uo pipefail
 
 STATE_DIR=/var/lib/rp-power
 STATE_FILE="$STATE_DIR/mode"
+# Skutečně aplikovaný režim (viz "auto" níže) — čte ho uživatelský rp-power
+# (status, sync path unit), proto musí zůstat world-readable.
+EFFECTIVE_FILE="$STATE_DIR/effective"
 
 # Spodní zámek taktu dGPU v režimu gaming. Smysl je zabránit propadu na
 # 210 MHz, který rozbíjí frametime — není to overclock, napětí zůstává
@@ -73,7 +75,7 @@ set_gpu() {
 
 apply() {
     case "$1" in
-        gaming|turbo)
+        gaming)
             set_platform_profile performance
             set_cpu performance performance
             set_gpu gaming
@@ -85,7 +87,10 @@ apply() {
             ;;
         battery)
             set_platform_profile low-power
-            # CPU nechává na TLP (viz výše).
+            # Tady TLP záměrně přebíjíme: battery je explicitní "chci teď co
+            # nejdéle vydržet" a nemá čekat na to, jestli/kdy TLP zrovna
+            # přepne svůj vlastní AC/BAT profil.
+            set_cpu powersave power
             set_gpu battery
             ;;
         *)
@@ -94,13 +99,16 @@ apply() {
             ;;
     esac
     echo "  režim '$1' aplikován"
+    echo "$1" > "$EFFECTIVE_FILE"
 }
 
 mkdir -p "$STATE_DIR"
 
 case "${1:-auto}" in
     auto)
-        # Na baterce vždy shodit dolů, bez ohledu na uloženou volbu.
+        # Na baterce vždy shodit dolů, bez ohledu na uloženou volbu — volá se
+        # jak z udev při odpojení AC, tak periodicky z rp-power-gpu-guard.timer,
+        # protože nvidia-smi limity nepřežijí probuzení dGPU z runtime suspendu.
         # Po zapojení do sítě se obnoví to, co si uživatel zvolil.
         chosen=$(cat "$STATE_FILE" 2>/dev/null || echo balanced)
         if on_ac; then
@@ -109,12 +117,12 @@ case "${1:-auto}" in
             apply battery
         fi
         ;;
-    battery|balanced|gaming|turbo)
+    battery|balanced|gaming)
         echo "$1" > "$STATE_FILE"
         apply "$1"
         ;;
     *)
-        echo "použití: $0 {battery|balanced|gaming|turbo|auto}" >&2
+        echo "použití: $0 {battery|balanced|gaming|auto}" >&2
         exit 1
         ;;
 esac

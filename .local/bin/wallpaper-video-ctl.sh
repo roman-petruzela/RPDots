@@ -11,7 +11,7 @@ set -euo pipefail
 STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"
 CURRENT_VIDEO="$STATE_DIR/current-video"
 
-# Existuje = video vrstva je dočasně potlačená (rp-power gaming/turbo). Statická
+# Existuje = video vrstva je dočasně potlačená (rp-power battery/gaming). Statická
 # awww vrstva zůstane, takže tapeta nezmizí — jen zamrzne na prvním snímku.
 # Guard sedí tady, a ne ve volajícím, aby ho respektoval i healthcheck timer,
 # který by jinak video do dvou minut nahodil zpátky.
@@ -133,8 +133,9 @@ ensure_video() {
 }
 
 # Potlačí video vrstvu, dokud ji někdo neuvolní. Používá rp-power při přepnutí
-# do gaming/turbo — video dekóduje a překresluje ta samá iGPU, která zároveň
-# přebírá každý snímek hry z dGPU, takže si lezou do cesty.
+# do gaming (video dekóduje a překresluje ta samá iGPU, která zároveň přebírá
+# každý snímek hry z dGPU, takže si lezou do cesty) a battery (dekód videa
+# stojí citelně víc energie než statický obrázek).
 inhibit_video() {
     mkdir -p "$STATE_DIR"
     : > "$VIDEO_INHIBIT"

@@ -18,10 +18,9 @@ Flyout {
     property string gpu: ""
 
     readonly property var modes: [
-        { id: "battery",  icon: "󰁹", label: "Battery",  hint: "CPU powersave, dGPU asleep" },
+        { id: "battery",  icon: "󰁹", label: "Battery",  hint: "CPU powersave, dGPU limited, wallpaper suspended" },
         { id: "balanced", icon: "󰗑", label: "Balanced", hint: "Everyday default" },
         { id: "gaming",   icon: "󰊴", label: "Gaming",   hint: "Full power, dGPU clocks locked" },
-        { id: "turbo",    icon: "󰉁", label: "Turbo",    hint: "Gaming plus niri animations off" },
     ]
 
     Process {

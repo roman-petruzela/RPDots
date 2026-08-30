@@ -1,43 +1,48 @@
 #!/usr/bin/env bash
 # rp-power — přepínání power režimů RPRice.
 #
-#   rp-power battery    šetřicí: CPU powersave, dGPU odemčená a nechaná spát
+#   rp-power battery    šetřicí: CPU powersave, dGPU omezená a nechaná spát,
+#                        video tapeta uspaná
 #   rp-power balanced   běžná práce (výchozí)
 #   rp-power gaming     plný výkon + zámek taktu dGPU + uspaná video tapeta
-#   rp-power turbo      jako gaming, navíc vypnuté animace niri
 #   rp-power status     co je teď nastavené
+#   rp-power sync       interní — dorovná session efekty (video tapeta) podle
+#                        aktuálně platného režimu; volá ho path unit při AC
+#                        události, není určeno k ručnímu spouštění
 #
 # Privilegovanou část (CPU, ACPI profil, nvidia-smi) dělá /usr/local/bin/rp-power-apply
-# přes sudo. Tady zůstávají jen věci ze session — hlavně animace niri.
+# přes sudo. Tady zůstávají jen věci ze session — hlavně animace niri a video tapeta.
 set -uo pipefail
 
 HELPER=/usr/local/bin/rp-power-apply
 NIRI_KDL="$HOME/.config/niri/power-mode.kdl"
 STATE_FILE=/var/lib/rp-power/mode
+# Skutečně aplikovaný režim — na baterce se může lišit od STATE_FILE, protože
+# odpojení AC vynutí "battery" bez ohledu na to, co má uživatel vybrané (viz
+# rp-power-apply). Zapisuje ho výhradně rp-power-apply.
+EFFECTIVE_FILE=/var/lib/rp-power/effective
 VIDEO_CTL="$HOME/.local/bin/wallpaper-video-ctl.sh"
 
 # Video tapeta se dekóduje a překresluje na iGPU — tedy na té samé, která zároveň
-# přebírá každý snímek hry z dGPU. Ve výkonnostních režimech ji proto uspíme;
-# statická awww vrstva zůstane, takže plocha jen zamrzne na prvním snímku.
+# přebírá každý snímek hry z dGPU. V gaming režimu ji proto uspíme kvůli výkonu;
+# na baterce kvůli spotřebě (dekód videa stojí citelně víc než statický obrázek).
+# Statická awww vrstva zůstane, takže plocha jen zamrzne na prvním snímku.
 switch_wallpaper_video() {
     [[ -x "$VIDEO_CTL" ]] || return 0
     case "$1" in
-        gaming|turbo) "$VIDEO_CTL" inhibit   >/dev/null 2>&1 && echo "  video tapeta uspaná" ;;
-        *)            "$VIDEO_CTL" uninhibit >/dev/null 2>&1 && echo "  video tapeta obnovená" ;;
+        battery|gaming) "$VIDEO_CTL" inhibit   >/dev/null 2>&1 && echo "  video tapeta uspaná" ;;
+        *)              "$VIDEO_CTL" uninhibit >/dev/null 2>&1 && echo "  video tapeta obnovená" ;;
     esac
     return 0
 }
 
 write_animations() {
-    local mode=$1 tmp
+    local tmp
     tmp=$(mktemp)
     {
         echo "// Generováno skriptem rp-power — needitovat ručně."
-        echo "// Přepíná se přes: rp-power battery|balanced|gaming|turbo"
-        if [[ "$mode" == "turbo" ]]; then
-            printf 'animations {\n    off\n}\n'
-        else
-            cat <<'KDL'
+        echo "// Přepíná se přes: rp-power battery|balanced|gaming"
+        cat <<'KDL'
 animations {
     slowdown 1.5
     window-open {
@@ -58,7 +63,6 @@ animations {
     }
 }
 KDL
-        fi
     } > "$tmp"
 
     # Nikdy nenechat rozbitý config — niri ho hot-reloaduje a rozsypal by se
@@ -74,7 +78,7 @@ KDL
         return 1
     fi
     rm -f "$tmp" "$backup"
-    [[ "$mode" == "turbo" ]] && echo "  animace niri vypnuté" || echo "  animace niri zapnuté"
+    echo "  animace niri zapnuté"
     return 0
 }
 
@@ -84,7 +88,10 @@ status() {
     gov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)
     epp=$(cat /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference 2>/dev/null)
     prof=$(cat /sys/firmware/acpi/platform_profile 2>/dev/null)
-    mode=$(cat "$STATE_FILE" 2>/dev/null || echo "?")
+    # EFFECTIVE_FILE odráží to, co je fakticky aplikované (viz komentář výše);
+    # dokud nevznikne (první běh před instalací rp-power-apply), padáme na
+    # zvolený režim.
+    mode=$(cat "$EFFECTIVE_FILE" 2>/dev/null || cat "$STATE_FILE" 2>/dev/null || echo "?")
 
     echo "režim:            $mode"
     echo "napájení:         $([[ "$ac" == "1" ]] && echo 'síť' || echo 'baterie')"
@@ -113,16 +120,21 @@ case "${1:-status}" in
     status)
         status
         ;;
-    battery|balanced|gaming|turbo)
-        write_animations "$1"
+    battery|balanced|gaming)
+        write_animations
         switch_wallpaper_video "$1"
         sudo -n "$HELPER" "$1" || {
             echo "  !! sudo selhalo — je nainstalované /etc/sudoers.d/rp-power?" >&2
             exit 1
         }
         ;;
+    sync)
+        # Voláno path unitem při změně EFFECTIVE_FILE (AC plug/unplug) — jen
+        # dorovná session efekty, bez sudo a beze změny STATE_FILE.
+        switch_wallpaper_video "$(cat "$EFFECTIVE_FILE" 2>/dev/null || cat "$STATE_FILE" 2>/dev/null || echo balanced)"
+        ;;
     *)
-        echo "použití: rp-power {battery|balanced|gaming|turbo|status}" >&2
+        echo "použití: rp-power {battery|balanced|gaming|status}" >&2
         exit 1
         ;;
 esac
