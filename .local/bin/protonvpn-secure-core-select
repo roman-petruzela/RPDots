@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Picks the fastest online regular server in the preferred country (falling
+back to any country if none are online) and points ProtonVPN's 'connect at
+startup' setting at it.
+
+Secure Core is deliberately excluded: its exit pool is small and shared, and
+Discord rejects authenticated sessions coming from it (the client loops on
+"Temporary Network Error" even though TCP and the gateway handshake succeed).
+Tor exits are excluded for the same practical reason.
+
+A handful of "regular" CZ servers turned out to share the exact same problem:
+they're all fronted by the same WireGuard gateway (149.102.235.33) which NATs
+outbound traffic through 149.102.235.47 - the same real-world exit Discord
+already blocks for Secure Core. Picking "fastest regular server" kept landing
+back on one of these because they're geographically closest. Blocked below by
+their declared ExitIP so the picker falls through to the next-best score.
+
+Runs before protonvpn-app's own autostart unit (see
+protonvpn-secure-core-select.service).
+"""
+import json
+import sys
+from pathlib import Path
+
+SERVER_LIST = Path.home() / ".cache/Proton/VPN/serverlist.json"
+APP_CONFIG = Path.home() / ".config/Proton/VPN/app-config.json"
+SECURE_CORE_BIT = 1 << 0
+TOR_BIT = 1 << 1
+STATUS_ONLINE = 1
+PAID_TIER = 2
+
+# Default startup exit country. Switzerland ("CH", ISO 3166-1 alpha-2 -
+# Confoederatio Helvetica; not to be confused with "CN" China).
+PREFERRED_COUNTRY = "CH"
+
+# Discord-blocked NAT egress IPs, keyed by the declared ExitIP shared by every
+# server behind that gateway (see module docstring). Confirmed 2026-08-31.
+BLOCKED_EXIT_IPS = {"149.102.235.33"}
+
+DEFAULT_APP_CONFIG = {
+    "tray_pinned_servers": [],
+    "connect_at_app_startup": None,
+    "start_app_minimized": False,
+}
+
+
+def pick_fastest_regular_server():
+    with SERVER_LIST.open() as f:
+        servers = json.load(f)["LogicalServers"]
+
+    candidates = [
+        s for s in servers
+        if not s.get("Features", 0) & (SECURE_CORE_BIT | TOR_BIT)
+        and s.get("Status") == STATUS_ONLINE
+        and not any(
+            srv.get("ExitIP") in BLOCKED_EXIT_IPS for srv in s.get("Servers", [])
+        )
+    ]
+    if not candidates:
+        return None
+
+    # Stick to the preferred country when it has an online candidate; only
+    # spill over to other countries if it's entirely down.
+    preferred = [s for s in candidates if s.get("ExitCountry") == PREFERRED_COUNTRY]
+    pool = preferred or candidates
+
+    # Prefer paid-tier servers; free ones are crowded. Fall back if there
+    # are none, so a downgraded subscription still gets a server.
+    paid = [s for s in pool if s.get("Tier", 0) >= PAID_TIER]
+
+    return min(paid or pool, key=lambda s: s["Score"])["Name"]
+
+
+def main():
+    if not SERVER_LIST.exists():
+        print(f"no server list cache at {SERVER_LIST}, skipping", file=sys.stderr)
+        return 0
+
+    server_name = pick_fastest_regular_server()
+    if not server_name:
+        print("no online regular server found, leaving config untouched", file=sys.stderr)
+        return 0
+
+    if APP_CONFIG.exists():
+        with APP_CONFIG.open() as f:
+            config = json.load(f)
+    else:
+        config = dict(DEFAULT_APP_CONFIG)
+
+    config["connect_at_app_startup"] = server_name
+    APP_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    with APP_CONFIG.open("w") as f:
+        json.dump(config, f, indent=4)
+
+    print(f"connect_at_app_startup set to {server_name}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

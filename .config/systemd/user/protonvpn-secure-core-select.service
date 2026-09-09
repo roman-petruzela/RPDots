@@ -1,0 +1,11 @@
+[Unit]
+Description=Pick fastest Secure Core server for ProtonVPN autostart
+Before=app-protonvpn@autostart.service
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/protonvpn-secure-core-select
+
+[Install]
+WantedBy=graphical-session.target
