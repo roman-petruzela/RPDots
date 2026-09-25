@@ -59,6 +59,17 @@ layout {
     struts {
     }
 }
+// Blur (niri 26.04+, ext-background-effect). Default is xray: the wallpaper is
+// blurred once and reused as a static image, so it is nearly free — except while
+// the mpvpaper video wallpaper plays, which forces a re-blur every video frame.
+// Windows opt in either themselves via the protocol (kitty `background_blur`,
+// quickshell `BackgroundEffect`) or via `background-effect` rules below.
+blur {
+    passes 3
+    offset 3.0
+    noise 0.02
+    saturation 1.5
+}
 include optional=true "~/.config/niri/theme-colors.kdl"
 spawn-sh-at-startup "~/.local/bin/start-rice-services.sh"
 hotkey-overlay {
@@ -72,6 +83,25 @@ include optional=true "~/.config/niri/power-mode.kdl"
 layer-rule {
     match namespace="^awww-daemon$"
     place-within-backdrop true
+}
+// Blur behind fuzzel and mako. The radius must match their own corner radius
+// (templates/fuzzel.ini `radius`, templates/mako.ini `border-radius`), otherwise
+// the blurred rectangle pokes out past the rounded corners.
+// waybar is left out on purpose: its surface is a full-width transparent strip
+// with floating pills, so blurring it would smear a band across the whole top.
+layer-rule {
+    match namespace="^launcher$"
+    geometry-corner-radius 12
+    background-effect {
+        blur true
+    }
+}
+layer-rule {
+    match namespace="^notifications$"
+    geometry-corner-radius 14
+    background-effect {
+        blur true
+    }
 }
 window-rule {
     match app-id="^wine" title="^Rockstar Games Launcher$"
@@ -125,6 +155,9 @@ window-rule {
     match app-id="(?i)^spotify$"
     opacity 0.75
     draw-border-with-background false
+    background-effect {
+        blur true
+    }
 }
 // niri kreslí focus-ring za oknem, a u oken s CSD jako vyplněný obdélník, ne
 // jako dutý prstenec. Zed má průhledné pozadí, takže se skrz něj místo tapety
@@ -138,6 +171,9 @@ window-rule {
     match app-id=r#"^dev\.zed\.Zed$"#
     match app-id=r#"^vesktop$"#
     draw-border-with-background false
+    background-effect {
+        blur true
+    }
 }
 /-window-rule {
     match app-id=r#"^org\.keepassxc\.KeePassXC$"#
