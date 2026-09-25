@@ -7,5 +7,5 @@ case "$action" in
 esac
 
 # Hodnotu si OSD načte samo z brightnessctl — `qs ipc call` v quickshellu
-# 0.3.0 neumí předat argument.
-qs ipc call osd-brightness trigger >/dev/null 2>&1 || true
+# 0.3.0 neumí předat argument. rp-shell místo qs ipc: viz komentář v rp-shell.
+"$HOME/.local/bin/rp-shell" osd-brightness trigger || true

@@ -54,8 +54,7 @@ read_blacklist() {
 # The OSD reads the value from PipeWire itself — `qs ipc call` in 0.3.0
 # can't pass an argument.
 osd() {
-    command -v qs >/dev/null 2>&1 || return 0
-    qs ipc call osd-volume trigger >/dev/null 2>&1 || true
+    "$HOME/.local/bin/rp-shell" osd-volume trigger || true
 }
 
 # ── writing to all outputs ─────────────────────────────────────────────

@@ -37,6 +37,12 @@ MPV_OPTS="${WALL_VIDEO_MPV_OPTS:-no-audio loop-file=inf hwdec=auto-safe profile=
 
 have_mpvpaper() { command -v mpvpaper >/dev/null 2>&1; }
 
+# Dá vědět pickeru (WallpaperPicker.qml), že nová tapeta je opravdu na ploše —
+# awww ji už zobrazil a případné staré video nad ní je pryč. Picker do té doby
+# drží přes obrazovku svůj náhled, aby přepnutí vypadalo okamžitě.
+SHOWN_FILE="$STATE_DIR/wallpaper-shown"
+mark_shown() { date +%s%N >"$SHOWN_FILE" 2>/dev/null || true; }
+
 # Počká, až awww dokreslí přechodovou animaci, jinak by mpvpaper naskočil doprostřed
 # a přechod by se zahodil. Klient awww se vrací hned (~120 ms), animaci dělá daemon
 # asynchronně (~3 s při step=10 fps=120), takže se řídíme podle jeho CPU aktivity.
@@ -68,10 +74,11 @@ stop_video() {
     pkill -x mpvpaper >/dev/null 2>&1 || true
     # mpvpaper na SIGTERM spolehlivě nereaguje (drží si ho libmpv), takže po
     # krátkém čekání eskalujeme na SIGKILL. Bez toho by video zůstalo viset
-    # nad nově nastavenou statickou tapetou.
+    # nad nově nastavenou statickou tapetou. Jemné kolo po 50 ms: dřív se
+    # čekalo po 0,25 s až 1,5 s a o tolik se zdržel i mark_shown.
     local i
-    for i in 1 2 3 4 5 6; do
-        sleep 0.25
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        sleep 0.05
         pgrep -x mpvpaper >/dev/null 2>&1 || return 0
     done
     pkill -KILL -x mpvpaper >/dev/null 2>&1 || true
@@ -80,11 +87,13 @@ stop_video() {
 
 start_video() {
     local video="$1"
-    have_mpvpaper || return 0
-    [[ -f "$video" ]] || return 0
-    [[ -f "$VIDEO_INHIBIT" ]] && { stop_video; return 0; }
+    have_mpvpaper || { mark_shown; return 0; }
+    [[ -f "$video" ]] || { mark_shown; return 0; }
+    [[ -f "$VIDEO_INHIBIT" ]] && { stop_video; mark_shown; return 0; }
 
     stop_video
+    # První snímek nového videa už awww ukazuje, starý mpvpaper je pryč.
+    mark_shown
     # Krátká pauza, ať se stará layer-shell surface stihne odregistrovat.
     sleep 0.2
     wait_for_transition
@@ -107,7 +116,7 @@ start_video() {
 
 # Srovná stav mpvpaperu s tím, co je zapsané v current-video.
 sync_video() {
-    [[ -f "$VIDEO_INHIBIT" ]] && { stop_video; return 0; }
+    [[ -f "$VIDEO_INHIBIT" ]] && { stop_video; mark_shown; return 0; }
     if [[ -f "$CURRENT_VIDEO" ]]; then
         local video
         video="$(cat "$CURRENT_VIDEO" 2>/dev/null || true)"
@@ -119,6 +128,7 @@ sync_video() {
         rm -f "$CURRENT_VIDEO"
     fi
     stop_video
+    mark_shown
 }
 
 # Nastartuje mpvpaper jen pokud už neběží (pro healthcheck — nechceme

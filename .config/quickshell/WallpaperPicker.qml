@@ -29,6 +29,13 @@ PanelWindow {
     // Při otevření se má skočit rovnou na aktuální tapetu, ne k ní dojet.
     property bool instantMove: false
     property int thumbEpoch: 0
+    // Cesty+náhledy posledního výpisu. Když se nezmění, model se nepřestavuje —
+    // karty i načtené náhledy přežijí zavření a picker se otevře hned hotový.
+    property string listSig: ""
+    property string currentPath: ""
+    // Sekvence po výběru: zoom doběhl / tapeta je opravdu na ploše
+    property bool zoomDone: false
+    property bool wallpaperShown: false
 
     visible: false
     color: "transparent"
@@ -43,11 +50,14 @@ PanelWindow {
 
     FocusedOutput { id: opener; window: root }
 
+    // Otevírá se bez animace — picker má reagovat stejně rychle jako fuzzel.
     function open() {
         applying = false
         filter = ""
-        stage.opacity = 0
+        stage.opacity = 1
+        backdrop.opacity = 1
         launch.visible = false
+        focusPath(currentPath)
         lister.running = false
         lister.running = true
         inhibitCheck.running = false
@@ -60,10 +70,7 @@ PanelWindow {
         else root.open()
     }
 
-    onVisibleChanged: {
-        if (visible) stage.opacity = 1
-        else settledIndex = -1
-    }
+    onVisibleChanged: if (!visible) settledIndex = -1
 
     // ---------------------------------------------------------------- data
 
@@ -86,9 +93,23 @@ PanelWindow {
                         search: (name + " " + f[0].split("/").pop()).toLowerCase()
                     })
                 }
-                root.entries = list
                 const cur = list.find(e => e.current)
-                root.rebuild(cur ? cur.path : "")
+                const curPath = cur ? cur.path : ""
+                const sig = list.map(e => e.path + "\t" + e.thumb).join("\n")
+                root.entries = list
+                if (sig !== root.listSig) {
+                    root.listSig = sig
+                    root.currentPath = curPath
+                    root.rebuild(curPath)
+                } else if (curPath !== root.currentPath) {
+                    // Tapetu mezitím změnilo něco jiného než picker
+                    root.markCurrent(curPath)
+                    root.focusPath(curPath)
+                }
+                // --list soubor se signálem založil; znovu nastavená cesta
+                // zajistí, že ho FileView opravdu sleduje.
+                shownSignal.path = ""
+                shownSignal.path = root.shownFile
             }
         }
     }
@@ -101,6 +122,23 @@ PanelWindow {
     }
 
     ListModel { id: shown }
+
+    function focusPath(path) {
+        for (let i = 0; i < shown.count; i++) {
+            if (shown.get(i).path !== path) continue
+            instantMove = true
+            view.currentIndex = i
+            instantMove = false
+            return
+        }
+    }
+
+    function markCurrent(path) {
+        currentPath = path
+        for (const e of entries) e.current = e.path === path
+        for (let i = 0; i < shown.count; i++)
+            shown.setProperty(i, "current", shown.get(i).path === path)
+    }
 
     function rebuild(focusPath) {
         const q = filter.trim().toLowerCase()
@@ -143,14 +181,53 @@ PanelWindow {
         view.currentIndex = ((view.currentIndex + delta) % shown.count + shown.count) % shown.count
     }
 
+    // Přechod dělá picker sám (zoom karty), awww proto dostane "none" a jen
+    // tapetu okamžitě vymění. Náhled zůstane přes obrazovku, dokud
+    // wallpaper-video-ctl.sh nezapíše wallpaper-shown (awww hotový, staré
+    // video pryč) — teprve pak se rozpustí, takže přepnutí působí okamžitě.
+    readonly property string shownFile: home + "/.cache/niri-rice/wallpaper-shown"
+
     function apply() {
         const e = currentEntry()
         if (!e || applying) return
         applying = true
-        Quickshell.execDetached([root.home + "/.local/bin/apply-wallpaper-theme.sh", e.path])
+        zoomDone = false
+        wallpaperShown = false
+        markCurrent(e.path)
+        Quickshell.execDetached(["env", "AWWW_TRANSITION_TYPE=none", "WALL_TRANSITION_TYPE=none",
+                                 root.home + "/.local/bin/apply-wallpaper-theme.sh", e.path])
         launchImage.source = "file://" + e.thumb
+        // U obrázku se na pozadí dotáhne plné rozlišení, ať rozmazaný 960px
+        // náhled nevisí přes celou obrazovku. U videa awww ukazuje jiný snímek
+        // než náhled, tam by to nepomohlo.
+        launchFull.source = e.video ? "" : "file://" + e.path
         launch.visible = true
-        launchAnim.start()
+        zoomAnim.start()
+        revealTimeout.restart()
+    }
+
+    function maybeReveal() {
+        if (applying && zoomDone && wallpaperShown && !revealAnim.running) revealAnim.start()
+    }
+
+    FileView {
+        id: shownSignal
+        watchChanges: true
+        onFileChanged: {
+            if (!root.applying) return
+            root.wallpaperShown = true
+            root.maybeReveal()
+        }
+    }
+
+    // Pojistka, kdyby signál nepřišel (např. chybí mpvpaper skript)
+    Timer {
+        id: revealTimeout
+        interval: 2500
+        onTriggered: {
+            root.wallpaperShown = true
+            root.maybeReveal()
+        }
     }
 
     Timer {
@@ -258,7 +335,6 @@ PanelWindow {
         anchors.fill: parent
         focus: root.visible
         opacity: 0
-        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
         readonly property real cardW: Math.min(width * 0.44, 900)
         readonly property real cardH: cardW * 9 / 16
@@ -310,7 +386,7 @@ PanelWindow {
             preferredHighlightBegin: 0.5
             preferredHighlightEnd: 0.5
             highlightRangeMode: PathView.StrictlyEnforceRange
-            highlightMoveDuration: root.instantMove ? 0 : 300
+            highlightMoveDuration: root.instantMove ? 0 : 170
             snapMode: PathView.SnapOneItem
             flickDeceleration: 900
             cacheItemCount: 2
@@ -593,8 +669,8 @@ PanelWindow {
 
     // -------------------------------------------------------------- launch
 
-    // Po potvrzení se vybraná karta rozroste přes celou obrazovku a pak se
-    // rozplyne — pod ní mezitím awww dělá skutečný přechod na novou tapetu.
+    // Po potvrzení se vybraná karta rozroste přes celou obrazovku; když je
+    // nová tapeta na ploše, překryv se rozpustí (viz apply()).
     ClippingRectangle {
         id: launch
         visible: false
@@ -611,27 +687,45 @@ PanelWindow {
             fillMode: Image.PreserveAspectCrop
             cache: false
         }
+
+        Image {
+            id: launchFull
+            anchors.fill: parent
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            cache: false
+            sourceSize: Qt.size(root.width, root.height)
+            visible: status === Image.Ready
+        }
+    }
+
+    ParallelAnimation {
+        id: zoomAnim
+        NumberAnimation { target: stage; property: "opacity"; to: 0; duration: 100 }
+        NumberAnimation { target: launch; property: "x"; from: stage.cx - stage.cardW / 2; to: 0; duration: 280; easing.type: Easing.OutCubic }
+        NumberAnimation { target: launch; property: "y"; from: stage.cy - stage.cardH / 2; to: 0; duration: 280; easing.type: Easing.OutCubic }
+        NumberAnimation { target: launch; property: "width"; from: stage.cardW; to: root.width; duration: 280; easing.type: Easing.OutCubic }
+        NumberAnimation { target: launch; property: "height"; from: stage.cardH; to: root.height; duration: 280; easing.type: Easing.OutCubic }
+        NumberAnimation { target: launch; property: "radius"; from: 14; to: 0; duration: 280 }
+        onFinished: {
+            root.zoomDone = true
+            root.maybeReveal()
+        }
     }
 
     SequentialAnimation {
-        id: launchAnim
+        id: revealAnim
         ParallelAnimation {
-            NumberAnimation { target: stage; property: "opacity"; to: 0; duration: 140 }
-            NumberAnimation { target: launch; property: "x"; from: stage.cx - stage.cardW / 2; to: 0; duration: 420; easing.type: Easing.OutCubic }
-            NumberAnimation { target: launch; property: "y"; from: stage.cy - stage.cardH / 2; to: 0; duration: 420; easing.type: Easing.OutCubic }
-            NumberAnimation { target: launch; property: "width"; from: stage.cardW; to: root.width; duration: 420; easing.type: Easing.OutCubic }
-            NumberAnimation { target: launch; property: "height"; from: stage.cardH; to: root.height; duration: 420; easing.type: Easing.OutCubic }
-            NumberAnimation { target: launch; property: "radius"; from: 14; to: 0; duration: 420 }
-        }
-        ParallelAnimation {
-            NumberAnimation { target: launch; property: "opacity"; from: 1; to: 0; duration: 320 }
-            NumberAnimation { target: backdrop; property: "opacity"; from: 1; to: 0; duration: 320 }
+            NumberAnimation { target: launch; property: "opacity"; from: 1; to: 0; duration: 160 }
+            NumberAnimation { target: backdrop; property: "opacity"; from: 1; to: 0; duration: 160 }
         }
         ScriptAction {
             script: {
+                revealTimeout.stop()
                 root.visible = false
                 launch.visible = false
                 launch.opacity = 1
+                launchFull.source = ""
                 backdrop.opacity = 1
                 root.applying = false
             }

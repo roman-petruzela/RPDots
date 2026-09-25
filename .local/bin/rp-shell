@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Pošle příkaz běžícímu quickshellu: `rp-shell wallpaper toggle`,
+# `rp-shell osd-volume trigger`, ...
+#
+# Jde přes unixový socket, který otevírá shell.qml (SocketServer), protože
+# `qs ipc call` pokaždé startuje celý Qt klient (~40 ms) — u OSD na klávesách
+# hlasitosti a u otevírání oken je to znatelné zpoždění. Když socket není
+# (quickshell neběží, starší config), spadne zpátky na `qs ipc call`, takže
+# návratový kód říká, jestli příkaz někdo převzal.
+sock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/rp-shell.sock"
+if [[ -S "$sock" ]] && command -v socat >/dev/null 2>&1 \
+    && printf '%s\n' "$*" | socat -t 0.5 - "UNIX-CONNECT:$sock" 2>/dev/null; then
+    exit 0
+fi
+command -v qs >/dev/null 2>&1 && exec qs ipc call "$@" >/dev/null 2>&1
+exit 1

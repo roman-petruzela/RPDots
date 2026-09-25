@@ -58,6 +58,46 @@ ShellRoot {
         else target.open()
     }
 
+    // Rychlá cesta pro klávesové zkratky a waybar: `rp-shell <cíl> <funkce>`
+    // pošle řádek "cíl funkce" na tenhle socket. `qs ipc call` pokaždé startuje
+    // celý Qt klient (~40 ms), což je u OSD hlasitosti a otevírání oken znát;
+    // socat na socket trvá pár ms. IpcHandlery výš zůstávají pro kompatibilitu.
+    SocketServer {
+        active: true
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/rp-shell.sock"
+        // Spojení zavírá server hned po přečtení příkazu — kdyby ho zavřel
+        // klient, quickshell by každé volání zalogoval jako PeerClosedError.
+        handler: Socket {
+            id: client
+            parser: SplitParser {
+                onRead: line => {
+                    root.dispatch(line.trim())
+                    client.connected = false
+                }
+            }
+        }
+    }
+
+    function dispatch(line) {
+        const flyouts = {
+            dashboard: dashboard, audio: audioSwitcher, power: powerSwitcher,
+            network: networkSwitcher, wallpaper: wallpaperPicker
+        }
+        const [target, fn] = line.split(/\s+/)
+        const flyout = flyouts[target]
+        if (flyout) {
+            if (fn === "toggle") root.openFlyout(flyout, true)
+            else if (fn === "open") root.openFlyout(flyout, false)
+            else if (fn === "hide") flyout.visible = false
+            else if (fn === "next" && target === "audio") audioSwitcher.selectNext()
+            return
+        }
+        if (line === "osd-volume trigger") osd.triggerVolume()
+        else if (line === "osd-brightness trigger") osd.triggerBrightness()
+        else if (line === "osd-keyboard-layout trigger") osd.triggerKeyboardLayout()
+        else console.warn("rp-shell: unknown command:", line)
+    }
+
     IpcHandler {
         target: "shell"
         function reload(): void {
@@ -91,5 +131,5 @@ ShellRoot {
         id: wallpaperPicker
     }
 
-    OSD {}
+    OSD { id: osd }
 }

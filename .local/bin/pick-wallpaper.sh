@@ -146,6 +146,10 @@ if [[ "${1:-}" == "--list" ]]; then
   [[ "${#files[@]}" -gt 0 ]] || exit 0
   mapfile -t sigs < <(stat -c '%Y_%s' -- "${files[@]}")
   current_src="$(current_wallpaper_source)"
+  # Signální soubor pro picker (viz mark_shown ve wallpaper-video-ctl.sh) —
+  # FileView ho umí sledovat, jen když už existuje.
+  shown_file="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/wallpaper-shown"
+  [[ -e "$shown_file" ]] || : >"$shown_file"
   missing=()
   for i in "${!files[@]}"; do
     file="${files[$i]}"
@@ -170,8 +174,7 @@ fi
 # Výchozí cesta je quickshell coverflow (WallpaperPicker.qml) — ten po výběru
 # sám spustí apply-wallpaper-theme.sh. Rofi zůstává jako fallback, když qs
 # neběží nebo ještě nemá načtený IPC cíl `wallpaper` (--rofi ho vynutí).
-if [[ "${1:-}" != "--rofi" ]] && command -v qs >/dev/null 2>&1 \
-  && qs ipc call wallpaper toggle >/dev/null 2>&1; then
+if [[ "${1:-}" != "--rofi" ]] && "$HOME/.local/bin/rp-shell" wallpaper toggle; then
   exit 0
 fi
 

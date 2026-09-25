@@ -7,4 +7,4 @@ niri msg action switch-layout "${1:-next}" >/dev/null 2>&1
 
 # Hodnotu (aktuální layout) si OSD načte samo přes `niri msg keyboard-layouts`
 # — `qs ipc call` v quickshellu 0.3.0 neumí předat argument.
-qs ipc call osd-keyboard-layout trigger >/dev/null 2>&1 || true
+"$HOME/.local/bin/rp-shell" osd-keyboard-layout trigger || true

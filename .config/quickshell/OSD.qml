@@ -21,24 +21,34 @@ Item {
     readonly property PwNode sink: Pipewire.defaultAudioSink
     PwObjectTracker { objects: root.sink ? [root.sink] : [] }
 
+    // Volá je IpcHandler i rychlý socket v shell.qml (rp-shell).
+    function triggerVolume() {
+        if (!root.sink || !root.sink.audio) return
+        root.osdType = "volume"
+        root.osdMuted = root.sink.audio.muted
+        root.osdValue = Math.round(root.sink.audio.volume * 100)
+        root.showing = true
+        hideTimer.restart()
+    }
+
+    function triggerBrightness() {
+        brightnessProc.running = false
+        brightnessProc.running = true
+    }
+
+    function triggerKeyboardLayout() {
+        keyboardLayoutProc.running = false
+        keyboardLayoutProc.running = true
+    }
+
     IpcHandler {
         target: "osd-volume"
-        function trigger(): void {
-            if (!root.sink || !root.sink.audio) return
-            root.osdType = "volume"
-            root.osdMuted = root.sink.audio.muted
-            root.osdValue = Math.round(root.sink.audio.volume * 100)
-            root.showing = true
-            hideTimer.restart()
-        }
+        function trigger(): void { root.triggerVolume() }
     }
 
     IpcHandler {
         target: "osd-brightness"
-        function trigger(): void {
-            brightnessProc.running = false
-            brightnessProc.running = true
-        }
+        function trigger(): void { root.triggerBrightness() }
     }
 
     Process {
@@ -60,10 +70,7 @@ Item {
 
     IpcHandler {
         target: "osd-keyboard-layout"
-        function trigger(): void {
-            keyboardLayoutProc.running = false
-            keyboardLayoutProc.running = true
-        }
+        function trigger(): void { root.triggerKeyboardLayout() }
     }
 
     Process {

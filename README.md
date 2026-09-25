@@ -209,9 +209,18 @@ closes it.
 
 | Module | Flyout | IPC |
 |---|---|---|
-| Volume | `AudioSwitcher.qml` | `qs ipc call audio toggle` |
-| Battery | `PowerSwitcher.qml` | `qs ipc call power toggle` |
-| Network | `NetworkSwitcher.qml` | `qs ipc call network toggle` |
+| Volume | `AudioSwitcher.qml` | `rp-shell audio toggle` |
+| Battery | `PowerSwitcher.qml` | `rp-shell power toggle` |
+| Network | `NetworkSwitcher.qml` | `rp-shell network toggle` |
+
+**`rp-shell <target> <function>`** is how keybinds, waybar and the OSD scripts
+talk to quickshell. It writes one line to a `SocketServer` in `shell.qml`
+(`$XDG_RUNTIME_DIR/rp-shell.sock`) via socat: ~7 ms, against ~40 ms for
+`qs ipc call`, which boots a whole Qt client per call — that was the noticeable
+lag on volume keys and flyouts. The server closes the connection after reading
+(if the client did, quickshell would log a `PeerClosedError` per call). Without
+the socket it falls back to `qs ipc call`, so the `IpcHandler`s stay; a new
+target needs a line in `shell.qml`'s `dispatch()` too.
 
 Only one is open at a time — they share the same spot, so `shell.qml`'s
 `openFlyout()` hides the others.
@@ -232,17 +241,26 @@ reason `rp-power status` checks `runtime_status` first.
 
 ## Wallpaper picker
 
-`Mod+Shift+W` still runs `pick-wallpaper.sh`, which first tries
-`qs ipc call wallpaper toggle` and only falls back to the old rofi list when
-quickshell isn't running or hasn't loaded the `wallpaper` target yet
-(`pick-wallpaper.sh --rofi` forces rofi). `WallpaperPicker.qml` is a full-screen
+`Mod+Shift+W` runs `rp-shell wallpaper toggle` and only falls back to the old
+rofi list (`pick-wallpaper.sh --rofi`) when quickshell isn't running. `WallpaperPicker.qml` is a full-screen
 3D coverflow: side cards are `Rotation`s around the Y axis (Qt Quick projects
 those with real perspective), placed on a `PathView` path that is stretched in
 the middle and compressed at the edges so the neighbours stack like book pages.
 The backdrop is the focused wallpaper itself, blurred at a third of the screen
 resolution (cheaper, and a 960 px thumbnail would be soft at full size anyway).
 Enter hands the path to `apply-wallpaper-theme.sh` — never matugen directly —
-and zooms the card to full screen while awww runs the real transition underneath.
+with `AWWW_TRANSITION_TYPE=none`: the card zooming to full screen *is* the
+transition, and a wave from awww afterwards read as a second, redundant one.
+(`01-wallpaper-transition.sh` forces `step=255` for `none`, otherwise its explicit
+`--transition-step 10` would slow the alias back down.) The zoomed card stays up
+until `wallpaper-video-ctl.sh` writes `~/.cache/niri-rice/wallpaper-shown` —
+awww has swapped the image *and* any old mpvpaper is gone — and then dissolves
+in 160 ms, so the switch looks instant even when a video has to be killed first.
+A 2.5 s timeout covers a missing signal. `stop_video` now polls every 50 ms
+(was 250 ms) before escalating to SIGKILL, since that wait now delays the reveal.
+
+The model is only rebuilt when the list of paths/thumbnails changes, so cards and
+their decoded thumbnails survive closing and the picker opens fully drawn.
 
 The list comes from `pick-wallpaper.sh --list` (path, thumbnail, kind, current).
 The 960×540 thumbnails are named `large-v1-<mtime>_<size>-<basename>.jpg`

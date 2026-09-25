@@ -11,7 +11,7 @@
   ],
   "modules-center": ["clock"],
   "modules-right": [
-    "network",
+    "custom/network",
     "custom/vpn",
     "group/hardware",
     "group/audio-peripherals",
@@ -53,7 +53,7 @@
     "format-icons": { "default": ["", "", ""] },
     "tooltip-format": "{desc}\n{volume} %",
     // levý = přepínač výstupů, pravý = pavucontrol, prostřední = ztlumit
-    "on-click": "qs ipc call audio toggle",
+    "on-click": "~/.local/bin/rp-shell audio toggle",
     "on-click-right": "pavucontrol",
     "on-click-middle": "~/.local/bin/rp-audio mute",
     // kolečko mění hlasitost na všech výstupech naráz
@@ -61,19 +61,23 @@
     "on-scroll-down": "~/.local/bin/rp-audio volume down",
   },
   "backlight": { "format": "󰃟 {percent}%" },
-  "network": {
-    // Bez "interface" se sleduje rozhraní s výchozí trasou, takže se modul
-    // sám přepne mezi wifi a ethernetem. ProtonVPN routuje přes vlastní
-    // tabulku, takže proton0 výchozí trasu v main nepřebíjí a neobjeví se tu.
+  "custom/network": {
+    // The built-in "network" module, without "interface" set, auto-selects
+    // by lowest default-route metric across IPv4 and IPv6 combined (the
+    // netlink route dump goes out as AF_UNSPEC and nothing filters by
+    // family afterwards - a waybar bug, see Alexays/Waybar
+    // src/modules/network.cpp). ProtonVPN's IPv6 leak protection keeps a
+    // default IPv6 route on the dummy ipv6leakintrf0 interface with a lower
+    // metric than the real IPv4 default route, so after connecting the VPN
+    // the module sometimes latched onto it and showed
+    // "ipv6leakintrf0 (no IP)" instead of the real ethernet/wifi. This
+    // script only looks at the IPv4 default route instead, so that
+    // IP-less dummy interface can never win - see waybar-network.sh.
+    "exec": "~/.local/bin/waybar-network.sh",
     "interval": 2,
-    "format-wifi": "  󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
-    "format-ethernet": "󰌘  󰇚{bandwidthDownBytes} 󰕒{bandwidthUpBytes}",
-    "format-linked": "󰌘 {ifname} (no IP)",
-    "format-disconnected": "󰖪 offline",
-    "on-click": "qs ipc call network toggle",
+    "return-type": "json",
+    "on-click": "~/.local/bin/rp-shell network toggle",
     "max-length": 30,
-    "tooltip-format-wifi": "  {essid}\n{ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}\nSignal {signalStrength}%",
-    "tooltip-format-ethernet": "󰌘 {ifname}\nIP {ipaddr}\nMask {cidr}\nGW {gwaddr}",
   },
   "custom/vpn": {
     "on-click": "~/.local/bin/protonvpn-app",
@@ -88,7 +92,7 @@
   "battery": {
     "states": { "warning": 30, "critical": 15 },
     // levý klik = přepínač power režimů (rp-power)
-    "on-click": "qs ipc call power toggle",
+    "on-click": "~/.local/bin/rp-shell power toggle",
     "tooltip-format": "{capacity} % {time}\nClick to switch power mode",
     "format": "{icon} {capacity}%",
     "format-charging": " {capacity}%",
@@ -129,6 +133,6 @@
   "custom/power": {
     "format": "",
     "tooltip": false,
-    "on-click": "qs ipc call dashboard toggle",
+    "on-click": "~/.local/bin/rp-shell dashboard toggle",
   },
 }

@@ -31,6 +31,9 @@ apply_wallpaper_transition() {
             step="${WALL_TRANSITION_STEP:-90}"
             fps="${WALL_TRANSITION_FPS:-120}"
         fi
+        # "none" = okamžitě (WallpaperPicker.qml má vlastní animaci). Explicitní
+        # --transition-step by jinak alias "none" (step 255) zase zpomalil.
+        [[ "$trans" == "none" ]] && step=255
         swww img "$wall" \
             --transition-type "$trans" \
             --transition-angle "$angle" \
@@ -50,6 +53,7 @@ apply_wallpaper_transition() {
             step="${AWWW_TRANSITION_STEP:-10}"
             fps="${AWWW_TRANSITION_FPS:-120}"
         fi
+        [[ "$trans" == "none" ]] && step=255
         wave="${AWWW_TRANSITION_WAVE:-40,30}"
         pos="${AWWW_TRANSITION_POS:-0.5,0.5}"
         
