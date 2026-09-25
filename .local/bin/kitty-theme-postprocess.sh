@@ -6,9 +6,10 @@ set -euo pipefail
 THEME="$HOME/.config/kitty/current-theme.conf"
 [[ -f "$THEME" ]] || exit 0
 
-# Target HSV value for the background, and the minimum WCAG contrast ratio an
-# ANSI colour has to reach against it.
+# Target HSV value for the background, the ceiling on its HSV saturation, and
+# the minimum WCAG contrast ratio an ANSI colour has to reach against it.
 KITTY_BG_VALUE="${KITTY_BG_VALUE:-0.23}" \
+KITTY_BG_MAX_SAT="${KITTY_BG_MAX_SAT:-0.35}" \
 KITTY_MIN_CONTRAST="${KITTY_MIN_CONTRAST:-2.5}" \
 python3 - "$THEME" <<'PY'
 import colorsys, os, re, sys
@@ -16,6 +17,7 @@ import colorsys, os, re, sys
 path = sys.argv[1]
 text = open(path).read()
 bg_value = float(os.environ["KITTY_BG_VALUE"])
+bg_max_sat = float(os.environ["KITTY_BG_MAX_SAT"])
 min_contrast = float(os.environ["KITTY_MIN_CONTRAST"])
 
 
@@ -50,8 +52,13 @@ if not m:
 # value also makes this script idempotent — the old relative version darkened the
 # theme again on every extra run, which is how a stray `matugen` invocation used
 # to leave kitty visibly off.
+#
+# Saturation is capped rather than scaled for the same reason: a cap is
+# idempotent, a multiplier would bleach the background a bit more on every run.
+# Colourful schemes hand back ~0.45-0.5 here; the cap tones them down without
+# touching already-muted or monochrome ones.
 hue, sat, _ = colorsys.rgb_to_hsv(*parse(m.group(1)))
-bg = colorsys.hsv_to_rgb(hue, sat, bg_value)
+bg = colorsys.hsv_to_rgb(hue, min(sat, bg_max_sat), bg_value)
 text = re.sub(r'^(background\s+)#[0-9a-fA-F]{6}', f'\\g<1>{fmt(bg)}',
               text, flags=re.MULTILINE)
 

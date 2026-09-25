@@ -76,11 +76,11 @@ value instead of halving whatever it finds.
 | What | Where | Now |
 |---|---|---|
 | **Spotify opacity** | `.config/niri/config.kdl` → `window-rule` matching `spotify` → `opacity` | `0.75` |
-| Terminal opacity | `.config/kitty/kitty.conf` → `background_opacity` | `0.75` |
+| Terminal opacity | `.config/kitty/kitty.conf` → `background_opacity` | `0.45` (lower than the rest since niri blurs behind it) |
 | GTK / Thunar alphas | `.local/share/themes/RPRice/gtk-3.0/widgets.css` (top of file) | `rp_window` 0.55, `rp_view` 0.46 |
 | Zed alphas | `.config/matugen/templates/zed-theme.json` → `set_alpha` | chrome 0.78, editor/terminal 0.85 |
 | Surface tones | `templates/gtk3-dark.css`, `zed-theme.json`, `spicetify-user.css` | `set_lightness` / `set_saturation` |
-| kitty background | `KITTY_BG_VALUE` in `.local/bin/kitty-theme-postprocess.sh` | `0.23` HSV value |
+| kitty background | `KITTY_BG_VALUE` / `KITTY_BG_MAX_SAT` in `.local/bin/kitty-theme-postprocess.sh` | `0.23` HSV value, saturation ≤ `0.35` |
 | kitty ANSI legibility floor | `KITTY_MIN_CONTRAST`, same script | `2.5` : 1 vs background |
 | Monochrome cutoff | `THEME_MONO_THRESHOLD` (`THEME_MONO_MODE=on\|off\|auto` forces it) | `2.0` % |
 

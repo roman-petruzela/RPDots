@@ -65,7 +65,7 @@ layout {
 // Windows opt in either themselves via the protocol (kitty `background_blur`,
 // quickshell `BackgroundEffect`) or via `background-effect` rules below.
 blur {
-    passes 3
+    passes 2
     offset 3.0
     noise 0.02
     saturation 1.5
