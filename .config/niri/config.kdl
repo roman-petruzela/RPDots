@@ -107,6 +107,15 @@ layer-rule {
         blur true
     }
 }
+// Launcher and session menu (quickshell): full-screen like the wallpaper picker,
+// windows underneath blurred for real (xray off).
+layer-rule {
+    match namespace="^rp-overlay$"
+    background-effect {
+        blur true
+        xray false
+    }
+}
 // Mod+Tab / Alt+Tab switchers (quickshell): a floating glass panel.
 layer-rule {
     match namespace="^rp-switcher$"
@@ -223,7 +232,8 @@ binds {
     Mod+Shift+Slash { show-hotkey-overlay; }
     Mod+T hotkey-overlay-title="Open a Terminal: kitty" { spawn "kitty"; }
     Mod+E hotkey-overlay-title="File Manager: yazi" { spawn "kitty" "--" "yazi"; }
-    Mod+D hotkey-overlay-title="Run an Application: fuzzel" { spawn "fuzzel"; }
+    // quickshell Launcher.qml; fuzzel only when quickshell isn't running
+    Mod+D hotkey-overlay-title="Run an Application" { spawn-sh "~/.local/bin/rp-shell launcher toggle || fuzzel"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen: swaylock" { spawn "swaylock"; }
     Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
     XF86AudioRaiseVolume allow-when-locked=true { spawn "~/.local/bin/volume-osd.sh" "up"; }
@@ -393,7 +403,9 @@ binds {
     Mod+Shift+O hotkey-overlay-title="Přepínač výstupu zvuku" { spawn "qs" "ipc" "call" "audio" "toggle"; }
     Mod+Ctrl+O hotkey-overlay-title="Další výstup zvuku" { spawn "qs" "ipc" "call" "audio" "next"; }
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
-    Mod+Shift+E { quit; }
+    // quickshell SessionMenu.qml (lock/suspend/log out/restart/shut down);
+    // falls back to niri's own exit dialog. Ctrl+Alt+Delete always gets that.
+    Mod+Shift+E { spawn-sh "~/.local/bin/rp-shell session toggle || niri msg action quit"; }
     Ctrl+Alt+Delete { quit; }
     Mod+Shift+P { power-off-monitors; }
 }

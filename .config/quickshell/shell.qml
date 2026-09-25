@@ -1,3 +1,6 @@
+//@ pragma IconTheme Papirus-Dark
+// Bez tohohle quickshell hledá ikony jen v hicolor a obecné názvy
+// (utilities-system-monitor, …) vykreslí jako šachovnici.
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -43,6 +46,18 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "launcher"
+        function toggle(): void { root.openFlyout(launcher, true) }
+        function hide(): void   { launcher.visible = false }
+    }
+
+    IpcHandler {
+        target: "session"
+        function toggle(): void { root.openFlyout(sessionMenu, true) }
+        function hide(): void   { sessionMenu.visible = false }
+    }
+
+    IpcHandler {
         target: "windows"
         function next(): void { root.dispatch("windows next") }
         function prev(): void { root.dispatch("windows prev") }
@@ -65,7 +80,7 @@ ShellRoot {
 
     // Okna vyjíždějí na stejné místo, takže se navzájem vylučují.
     function openFlyout(target, allowToggle) {
-        for (const f of [dashboard, audioSwitcher, powerSwitcher, networkSwitcher, wallpaperPicker])
+        for (const f of [dashboard, audioSwitcher, powerSwitcher, networkSwitcher, wallpaperPicker, launcher, sessionMenu])
             if (f !== target) f.visible = false
 
         if (allowToggle) target.toggle()
@@ -106,7 +121,8 @@ ShellRoot {
 
         const flyouts = {
             dashboard: dashboard, audio: audioSwitcher, power: powerSwitcher,
-            network: networkSwitcher, wallpaper: wallpaperPicker
+            network: networkSwitcher, wallpaper: wallpaperPicker,
+            launcher: launcher, session: sessionMenu
         }
         const [target, fn] = line.split(/\s+/)
         const flyout = flyouts[target]
@@ -155,6 +171,10 @@ ShellRoot {
     WallpaperPicker {
         id: wallpaperPicker
     }
+
+    Launcher { id: launcher }
+
+    SessionMenu { id: sessionMenu }
 
     NiriState { id: niri }
 

@@ -162,7 +162,10 @@ Item {
 
     function appIcon(appId) {
         const entry = DesktopEntries.heuristicLookup(appId)
-        return Quickshell.iconPath(entry?.icon ?? appId, "application-x-executable")
+        // iconPath(name, fallback) náhradu nepoužije, když ikona v tématu jen
+        // chybí (vykreslí šachovnici); check=true vrátí prázdný řetězec
+        return Quickshell.iconPath(entry?.icon ?? appId, true)
+            || Quickshell.iconPath("application-x-executable")
     }
 
     function appName(appId) {
