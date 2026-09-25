@@ -33,8 +33,8 @@ while IFS= read -r profile; do
 EOF
 
     cat > "$profile/chrome/userContent.css" <<EOF
-:root { color-scheme: dark; }
 @-moz-document url-prefix("about:newtab"), url-prefix("about:home") {
+  :root { color-scheme: dark; }
   body { background: ${background} !important; color: ${foreground} !important; }
 }
 EOF
