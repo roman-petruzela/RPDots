@@ -15,9 +15,11 @@ else
     exit 0
 fi
 
+restarted=0
 if ! pgrep -x "$daemon" >/dev/null 2>&1; then
     "$daemon" >/dev/null 2>&1 &
     sleep 0.5
+    restarted=1
 fi
 
 if [[ -f "$CURRENT_WALL" ]]; then
@@ -41,6 +43,13 @@ fi
 # nebo když spadl), nahodit ho zpátky. 'ensure' běžící instanci nechá být, aby
 # healthcheck nerestartoval video při každém tiknutí timeru.
 if [[ -x "$HOME/.local/bin/wallpaper-video-ctl.sh" ]]; then
-    "$HOME/.local/bin/wallpaper-video-ctl.sh" ensure >/dev/null 2>&1 || true
+    # Po restartu daemonu ale sync: mpvpaper sdílí s awww vrstvu background
+    # a niri kreslí později namapovaný povrch navrch — nový awww by jinak
+    # video překryl. sync mpvpaper restartuje, takže bude zase nahoře.
+    if [[ "$restarted" == 1 ]]; then
+        "$HOME/.local/bin/wallpaper-video-ctl.sh" sync >/dev/null 2>&1 || true
+    else
+        "$HOME/.local/bin/wallpaper-video-ctl.sh" ensure >/dev/null 2>&1 || true
+    fi
 fi
 

@@ -246,8 +246,6 @@ rofi list (`pick-wallpaper.sh --rofi`) when quickshell isn't running. `Wallpaper
 3D coverflow: side cards are `Rotation`s around the Y axis (Qt Quick projects
 those with real perspective), placed on a `PathView` path that is stretched in
 the middle and compressed at the edges so the neighbours stack like book pages.
-The backdrop is the focused wallpaper itself, blurred at a third of the screen
-resolution (cheaper, and a 960 px thumbnail would be soft at full size anyway).
 Enter hands the path to `apply-wallpaper-theme.sh` — never matugen directly —
 with `AWWW_TRANSITION_TYPE=none`: the card zooming to full screen *is* the
 transition, and a wave from awww afterwards read as a second, redundant one.
@@ -261,6 +259,28 @@ A 2.5 s timeout covers a missing signal. `stop_video` now polls every 50 ms
 
 The model is only rebuilt when the list of paths/thumbnails changes, so cards and
 their decoded thumbnails survive closing and the picker opens fully drawn.
+
+The picker has no backdrop of its own. Its overlay (`rp-wallpaper-picker`) gets
+niri blur with `xray false`, so the windows underneath stay visible, blurred.
+The focused wallpaper is previewed *behind* them by `WallpaperPreview.qml`: one
+Bottom-layer surface per monitor (above awww and mpvpaper in the Background layer),
+full resolution for images and the 960 px thumbnail for videos. After Enter the card
+zooms out and fades, the overlay unmaps, and the preview stays until the
+wallpaper-shown signal arrives.
+
+### Blur and video wallpapers
+
+niri's default blur is **xray**: a window blurs the *backdrop*, meaning the layers
+with `place-within-backdrop`, not what is really behind it. That is cheap because a
+static wallpaper is blurred once and reused. mpvpaper used to run in the Bottom
+layer, and `place-within-backdrop` only applies to the Background layer, so every
+blurred window (kitty, fuzzel, mako) showed awww's frozen first frame while the
+video played above it. mpvpaper now runs in the Background layer with its own
+`place-within-backdrop` rule, so the blur follows the video, at the cost of one
+re-blur per video frame (`battery`/`gaming` stop the video anyway). Within one layer
+niri draws the most recently mapped surface on top. That is why the healthcheck
+runs `sync` (restarting mpvpaper) instead of `ensure` after it had to restart
+awww-daemon: otherwise the fresh awww surface would cover the video.
 
 The list comes from `pick-wallpaper.sh --list` (path, thumbnail, kind, current).
 The 960×540 thumbnails are named `large-v1-<mtime>_<size>-<basename>.jpg`

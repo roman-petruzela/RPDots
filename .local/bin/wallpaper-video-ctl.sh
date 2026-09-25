@@ -17,10 +17,13 @@ CURRENT_VIDEO="$STATE_DIR/current-video"
 # který by jinak video do dvou minut nahodil zpátky.
 VIDEO_INHIBIT="$STATE_DIR/video-inhibit"
 
-# Vrstva mpvpaperu. Musí být nad background vrstvou, kde sedí awww, jinak by video
-# zmizelo pod tapetou. Pozn.: kvůli tomu se na video neuplatní niri
-# place-within-backdrop (to funguje jen pro background vrstvu).
-LAYER="${WALL_VIDEO_LAYER:-bottom}"
+# Vrstva mpvpaperu. Background — stejná jako awww — protože niri zahrnuje do
+# backdropu (place-within-backdrop, pravidlo v config.kdl) jen tuhle vrstvu,
+# a jen z backdropu bere xray blur oken (kitty, fuzzel, mako). V Bottom by
+# video pod rozmazanými okny nebylo vidět, blur by ukazoval statický snímek.
+# V rámci jedné vrstvy kreslí niri později namapovaný povrch navrch, proto
+# healthcheck po restartu awww-daemonu restartuje i video (sync, ne ensure).
+LAYER="${WALL_VIDEO_LAYER:-background}"
 
 # no-audio       — tapeta nikdy nehraje zvuk
 # loop-file=inf  — nekonečná smyčka

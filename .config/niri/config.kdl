@@ -59,9 +59,11 @@ layout {
     struts {
     }
 }
-// Blur (niri 26.04+, ext-background-effect). Default is xray: the wallpaper is
-// blurred once and reused as a static image, so it is nearly free — except while
-// the mpvpaper video wallpaper plays, which forces a re-blur every video frame.
+// Blur (niri 26.04+, ext-background-effect). Default is xray: a window blurs the
+// backdrop (layers with place-within-backdrop — awww and mpvpaper), not what is
+// really behind it. A static wallpaper is blurred once and reused, so it is nearly
+// free; a playing video wallpaper forces a re-blur every video frame. `xray false`
+// blurs the actual content underneath (used by the wallpaper picker overlay).
 // Windows opt in either themselves via the protocol (kitty `background_blur`,
 // quickshell `BackgroundEffect`) or via `background-effect` rules below.
 blur {
@@ -84,6 +86,13 @@ layer-rule {
     match namespace="^awww-daemon$"
     place-within-backdrop true
 }
+// Video wallpaper: mpvpaper runs in the background layer (wallpaper-video-ctl.sh)
+// so it can join the backdrop too — xray blur then follows the playing video
+// instead of showing awww's static first frame underneath it.
+layer-rule {
+    match namespace="^mpvpaper$"
+    place-within-backdrop true
+}
 // Blur behind fuzzel and mako. The radius must match their own corner radius
 // (templates/fuzzel.ini `radius`, templates/mako.ini `border-radius`), otherwise
 // the blurred rectangle pokes out past the rounded corners.
@@ -94,6 +103,16 @@ layer-rule {
     geometry-corner-radius 12
     background-effect {
         blur true
+    }
+}
+// Wallpaper picker (quickshell): xray off, so the windows under the overlay get
+// blurred instead of being replaced by the blurred wallpaper. The preview of the
+// picked wallpaper sits below the windows (rp-wallpaper-preview, Bottom layer).
+layer-rule {
+    match namespace="^rp-wallpaper-picker$"
+    background-effect {
+        blur true
+        xray false
     }
 }
 layer-rule {

@@ -3,12 +3,12 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
 import QtQuick
-import QtQuick.Effects
 import "Colors.js" as Colors
 
 // Výběr tapety (Mod+Shift+W) jako 3D coverflow přes celou obrazovku.
-// Pozadí je rozmazaná právě vybraná tapeta, takže ještě před potvrzením je
-// vidět, jak bude plocha zhruba vypadat.
+// Picker je průhledný: okna pod ním rozmazává niri a vybraná tapeta se hned
+// ukazuje za nimi na všech monitorech (WallpaperPreview), takže ještě před
+// potvrzením je vidět, jak bude plocha vypadat.
 //
 // Seznam i náhledy dodává `pick-wallpaper.sh --list` (stejná cache jako rofi
 // fallback). Chybějící náhledy se generují na pozadí; karty je zkoušejí
@@ -36,6 +36,9 @@ PanelWindow {
     // Sekvence po výběru: zoom doběhl / tapeta je opravdu na ploše
     property bool zoomDone: false
     property bool wallpaperShown: false
+    // Čte je WallpaperPreview (jeden na monitor, pod okny) — viz shell.qml
+    property bool previewActive: false
+    property url previewSource: ""
 
     visible: false
     color: "transparent"
@@ -55,9 +58,10 @@ PanelWindow {
         applying = false
         filter = ""
         stage.opacity = 1
-        backdrop.opacity = 1
         launch.visible = false
         focusPath(currentPath)
+        previewActive = true
+        previewTimer.restart()
         lister.running = false
         lister.running = true
         inhibitCheck.running = false
@@ -70,7 +74,12 @@ PanelWindow {
         else root.open()
     }
 
-    onVisibleChanged: if (!visible) settledIndex = -1
+    onVisibleChanged: {
+        if (visible) return
+        settledIndex = -1
+        // Po výběru náhled pod okny zůstává, dokud není tapeta na ploše
+        if (!applying) previewActive = false
+    }
 
     // ---------------------------------------------------------------- data
 
@@ -197,17 +206,18 @@ PanelWindow {
         Quickshell.execDetached(["env", "AWWW_TRANSITION_TYPE=none", "WALL_TRANSITION_TYPE=none",
                                  root.home + "/.local/bin/apply-wallpaper-theme.sh", e.path])
         launchImage.source = "file://" + e.thumb
-        // U obrázku se na pozadí dotáhne plné rozlišení, ať rozmazaný 960px
-        // náhled nevisí přes celou obrazovku. U videa awww ukazuje jiný snímek
-        // než náhled, tam by to nepomohlo.
-        launchFull.source = e.video ? "" : "file://" + e.path
         launch.visible = true
         zoomAnim.start()
         revealTimeout.restart()
     }
 
+    // Picker už zmizel (zoomDone), náhled pod okny drží novou tapetu, dokud
+    // ji awww skutečně nezobrazí — pak se náhled rozpustí do identického obrazu.
     function maybeReveal() {
-        if (applying && zoomDone && wallpaperShown && !revealAnim.running) revealAnim.start()
+        if (!applying || !zoomDone || !wallpaperShown) return
+        revealTimeout.stop()
+        previewActive = false
+        applying = false
     }
 
     FileView {
@@ -245,72 +255,25 @@ PanelWindow {
 
     // ------------------------------------------------------------ backdrop
 
-    // Dvě vrstvy kvůli prolínání: nový náhled se načte do zadní, a až je
-    // hotový, prohodí se. Rozmazává se v malém rozlišení — je to levnější
-    // a 960px náhled by v plné velikosti stejně nebyl ostrý.
-    property bool frontIsA: true
-
+    // Picker nemá vlastní pozadí: okna pod ním rozmazává niri (layer-rule
+    // `rp-wallpaper-picker`, xray false) a tapetu za nimi mění WallpaperPreview.
+    // Obrázek se do náhledu posílá v plném rozlišení; u videa jen jeho náhled.
     Timer {
-        id: backdropTimer
-        interval: 90
+        id: previewTimer
+        interval: 110
         onTriggered: {
             const e = root.currentEntry()
-            if (!e) return
-            const src = "file://" + e.thumb
-            const front = root.frontIsA ? backA : backB
-            const back = root.frontIsA ? backB : backA
-            if (front.source.toString() === src) return
-            if (back.source.toString() === src && back.status === Image.Ready)
-                root.frontIsA = !root.frontIsA
-            else
-                back.source = src
+            if (e) root.previewSource = "file://" + (e.video ? e.thumb : e.path)
         }
     }
 
-    Item {
-        id: backdrop
-        anchors.fill: parent
-        layer.enabled: true
-        layer.textureSize: Qt.size(width / 3, height / 3)
-        layer.effect: MultiEffect {
-            blurEnabled: true
-            blur: 1.0
-            blurMax: 48
-            saturation: 0.15
-        }
-
-        Rectangle { anchors.fill: parent; color: Colors.background }
-
-        Image {
-            id: backA
-            anchors.fill: parent
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            cache: false
-            opacity: root.frontIsA ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: 380; easing.type: Easing.InOutQuad } }
-            onStatusChanged: if (status === Image.Ready && !root.frontIsA) root.frontIsA = true
-        }
-
-        Image {
-            id: backB
-            anchors.fill: parent
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            cache: false
-            opacity: root.frontIsA ? 0 : 1
-            Behavior on opacity { NumberAnimation { duration: 380; easing.type: Easing.InOutQuad } }
-            onStatusChanged: if (status === Image.Ready && root.frontIsA) root.frontIsA = false
-        }
-    }
-
-    // Závoj: nahoře lehký, dole tmavší, aby byl popisek čitelný nad čímkoli.
+    // Závoj jen kvůli čitelnosti popisků nad rozmazanými okny
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.alpha(Colors.background, 0.35) }
-            GradientStop { position: 0.6; color: Qt.alpha(Colors.background, 0.45) }
-            GradientStop { position: 1.0; color: Qt.alpha(Colors.background, 0.85) }
+            GradientStop { position: 0.0; color: Qt.alpha(Colors.background, 0.15) }
+            GradientStop { position: 0.6; color: Qt.alpha(Colors.background, 0.3) }
+            GradientStop { position: 1.0; color: Qt.alpha(Colors.background, 0.75) }
         }
     }
 
@@ -393,7 +356,7 @@ PanelWindow {
 
             onCurrentIndexChanged: {
                 settleTimer.restart()
-                backdropTimer.restart()
+                previewTimer.restart()
             }
 
             readonly property real mid: height / 2
@@ -669,8 +632,8 @@ PanelWindow {
 
     // -------------------------------------------------------------- launch
 
-    // Po potvrzení se vybraná karta rozroste přes celou obrazovku; když je
-    // nová tapeta na ploše, překryv se rozpustí (viz apply()).
+    // Po potvrzení karta vyletí k okrajům obrazovky a cestou se rozplyne; pak
+    // picker zmizí a okna jsou zase ostrá. Nová tapeta za nimi už je (náhled).
     ClippingRectangle {
         id: launch
         visible: false
@@ -687,48 +650,23 @@ PanelWindow {
             fillMode: Image.PreserveAspectCrop
             cache: false
         }
-
-        Image {
-            id: launchFull
-            anchors.fill: parent
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            cache: false
-            sourceSize: Qt.size(root.width, root.height)
-            visible: status === Image.Ready
-        }
     }
 
     ParallelAnimation {
         id: zoomAnim
         NumberAnimation { target: stage; property: "opacity"; to: 0; duration: 100 }
-        NumberAnimation { target: launch; property: "x"; from: stage.cx - stage.cardW / 2; to: 0; duration: 280; easing.type: Easing.OutCubic }
-        NumberAnimation { target: launch; property: "y"; from: stage.cy - stage.cardH / 2; to: 0; duration: 280; easing.type: Easing.OutCubic }
-        NumberAnimation { target: launch; property: "width"; from: stage.cardW; to: root.width; duration: 280; easing.type: Easing.OutCubic }
-        NumberAnimation { target: launch; property: "height"; from: stage.cardH; to: root.height; duration: 280; easing.type: Easing.OutCubic }
-        NumberAnimation { target: launch; property: "radius"; from: 14; to: 0; duration: 280 }
+        NumberAnimation { target: launch; property: "x"; from: stage.cx - stage.cardW / 2; to: 0; duration: 300; easing.type: Easing.OutCubic }
+        NumberAnimation { target: launch; property: "y"; from: stage.cy - stage.cardH / 2; to: 0; duration: 300; easing.type: Easing.OutCubic }
+        NumberAnimation { target: launch; property: "width"; from: stage.cardW; to: root.width; duration: 300; easing.type: Easing.OutCubic }
+        NumberAnimation { target: launch; property: "height"; from: stage.cardH; to: root.height; duration: 300; easing.type: Easing.OutCubic }
+        NumberAnimation { target: launch; property: "radius"; from: 14; to: 0; duration: 300 }
+        NumberAnimation { target: launch; property: "opacity"; from: 1; to: 0; duration: 300; easing.type: Easing.InQuad }
         onFinished: {
+            root.visible = false
+            launch.visible = false
+            launch.opacity = 1
             root.zoomDone = true
             root.maybeReveal()
-        }
-    }
-
-    SequentialAnimation {
-        id: revealAnim
-        ParallelAnimation {
-            NumberAnimation { target: launch; property: "opacity"; from: 1; to: 0; duration: 160 }
-            NumberAnimation { target: backdrop; property: "opacity"; from: 1; to: 0; duration: 160 }
-        }
-        ScriptAction {
-            script: {
-                revealTimeout.stop()
-                root.visible = false
-                launch.visible = false
-                launch.opacity = 1
-                launchFull.source = ""
-                backdrop.opacity = 1
-                root.applying = false
-            }
         }
     }
 }

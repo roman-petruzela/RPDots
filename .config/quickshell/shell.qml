@@ -131,5 +131,16 @@ ShellRoot {
         id: wallpaperPicker
     }
 
+    // Náhled vybrané tapety pod okny, na všech monitorech
+    Variants {
+        model: Quickshell.screens
+        delegate: WallpaperPreview {
+            required property var modelData
+            screen: modelData
+            active: wallpaperPicker.previewActive
+            source: wallpaperPicker.previewSource
+        }
+    }
+
     OSD { id: osd }
 }
