@@ -26,6 +26,9 @@ PKGS=(
     pavucontrol
     nm-connection-editor
     jq
+    socat
+    wl-clipboard
+    cliphist
     eza
     zsh
     zoxide

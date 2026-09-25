@@ -52,6 +52,12 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "clipboard"
+        function toggle(): void { root.openFlyout(clipboardHistory, true) }
+        function hide(): void   { clipboardHistory.visible = false }
+    }
+
+    IpcHandler {
         target: "session"
         function toggle(): void { root.openFlyout(sessionMenu, true) }
         function hide(): void   { sessionMenu.visible = false }
@@ -80,7 +86,7 @@ ShellRoot {
 
     // Okna vyjíždějí na stejné místo, takže se navzájem vylučují.
     function openFlyout(target, allowToggle) {
-        for (const f of [dashboard, audioSwitcher, powerSwitcher, networkSwitcher, wallpaperPicker, launcher, sessionMenu])
+        for (const f of [dashboard, audioSwitcher, powerSwitcher, networkSwitcher, wallpaperPicker, launcher, sessionMenu, clipboardHistory])
             if (f !== target) f.visible = false
 
         if (allowToggle) target.toggle()
@@ -122,7 +128,7 @@ ShellRoot {
         const flyouts = {
             dashboard: dashboard, audio: audioSwitcher, power: powerSwitcher,
             network: networkSwitcher, wallpaper: wallpaperPicker,
-            launcher: launcher, session: sessionMenu
+            launcher: launcher, session: sessionMenu, clipboard: clipboardHistory
         }
         const [target, fn] = line.split(/\s+/)
         const flyout = flyouts[target]
@@ -175,6 +181,8 @@ ShellRoot {
     Launcher { id: launcher }
 
     SessionMenu { id: sessionMenu }
+
+    ClipboardHistory { id: clipboardHistory }
 
     NiriState { id: niri }
 

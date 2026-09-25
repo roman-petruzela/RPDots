@@ -94,6 +94,7 @@ start_user_unit niri-rice-wallpaper-healthcheck.service >/dev/null 2>&1 || true
 start_user_unit niri-rice-quickshell.service >/dev/null 2>&1 || true
 # společná hlasitost všech výstupů
 start_user_unit niri-rice-audio-sync.service >/dev/null 2>&1 || true
+start_user_unit niri-rice-cliphist.service >/dev/null 2>&1 || true
 # niri-rice-waybar.service také zakázán
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user start niri-rice-wallpaper-healthcheck.timer >/dev/null 2>&1 || true

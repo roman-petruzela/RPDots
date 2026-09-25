@@ -365,6 +365,19 @@ hicolor and draws generic names like `utilities-system-monitor` as a
 checkerboard. Pragmas are read at startup, so changing it needs
 `systemctl --user restart niri-rice-quickshell`.
 
+## Clipboard history
+
+`niri-rice-cliphist.service` runs `wl-paste --watch cliphist store`, so every
+selection (text or image) lands in cliphist. `Mod+Ctrl+V` opens
+`ClipboardHistory.qml`, the same fuzzel-like box as the launcher (Mod+Shift+V
+was already taken by the floating/tiling focus switch). Typing filters, Enter
+decodes the entry back into the clipboard, and Shift+Delete removes it. Pasting
+stays a manual Ctrl+V, because auto-paste would need `wtype`. Image previews are
+decoded lazily, only for rows that get drawn, into `$XDG_RUNTIME_DIR/rp-clip`
+(tmpfs), and that directory is wiped on every open. The unit has
+`ConditionPathExists=/usr/bin/cliphist`, so it stays quiet until cliphist is
+installed.
+
 ## Dashboard
 
 **Now Playing** talks to `Quickshell.Services.Mpris`. Two things it is easy to
@@ -505,6 +518,7 @@ above is what makes the mode not depend on TLP having already run.
 | `Mod+T` | Terminal |
 | `Mod+D` | Launcher (quickshell; fuzzel if quickshell isn't running) |
 | `Mod+Shift+E` | Session menu: lock, suspend, log out, restart, shut down |
+| `Mod+Ctrl+V` | Clipboard history (Enter copies, Shift+Delete removes) |
 | `Mod+E` | Files (yazi) |
 | `Mod+Q` | Close window |
 | `Mod+Shift+W` | Pick wallpaper + apply theme (←/→ one, ↑/↓ ten, type to filter) |

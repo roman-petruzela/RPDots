@@ -405,6 +405,8 @@ binds {
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
     // quickshell SessionMenu.qml (lock/suspend/log out/restart/shut down);
     // falls back to niri's own exit dialog. Ctrl+Alt+Delete always gets that.
+    // Clipboard history (quickshell ClipboardHistory.qml + cliphist)
+    Mod+Ctrl+V { spawn "~/.local/bin/rp-shell" "clipboard" "toggle"; }
     Mod+Shift+E { spawn-sh "~/.local/bin/rp-shell session toggle || niri msg action quit"; }
     Ctrl+Alt+Delete { quit; }
     Mod+Shift+P { power-off-monitors; }
