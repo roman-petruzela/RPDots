@@ -51,8 +51,8 @@ x-scheme-handler/beeper=Beeper.desktop
 x-scheme-handler/net.thunderbird=userapp-Thunderbird-K27TR3.desktop
 x-scheme-handler/claude-cli=claude-code-url-handler.desktop
 application/zip=org.kde.ark.desktop
-application/x-tar=org.kde.ark.desktop
-application/x-compressed-tar=org.kde.ark.desktop
+application/x-tar=org.gnome.FileRoller.desktop
+application/x-compressed-tar=org.gnome.FileRoller.desktop
 application/x-bzip2-compressed-tar=org.kde.ark.desktop
 application/x-xz-compressed-tar=org.kde.ark.desktop
 application/x-7z-compressed=org.kde.ark.desktop
@@ -217,9 +217,14 @@ audio/x-wavpack-correction=mpv.desktop
 audio/x-xi=mpv.desktop
 audio/x-xm=mpv.desktop
 audio/x-xmf=mpv.desktop
+application/x-osu-skin-archive=org.kde.ark.desktop
+x-scheme-handler/proton-inbox=proton-mail.desktop
 
 [Added Associations]
 application/zip=org.kde.ark.desktop;
 x-scheme-handler/mailto=userapp-Thunderbird-LZ48P3.desktop;
 x-scheme-handler/mid=userapp-Thunderbird-LZ48P3.desktop;
 x-scheme-handler/net.thunderbird=userapp-Thunderbird-K27TR3.desktop;
+application/x-osu-skin-archive=sh.ppy.osu.desktop;org.kde.ark.desktop;
+application/x-compressed-tar=org.gnome.FileRoller.desktop;
+application/x-tar=org.gnome.FileRoller.desktop;
