@@ -93,9 +93,11 @@ layer-rule {
     match namespace="^mpvpaper$"
     place-within-backdrop true
 }
-// Blur behind fuzzel and mako. The radius must match their own corner radius
-// (templates/fuzzel.ini `radius`, templates/mako.ini `border-radius`), otherwise
-// the blurred rectangle pokes out past the rounded corners.
+// Blur behind fuzzel. The radius must match its own corner radius
+// (templates/fuzzel.ini `radius`), otherwise the blurred rectangle pokes out past
+// the rounded corners. mako gets no blur: it draws all notifications into one
+// surface with `margin` *inside* it, so the blur filled a frame around and a band
+// between the bubbles — the odd border. Its background is 93 % opaque anyway.
 // waybar is left out on purpose: its surface is a full-width transparent strip
 // with floating pills, so blurring it would smear a band across the whole top.
 layer-rule {
@@ -105,7 +107,7 @@ layer-rule {
         blur true
     }
 }
-// Mod+Tab workspace switcher (quickshell): a floating glass panel.
+// Mod+Tab / Alt+Tab switchers (quickshell): a floating glass panel.
 layer-rule {
     match namespace="^rp-switcher$"
     geometry-corner-radius 22
@@ -121,13 +123,6 @@ layer-rule {
     background-effect {
         blur true
         xray false
-    }
-}
-layer-rule {
-    match namespace="^notifications$"
-    geometry-corner-radius 14
-    background-effect {
-        blur true
     }
 }
 window-rule {
@@ -217,28 +212,10 @@ overview {
     zoom 0.35
 }
 
-// Alt+Tab: niri's built-in switcher (live window previews). Highlight colours
-// come from theme-colors.kdl (theme-modules/30-niri.sh) and merge into this.
+// Alt+Tab is the quickshell window switcher (WindowSwitcher.qml, see binds),
+// so niri's built-in one is off — otherwise its defaults would also grab Mod+Tab.
 recent-windows {
-    // Default 150 ms made Alt+Tab feel laggy; a flick shorter than this still
-    // switches windows without flashing the switcher.
-    open-delay-ms 60
-    highlight {
-        padding 12
-        corner-radius 16
-    }
-    previews {
-        max-height 360
-        max-scale 0.4
-    }
-    // Replaces niri's defaults, which also bind the switcher to Mod+Tab —
-    // Mod+Tab is the quickshell workspace switcher instead (see binds).
-    binds {
-        Alt+Tab         { next-window; }
-        Alt+Shift+Tab   { previous-window; }
-        Alt+grave       { next-window     filter="app-id"; }
-        Alt+Shift+grave { previous-window filter="app-id"; }
-    }
+    off
 }
 
 binds {
@@ -264,6 +241,12 @@ binds {
     // releasing Mod switches. Mod+O stays the overview.
     Mod+Tab       { spawn "~/.local/bin/rp-shell" "workspaces" "next"; }
     Mod+Shift+Tab { spawn "~/.local/bin/rp-shell" "workspaces" "prev"; }
+    // Window switcher, same style: hold Alt, Tab cycles, release switches.
+    // Alt+` limits it to windows of the focused app.
+    Alt+Tab         { spawn "~/.local/bin/rp-shell" "windows" "next"; }
+    Alt+Shift+Tab   { spawn "~/.local/bin/rp-shell" "windows" "prev"; }
+    Alt+grave       { spawn "~/.local/bin/rp-shell" "windows" "next-app"; }
+    Alt+Shift+grave { spawn "~/.local/bin/rp-shell" "windows" "prev-app"; }
     Mod+Q repeat=false { close-window; }
     Mod+Left  { focus-column-left; }
     Mod+Down  { focus-window-down; }

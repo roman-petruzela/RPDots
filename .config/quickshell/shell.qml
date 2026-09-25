@@ -43,6 +43,13 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "windows"
+        function next(): void { root.dispatch("windows next") }
+        function prev(): void { root.dispatch("windows prev") }
+        function hide(): void { winSwitcher.hide() }
+    }
+
+    IpcHandler {
         target: "workspaces"
         function next(): void { wsSwitcher.cycle(1) }
         function prev(): void { wsSwitcher.cycle(-1) }
@@ -86,9 +93,16 @@ ShellRoot {
     }
 
     function dispatch(line) {
-        if (line === "workspaces next") return wsSwitcher.cycle(1)
-        if (line === "workspaces prev") return wsSwitcher.cycle(-1)
-        if (line === "workspaces hide") return wsSwitcher.hide()
+        // Přepínače (Mod+Tab / Alt+Tab) se navzájem vylučují
+        const [t, f] = line.split(/\s+/)
+        if (t === "workspaces" || t === "windows") {
+            const sw = t === "workspaces" ? wsSwitcher : winSwitcher
+            const other = t === "workspaces" ? winSwitcher : wsSwitcher
+            other.hide()
+            if (f === "hide") sw.hide()
+            else sw.cycle(f.startsWith("prev") ? -1 : 1, f.endsWith("-app"))
+            return
+        }
 
         const flyouts = {
             dashboard: dashboard, audio: audioSwitcher, power: powerSwitcher,
@@ -146,6 +160,11 @@ ShellRoot {
 
     WorkspaceSwitcher {
         id: wsSwitcher
+        niri: niri
+    }
+
+    WindowSwitcher {
+        id: winSwitcher
         niri: niri
     }
 

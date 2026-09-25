@@ -293,7 +293,7 @@ The focused video card plays a muted preview after it settles (450 ms), unless
 `WallpaperVideoPreview.qml` behind a `Loader`, so a missing QtMultimedia breaks
 only the preview, not the picker.
 
-## Workspace switcher
+## Workspace and window switchers
 
 `Mod+Tab` is Alt+Tab for workspaces (`WorkspaceSwitcher.qml`): hold Mod, Tab
 cycles, releasing Mod switches. The Tab presses never reach quickshell. niri
@@ -315,6 +315,18 @@ Workspace and window data come from `NiriState.qml`, one long-running
 `niri msg --json event-stream` that keeps the state live. Opening the switcher
 therefore needs no IPC round-trip. The snapshot is taken on open, so the order
 doesn't reshuffle while you cycle.
+
+`Alt+Tab` (`WindowSwitcher.qml`) works the same way for windows. niri's
+built-in `recent-windows` switcher is turned `off` because it has live previews
+but can hardly be restyled, and its default binds would also take Mod+Tab.
+quickshell can't get live window previews on niri (there is no per-window
+screencopy), so each window card shows the app, the title, the workspace and a
+small minimap with the window highlighted. ``Alt+` `` limits the list to the
+focused app. The cards form a grid of at most 7×3; with more windows the grid
+scrolls a row at a time to keep the selection visible, with a scrollbar and a
+counter (↑/↓ or the wheel move by a row). Cards stay at full size rather than
+shrinking to fit, because titles become unreadable below ~200 px. The shared pieces (`minimap()`, app icons, output labels) live in
+`NiriState.qml` and `Minimap.qml`.
 
 ## Dashboard
 
@@ -458,8 +470,8 @@ above is what makes the mode not depend on TLP having already run.
 | `Mod+E` | Files (yazi) |
 | `Mod+Q` | Close window |
 | `Mod+Shift+W` | Pick wallpaper + apply theme (←/→ one, ↑/↓ ten, type to filter) |
-| `Alt+Tab` / `Alt+Shift+Tab` | Window switcher (niri `recent-windows`) |
-| ``Alt+` `` | Switcher limited to the current app |
+| `Alt+Tab` / `Alt+Shift+Tab` | Window switcher (hold Alt, release to switch) |
+| ``Alt+` `` | Window switcher limited to the focused app |
 | `Mod+Tab` / `Mod+Shift+Tab` | Workspace switcher (hold Mod, release to switch) |
 | `Mod+O` | Overview (zoom 0.35) |
 | `Mod+Shift+D` | Dashboard |

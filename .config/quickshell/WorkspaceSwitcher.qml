@@ -82,73 +82,18 @@ PanelWindow {
             const ww = byWs[ws.id] || []
             // Prázdné workspacy (niri má vždy jeden na konci) nejsou kam přepnout
             if (ww.length === 0 && !ws.is_focused) continue
-            const scr = Quickshell.screens.find(s => s.name === ws.output)
             const active = ww.find(w => w.id === ws.active_window_id)
             list.push({
                 ws: ws,
                 recent: ws.is_focused ? Infinity : Math.max(0, ...ww.map(w => niri.stamp(w))),
                 label: ws.name ?? String(ws.idx),
                 title: active ? (active.title || active.app_id) : "Empty",
-                output: multiOutput ? outputLabel(ws.output, scr) : "",
-                tiles: layoutTiles(ww, ws.active_window_id, scr ? scr.width : 1920, scr ? scr.height : 1080)
+                output: multiOutput ? niri.outputLabel(ws.output) : "",
+                tiles: niri.minimap(ww, ws.active_window_id, ws.output, root.cardW, root.screenH)
             })
         }
         list.sort((a, b) => b.recent - a.recent)
         items = list
-    }
-
-    // Minimapa: sloupce vedle sebe s mezerou jako v niri (gaps 16), celé
-    // zmenšené tak, aby se vešly do karty; plovoucí okna jako sloupec navíc.
-    function layoutTiles(wins, activeId, outW, outH) {
-        const gap = 16
-        const cols = {}
-        for (const w of wins) {
-            const key = w.is_floating || !w.layout.pos_in_scrolling_layout
-                ? "float" : w.layout.pos_in_scrolling_layout[0]
-            ;(cols[key] = cols[key] || []).push(w)
-        }
-        const keys = Object.keys(cols).filter(k => k !== "float").map(Number).sort((a, b) => a - b)
-        if (cols.float) keys.push("float")
-
-        let stripW = gap
-        const colW = {}
-        for (const k of keys) {
-            colW[k] = Math.max(...cols[k].map(w => w.layout.tile_size[0]))
-            stripW += colW[k] + gap
-        }
-        const scale = Math.min(cardW / stripW, screenH / outH)
-        const offX = (cardW - stripW * scale) / 2
-        const offY = (screenH - outH * scale) / 2
-
-        const tiles = []
-        let x = gap
-        for (const k of keys) {
-            const col = cols[k].slice().sort((a, b) =>
-                (a.layout.pos_in_scrolling_layout?.[1] ?? 0) - (b.layout.pos_in_scrolling_layout?.[1] ?? 0))
-            let y = gap
-            for (const w of col) {
-                const [tw, th] = w.layout.tile_size
-                tiles.push({
-                    x: offX + x * scale, y: offY + y * scale,
-                    w: Math.max(tw * scale, 6), h: Math.max(th * scale, 6),
-                    appId: w.app_id ?? "", active: w.id === activeId
-                })
-                y += th + gap
-            }
-            x += colW[k] + gap
-        }
-        return tiles
-    }
-
-    // "eDP-1" nic neříká — vestavěný panel je „Laptop“, ostatní model monitoru
-    function outputLabel(name, scr) {
-        if (name.startsWith("eDP")) return "Laptop"
-        return scr?.model || name
-    }
-
-    function iconFor(appId) {
-        const entry = DesktopEntries.heuristicLookup(appId)
-        return Quickshell.iconPath(entry?.icon ?? appId, "application-x-executable")
     }
 
     Rectangle {
@@ -218,23 +163,10 @@ PanelWindow {
                         opacity: 0.55
                     }
 
-                    Repeater {
-                        model: card.modelData.tiles
-                        Rectangle {
-                            required property var modelData
-                            x: modelData.x; y: modelData.y
-                            width: modelData.w; height: modelData.h
-                            radius: 4
-                            color: Qt.alpha(Colors.surfaceContainerHighest, 0.88)
-                            border.width: modelData.active ? 1.5 : 1
-                            border.color: modelData.active ? Colors.primary : Qt.alpha(Colors.outline, 0.5)
-
-                            IconImage {
-                                anchors.centerIn: parent
-                                implicitSize: Math.max(10, Math.min(32, Math.min(parent.width, parent.height) * 0.5))
-                                source: root.iconFor(parent.modelData.appId)
-                            }
-                        }
+                    Minimap {
+                        anchors.fill: parent
+                        tiles: card.modelData.tiles
+                        niri: root.niri
                     }
 
                     Text {
