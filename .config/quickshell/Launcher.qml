@@ -5,7 +5,10 @@ import Quickshell.Widgets
 import QtQuick
 import "Colors.js" as Colors
 
-// Spouštěč aplikací (Mod+D), náhrada fuzzelu ve stylu ostatních oken rice.
+// Spouštěč aplikací (Mod+D), náhrada fuzzelu a schválně skoro jako on: malé
+// okno uprostřed, 12 řádků, zvýrazněná shoda, stejné barvy. Namespace
+// `launcher` je ten fuzzelí, takže dostane i jeho blur a zaoblení z niri
+// (layer-rule v config.kdl) — jen za panelem, okna kolem se nerozmazávají.
 // Prázdné pole ukáže naposledy spuštěné aplikace; psaní filtruje podle názvu,
 // obecného názvu, klíčových slov a popisu. Příklad jako `12*7+3` se spočítá
 // a Enter výsledek zkopíruje.
@@ -15,19 +18,24 @@ PanelWindow {
     id: root
 
     readonly property string fontFamily: "JetBrainsMono Nerd Font"
-    readonly property int rowH: 54
-    readonly property int maxRows: 8
+    readonly property int rowH: 34
+    readonly property int maxRows: 12
+    readonly property int pad: 12
 
     property var recent: []          // id aplikací, nejnovější první
     property var results: []
+    property string query: ""
     property int selected: 0
 
     visible: false
     color: "transparent"
-    anchors { top: true; bottom: true; left: true; right: true }
+    // Pevná velikost (jako fuzzel `lines=12`), bez kotev = uprostřed obrazovky;
+    // okno tak při psaní nemění rozměry ani neposkakuje
+    implicitWidth: 540
+    implicitHeight: panel.height
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "rp-overlay"
+    WlrLayershell.namespace: "launcher"
     WlrLayershell.keyboardFocus: root.visible
         ? WlrKeyboardFocus.Exclusive
         : WlrKeyboardFocus.None
@@ -96,6 +104,7 @@ PanelWindow {
 
     function refresh() {
         const q = input.text.trim().toLowerCase()
+        query = q
         const apps = DesktopEntries.applications.values.filter(a => !a.noDisplay)
         const rank = id => {
             const i = root.recent.indexOf(id)
@@ -112,7 +121,7 @@ PanelWindow {
                     || x.a.name.localeCompare(y.a.name))
                 .map(x => x.a)
         }
-        const rows = out.slice(0, 60).map(a => ({
+        const rows = out.map(a => ({
             kind: "app", app: a, title: a.name,
             sub: a.genericName && a.genericName !== a.name ? a.genericName : (a.comment || ""),
             icon: root.appIcon(a.icon)
@@ -148,6 +157,21 @@ PanelWindow {
         recentFile.setText(JSON.stringify(recent))
     }
 
+    // Název s obarvenou shodou (souvislý úsek, jinak jednotlivá písmena po řadě)
+    function highlight(name, q) {
+        const esc = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        const mark = t => "<font color=\"" + Colors.primary + "\">" + esc(t) + "</font>"
+        if (q === "") return esc(name)
+        const i = name.toLowerCase().indexOf(q)
+        if (i >= 0) return esc(name.slice(0, i)) + mark(name.slice(i, i + q.length)) + esc(name.slice(i + q.length))
+        let out = "", j = 0
+        for (const c of name) {
+            if (j < q.length && c.toLowerCase() === q[j]) { out += mark(c); j++ }
+            else out += esc(c)
+        }
+        return j === q.length ? out : esc(name)
+    }
+
     function move(delta) {
         if (results.length === 0) return
         selected = Math.max(0, Math.min(results.length - 1, selected + delta))
@@ -157,55 +181,38 @@ PanelWindow {
     // ------------------------------------------------------------------- ui
 
     Rectangle {
-        anchors.fill: parent
-        color: Qt.alpha(Colors.background, 0.3)
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        onClicked: root.visible = false
-    }
-
-    Rectangle {
         id: panel
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: Math.round(parent.height * 0.2)
-        width: 660
-        height: field.height + (root.results.length > 0 ? list.height + 22 : 0) + 24
-        radius: 26
-        color: Qt.alpha(Colors.surfaceContainer, 0.86)
-        border.color: Qt.alpha(Colors.outlineVariant, 0.8)
+        width: parent.width
+        height: field.height + root.maxRows * root.rowH + 3 * root.pad
+        radius: 12
+        color: Qt.alpha(Colors.surfaceContainer, 0.9)
+        border.color: Colors.outlineVariant
         border.width: 1
 
-        // Klik do panelu nesmí propadnout na zavírací vrstvu
-        MouseArea { anchors.fill: parent }
-
-        Rectangle {
+        Item {
             id: field
-            x: 12; y: 12
-            width: parent.width - 24
-            height: 58
-            radius: 18
-            color: Qt.alpha(Colors.surfaceContainerHighest, 0.9)
+            x: root.pad + 8; y: root.pad
+            width: parent.width - 2 * root.pad - 16
+            height: 36
 
             Text {
                 id: glyph
-                anchors { left: parent.left; leftMargin: 20; verticalCenter: parent.verticalCenter }
-                text: ""
+                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                text: "\uf002"
                 font.family: root.fontFamily
-                font.pixelSize: 18
+                font.pixelSize: 16
                 color: Colors.primary
             }
 
             TextInput {
                 id: input
                 anchors {
-                    left: glyph.right; leftMargin: 16; right: parent.right; rightMargin: 20
+                    left: glyph.right; leftMargin: 12; right: counter.left; rightMargin: 12
                     verticalCenter: parent.verticalCenter
                 }
                 focus: root.visible
                 font.family: root.fontFamily
-                font.pixelSize: 20
+                font.pixelSize: 16
                 color: Colors.onSurface
                 selectionColor: Qt.alpha(Colors.primary, 0.4)
                 clip: true
@@ -229,18 +236,26 @@ PanelWindow {
                     visible: input.text === ""
                     text: "Search apps, or type a sum"
                     font: input.font
-                    color: Qt.alpha(Colors.onSurfaceVariant, 0.6)
+                    color: Colors.outline
                 }
+            }
+
+            Text {
+                id: counter
+                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                text: root.results.length
+                font.family: root.fontFamily
+                font.pixelSize: 13
+                color: Colors.outline
             }
         }
 
         ListView {
             id: list
-            x: 12
-            anchors.top: field.bottom
-            anchors.topMargin: 10
-            width: parent.width - 24
-            height: Math.min(root.results.length, root.maxRows) * root.rowH
+            x: root.pad
+            y: field.y + field.height + root.pad
+            width: parent.width - 2 * root.pad
+            height: root.maxRows * root.rowH
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             model: root.results
@@ -253,43 +268,30 @@ PanelWindow {
 
                 width: list.width
                 height: root.rowH
-                radius: 14
-                color: sel ? Qt.alpha(Colors.surfaceContainerHighest, 0.95) : "transparent"
-                border.width: sel ? 1 : 0
-                border.color: Qt.alpha(Colors.primary, 0.7)
+                radius: 8
+                color: sel ? Colors.primaryContainer : "transparent"
 
                 IconImage {
                     id: icon
                     visible: row.modelData.icon !== ""
-                    anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
-                    implicitSize: 32
+                    anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                    implicitSize: 22
                     source: row.modelData.icon
                 }
 
-                Column {
+                Text {
                     anchors {
-                        left: parent.left; leftMargin: 62; right: parent.right; rightMargin: 14
+                        left: parent.left; leftMargin: 42; right: parent.right; rightMargin: 10
                         verticalCenter: parent.verticalCenter
                     }
-                    spacing: 2
-                    Text {
-                        width: parent.width
-                        text: row.modelData.title
-                        elide: Text.ElideRight
-                        font.family: root.fontFamily
-                        font.pixelSize: 15
-                        font.weight: row.modelData.kind === "calc" ? Font.DemiBold : Font.Medium
-                        color: row.sel ? Colors.primary : Colors.onSurface
-                    }
-                    Text {
-                        width: parent.width
-                        visible: text !== ""
-                        text: row.modelData.sub
-                        elide: Text.ElideRight
-                        font.family: root.fontFamily
-                        font.pixelSize: 12
-                        color: Colors.onSurfaceVariant
-                    }
+                    textFormat: row.modelData.kind === "calc" ? Text.PlainText : Text.StyledText
+                    text: row.modelData.kind === "calc" ? row.modelData.title
+                        : root.highlight(row.modelData.title, root.query)
+                    elide: Text.ElideRight
+                    font.family: root.fontFamily
+                    font.pixelSize: 15
+                    font.weight: row.modelData.kind === "calc" ? Font.DemiBold : Font.Normal
+                    color: row.sel ? Colors.onPrimaryContainer : Colors.onSurface
                 }
 
                 MouseArea {
