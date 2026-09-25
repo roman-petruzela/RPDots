@@ -109,7 +109,7 @@ window#waybar {
 }
 
 /* ── Network / VPN ────────────────────────────────────────── */
-#network,
+#custom-network,
 #custom-vpn {
     font-size: 12px;
     padding: 0 4px;
