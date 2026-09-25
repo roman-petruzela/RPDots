@@ -310,6 +310,8 @@ PanelWindow {
             switch (event.key) {
             case Qt.Key_Left:     root.step(-1); break
             case Qt.Key_Right:    root.step(1); break
+            case Qt.Key_Up:       root.step(-10); break
+            case Qt.Key_Down:     root.step(10); break
             case Qt.Key_PageUp:   root.step(-5); break
             case Qt.Key_PageDown: root.step(5); break
             case Qt.Key_Home:     view.currentIndex = 0; break
@@ -606,7 +608,7 @@ PanelWindow {
             Repeater {
                 model: root.filter !== ""
                     ? [["Esc", "clear filter"]]
-                    : [["← →", "browse"], ["Enter", "apply"], ["Ctrl R", "surprise me"],
+                    : [["← →", "browse"], ["↑ ↓", "jump 10"], ["Enter", "apply"], ["Ctrl R", "surprise me"],
                        ["Type", "to filter"], ["Esc", "close"]]
 
                 Row {
