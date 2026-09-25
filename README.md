@@ -153,6 +153,28 @@ scoped to that one binary. Until it's installed, `requires=` in
 itself isn't restarted (that would kill the running graphical session) — the
 new theme just takes effect next time it's shown.
 
+**rp-greeter** replaces lightdm-gtk-greeter with a login screen in quickshell,
+styled like the wallpaper picker: the blurred wallpaper, a clock at the top, a
+single password field in the middle (no avatar, no user list, just the one
+user) with a CZ/US layout chip, and suspend/restart/shut down at the bottom.
+The stack is greetd → a bare niri (`.local/share/rp-greeter/niri.kdl`: same
+keyboard layouts and outputs as the session, no binds) → `qs -p
+/usr/share/rp-greeter/greeter`. On login `Greetd.launch(..., quit=true)` ends
+quickshell, niri quits after it, and greetd starts `niri-session`. The password
+lives in the ShellRoot rather than a TextInput because there is a window on
+every monitor and typing works on any of them. The helper above also copies
+`Colors.js` to the greeter whenever the theme changes.
+
+```bash
+~/.local/share/rp-greeter/preview.sh                 # try it in the session (password "test")
+sudo ~/.local/share/rp-greeter/install.sh            # install greetd, switch from LightDM
+sudo ~/.local/share/rp-greeter/install.sh --revert   # back to LightDM
+```
+
+`install.sh` also adds `pam_gnome_keyring` to `/etc/pam.d/greetd`. LightDM's
+PAM stack unlocked the keyring at login and greetd's doesn't, so secrets would
+otherwise stop unlocking on their own.
+
 ## Audio
 
 One output for everything, switchable from the bar. Three parts:
@@ -328,6 +350,21 @@ counter (↑/↓ or the wheel move by a row). Cards stay at full size rather tha
 shrinking to fit, because titles become unreadable below ~200 px. The shared pieces (`minimap()`, app icons, output labels) live in
 `NiriState.qml` and `Minimap.qml`.
 
+## Launcher and session menu
+
+`Mod+D` opens `Launcher.qml` and `Mod+Shift+E` opens `SessionMenu.qml`. Both are
+full-screen `rp-overlay` layers that blur the windows underneath (`xray false`),
+like the wallpaper picker. The launcher lists recently launched apps first when
+the query is empty (`~/.cache/niri-rice/launcher-recent.json`), ranks matches by
+name, word start, generic name, keywords, comment and in-order letters, and turns
+a sum like `12*7+3` into a result that Enter copies. The results refresh when
+`DesktopEntries` finishes loading, which is asynchronous and would otherwise
+leave the first open after a quickshell start empty. `shell.qml` sets
+`//@ pragma IconTheme Papirus-Dark`. Without it quickshell only searches
+hicolor and draws generic names like `utilities-system-monitor` as a
+checkerboard. Pragmas are read at startup, so changing it needs
+`systemctl --user restart niri-rice-quickshell`.
+
 ## Dashboard
 
 **Now Playing** talks to `Quickshell.Services.Mpris`. Two things it is easy to
@@ -466,7 +503,8 @@ above is what makes the mode not depend on TLP having already run.
 | | |
 |---|---|
 | `Mod+T` | Terminal |
-| `Mod+D` | Launcher |
+| `Mod+D` | Launcher (quickshell; fuzzel if quickshell isn't running) |
+| `Mod+Shift+E` | Session menu: lock, suspend, log out, restart, shut down |
 | `Mod+E` | Files (yazi) |
 | `Mod+Q` | Close window |
 | `Mod+Shift+W` | Pick wallpaper + apply theme (←/→ one, ↑/↓ ten, type to filter) |

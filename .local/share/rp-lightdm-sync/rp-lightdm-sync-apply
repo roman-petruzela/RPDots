@@ -34,6 +34,13 @@ set_key() {
     fi
 }
 
+# rp-greeter (greetd + quickshell, ../rp-greeter/install.sh): stejné barvy jako
+# session. Tapetu čte z DST_WALLPAPER výš; tady jen Colors.js, pokud je nainstalovaný.
+SRC_COLORS="$USER_HOME/.config/quickshell/Colors.js"
+if [[ -d /usr/share/rp-greeter/greeter && -f "$SRC_COLORS" ]]; then
+    install -m644 "$SRC_COLORS" /usr/share/rp-greeter/greeter/Colors.js
+fi
+
 set_key "theme-name" "RPRice"
 set_key "icon-theme-name" "Papirus-Dark"
 set_key "cursor-theme-name" "Bibata-Modern-Ice"
