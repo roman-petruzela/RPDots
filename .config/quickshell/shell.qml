@@ -42,9 +42,16 @@ ShellRoot {
         function hide(): void   { networkSwitcher.visible = false }
     }
 
+    IpcHandler {
+        target: "wallpaper"
+        function toggle(): void { root.openFlyout(wallpaperPicker, true) }
+        function open(): void   { root.openFlyout(wallpaperPicker, false) }
+        function hide(): void   { wallpaperPicker.visible = false }
+    }
+
     // Okna vyjíždějí na stejné místo, takže se navzájem vylučují.
     function openFlyout(target, allowToggle) {
-        for (const f of [dashboard, audioSwitcher, powerSwitcher, networkSwitcher])
+        for (const f of [dashboard, audioSwitcher, powerSwitcher, networkSwitcher, wallpaperPicker])
             if (f !== target) f.visible = false
 
         if (allowToggle) target.toggle()
@@ -78,6 +85,10 @@ ShellRoot {
 
     NetworkSwitcher {
         id: networkSwitcher
+    }
+
+    WallpaperPicker {
+        id: wallpaperPicker
     }
 
     OSD {}

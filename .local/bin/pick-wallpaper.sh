@@ -38,26 +38,37 @@ is_video() {
 # (thumbnail ...^ + -extent vždy zaplní celou plochu, není co podbarvovat) —
 # takže každá změna tapety kvůli barvě motivu zneplatnila cache úplně všem
 # ostatním tapetám a picker je musel při příštím otevření přegenerovat znovu.
-thumb_path_for() {
-  local img="$1" sig key
+thumb_key_for() {
+  local img="$1" ver="$2" sig
   sig="$(stat -c '%Y_%s' "$img" 2>/dev/null || echo "0_0")"
-  key="$(printf 'v3|%s|%s' "$img" "$sig" | md5sum | awk '{print $1}')"
-  echo "$THUMB_DIR/$key.png"
+  printf '%s|%s|%s' "$ver" "$img" "$sig" | md5sum | awk '{print $1}'
+}
+
+# Malý náhled pro rofi (fallback), velký 16:9 pro quickshell coverflow —
+# prostřední karta je přes 800 px široká, 240px náhled by na ní byl rozmazaný.
+# Velký náhled nemá md5 klíč, ale čitelné jméno z mtime/velikosti/názvu —
+# --list ho tak spočítá pro celý adresář jedním `stat`, bez podprocesu na
+# soubor (s md5sum trvalo otevření pickeru se 100 tapetami přes 1,5 s).
+# Adresář se prochází jen do hloubky 1, takže basename je jednoznačný.
+thumb_path_for() { echo "$THUMB_DIR/$(thumb_key_for "$1" v3).png"; }
+large_thumb_name() { printf 'large-v1-%s-%s.jpg' "$1" "$(basename "$2")"; }
+large_thumb_path_for() {
+  echo "$THUMB_DIR/$(large_thumb_name "$(stat -c '%Y_%s' "$1" 2>/dev/null || echo 0_0)" "$1")"
 }
 
 make_thumb() {
   local img="$1"
-  local thumb src tmpframe key
+  local thumb large src tmpframe
   thumb="$(thumb_path_for "$img")"
-  key="$(basename "$thumb" .png)"
-  if [[ ! -f "$thumb" ]] && command -v magick >/dev/null 2>&1; then
+  large="$(large_thumb_path_for "$img")"
+  if [[ ( ! -f "$thumb" || ! -f "$large" ) ]] && command -v magick >/dev/null 2>&1; then
     src="$img"
     tmpframe=""
     # ImageMagick umí mp4 jen přes ffmpeg delegáta, který nemusí být k dispozici —
-    # u videa si snímek vytáhneme sami.
+    # u videa si snímek vytáhneme sami (jednou pro obě velikosti).
     if is_video "$img"; then
       if command -v ffmpeg >/dev/null 2>&1; then
-        tmpframe="$THUMB_DIR/$key.src.png"
+        tmpframe="${large%.jpg}.src.png"
         # thumbnail=100 vybere reprezentativní snímek — u videí s fade-in z černé
         # by prostý první snímek dal černý náhled.
         ffmpeg -y -v error -i "$img" -vf "thumbnail=100" -frames:v 1 -f image2 "$tmpframe" >/dev/null 2>&1 \
@@ -69,7 +80,11 @@ make_thumb() {
       fi
     fi
     if [[ -n "$src" ]]; then
-      magick "$src[0]" -auto-orient -thumbnail "240x140^" -gravity center -background "$wal_bg" -extent 240x140 "$thumb" >/dev/null 2>&1 || true
+      [[ -f "$thumb" ]] || magick "$src[0]" -auto-orient -thumbnail "240x140^" -gravity center -background "$wal_bg" -extent 240x140 "$thumb" >/dev/null 2>&1 || true
+      # Zápis přes .tmp + mv: quickshell soubor načítá, jakmile existuje, a
+      # napůl zapsaný JPEG by se mu zobrazil jako useknutý obrázek.
+      [[ -f "$large" ]] || { magick "$src[0]" -auto-orient -thumbnail "960x540^" -gravity center -extent 960x540 -quality 88 "$large.tmp.jpg" >/dev/null 2>&1 \
+        && mv -f "$large.tmp.jpg" "$large"; } || rm -f "$large.tmp.jpg"
     fi
     [[ -n "$tmpframe" ]] && rm -f "$tmpframe"
   fi
@@ -78,6 +93,14 @@ make_thumb() {
   else
     echo "$img"
   fi
+}
+
+list_wallpapers() {
+  find "$WALL_DIR" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' -o -iname '*.mp4' -o -iname '*.mkv' -o -iname '*.webm' \) -print0 | sort -z
+}
+
+current_wallpaper_source() {
+  cat "${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/current-wallpaper-source" 2>/dev/null || true
 }
 
 # Interní režim: sériově vygeneruje chybějící náhledy na pozadí a skončí.
@@ -103,10 +126,9 @@ fi
 # chybějící náhledy se dotáhnou postupně, jeden po druhém, příště. Priorita
 # je název (vidíš ho hned), náhled je jen bonus.
 warm_missing_thumbs() {
-  local file thumb missing=()
+  local file missing=()
   for file in "$@"; do
-    thumb="$(thumb_path_for "$file")"
-    [[ -f "$thumb" ]] || missing+=("$file")
+    [[ -f "$(thumb_path_for "$file")" && -f "$(large_thumb_path_for "$file")" ]] || missing+=("$file")
   done
   [[ "${#missing[@]}" -gt 0 ]] || return 0
   local prefix=()
@@ -115,17 +137,53 @@ warm_missing_thumbs() {
   setsid "${prefix[@]}" "$0" --warm-dispatch "${missing[@]}" >/dev/null 2>&1 </dev/null &
 }
 
+# Výpis pro quickshell picker (WallpaperPicker.qml), jeden řádek na tapetu:
+#   cesta \t velký náhled \t image|video \t 1 když je aktuální, jinak 0
+# Náhled nemusí ještě existovat — picker ho zkouší načíst znovu, dokud ho
+# warm_missing_thumbs na pozadí nedogeneruje.
+if [[ "${1:-}" == "--list" ]]; then
+  mapfile -d '' files < <(list_wallpapers)
+  [[ "${#files[@]}" -gt 0 ]] || exit 0
+  mapfile -t sigs < <(stat -c '%Y_%s' -- "${files[@]}")
+  current_src="$(current_wallpaper_source)"
+  missing=()
+  for i in "${!files[@]}"; do
+    file="${files[$i]}"
+    large="$THUMB_DIR/large-v1-${sigs[$i]}-${file##*/}.jpg"
+    [[ -f "$large" ]] || missing+=("$file")
+    kind=image
+    is_video "$file" && kind=video
+    current=0
+    [[ "$file" == "$current_src" ]] && current=1
+    printf '%s\t%s\t%s\t%d\n' "$file" "$large" "$kind" "$current"
+  done
+  # Dispatcher vyrobí i malý rofi náhled; tady se kvůli rychlosti hlídá jen velký.
+  if [[ "${#missing[@]}" -gt 0 ]]; then
+    prefix=()
+    command -v ionice >/dev/null 2>&1 && prefix+=(ionice -c3)
+    command -v nice >/dev/null 2>&1 && prefix+=(nice -n 19)
+    setsid "${prefix[@]}" "$0" --warm-dispatch "${missing[@]}" >/dev/null 2>&1 </dev/null &
+  fi
+  exit 0
+fi
+
+# Výchozí cesta je quickshell coverflow (WallpaperPicker.qml) — ten po výběru
+# sám spustí apply-wallpaper-theme.sh. Rofi zůstává jako fallback, když qs
+# neběží nebo ještě nemá načtený IPC cíl `wallpaper` (--rofi ho vynutí).
+if [[ "${1:-}" != "--rofi" ]] && command -v qs >/dev/null 2>&1 \
+  && qs ipc call wallpaper toggle >/dev/null 2>&1; then
+  exit 0
+fi
+
 pick_wallpaper() {
   local selected=""
   if command -v rofi >/dev/null 2>&1; then
-    mapfile -d '' files < <(find "$WALL_DIR" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' -o -iname '*.mp4' -o -iname '*.mkv' -o -iname '*.webm' \) -print0 | sort -z)
+    mapfile -d '' files < <(list_wallpapers)
     [[ "${#files[@]}" -gt 0 ]] || { echo ""; return; }
     local current_src=""
     local current_index=""
-    if [[ -f "${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/current-wallpaper-source" ]]; then
-      current_src="$(cat "${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/current-wallpaper-source" 2>/dev/null || true)"
-    fi
-    local rofi_theme rofi_entries
+    current_src="$(current_wallpaper_source)"
+    local rofi_theme
     rofi_theme='
       * {
         bg: '"${wal_bg}"'ee;
@@ -157,7 +215,11 @@ pick_wallpaper() {
     warm_missing_thumbs "${files[@]}"
     # Jen z cache, bez volání make_thumb — název je vždy hned k dispozici,
     # náhled se přidá jen když je už hotový (viz warm_missing_thumbs výš).
-    rofi_entries="$(
+    # Musí jít přímo rourou do rofi, ne přes proměnnou — $(...) v bashi tiše
+    # zahazuje NUL byty, takže by se ztratil oddělovač name\0icon\x1fpath a
+    # rofi by celý řádek (včetně "iconpath") vypsal jako holý text.
+    build_entries() {
+      local file base thumb
       for file in "${files[@]}"; do
         base="$(basename "$file")"
         thumb="$(thumb_path_for "$file")"
@@ -167,12 +229,12 @@ pick_wallpaper() {
           printf '%s\n' "$base"
         fi
       done
-    )"
+    }
     if [[ -n "$current_index" ]]; then
-      selected="$(printf '%s' "$rofi_entries" | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
+      selected="$(build_entries | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
           -show-icons -no-config -theme-str "$rofi_theme" -a "$current_index")"
     else
-      selected="$(printf '%s' "$rofi_entries" | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
+      selected="$(build_entries | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
           -show-icons -no-config -theme-str "$rofi_theme")"
     fi
     if [[ -n "${selected:-}" ]]; then
