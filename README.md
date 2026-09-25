@@ -322,8 +322,11 @@ cycles, releasing Mod switches. The Tab presses never reach quickshell. niri
 handles the bind and runs `rp-shell workspaces next`, so the window only sees the
 Mod release. If Mod is released before the window gets keyboard focus (an
 extremely fast tap), the switcher stays open; Enter switches and Esc closes.
-Workspaces are ordered by the newest `focus_timestamp` among their windows, with
-the current workspace first, so a quick Mod+Tab jumps back and forth. Empty
+Cards keep a fixed order, the focused monitor first and then by workspace
+number, so each workspace always sits in the same spot. The selection starts on
+the most recently used other workspace (newest `focus_timestamp` among its
+windows), so a quick Mod+Tab still jumps back and forth. A dot marks the current
+workspace, and the monitor name appears only on each monitor's first card. Empty
 workspaces are left out.
 
 The card is not a screenshot. niri reports no per-window position on screen

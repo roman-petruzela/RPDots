@@ -5,8 +5,9 @@ import QtQuick
 import "Colors.js" as Colors
 
 // Mod+Tab: „Alt+Tab pro workspacy“. Drž Mod, Tab listuje (Shift+Tab zpět),
-// puštění Mod přepne. Workspacy jsou seřazené od naposledy použitého, takže
-// rychlé Mod+Tab skáče tam a zpátky mezi dvěma posledními.
+// puštění Mod přepne. Karty jsou v pevném pořadí (monitor, pak číslo), výběr
+// ale začíná na naposledy použitém workspace — rychlé Mod+Tab tak pořád
+// skáče tam a zpátky mezi dvěma posledními.
 //
 // Tab při drženém Mod zpracuje niri (bind → `rp-shell workspaces next`), ne
 // tohle okno — dostane jen puštění Mod. Když Mod pustíš dřív, než okno
@@ -52,8 +53,11 @@ PanelWindow {
         if (!visible) {
             build()
             if (items.length === 0) return
-            const n = items.length
-            selected = n > 1 ? (delta > 0 ? 1 : n - 1) : 0
+            // Začít na naposledy použitém workspace (ne na vedlejší kartě),
+            // takže rychlé Mod+Tab pořád skáče tam a zpátky
+            const prev = items.indexOf(items.filter(i => !i.ws.is_focused)
+                .reduce((a, b) => (b.recent > (a?.recent ?? -1) ? b : a), null))
+            selected = prev >= 0 ? prev : 0
             const fw = niri.focusedWorkspace()
             const scr = fw ? Quickshell.screens.find(s => s.name === fw.output) : null
             if (scr) screen = scr
@@ -84,6 +88,7 @@ PanelWindow {
         for (const w of wins) (byWs[w.workspace_id] = byWs[w.workspace_id] || []).push(w)
 
         const multiOutput = new Set(Object.values(niri.workspaces).map(w => w.output)).size > 1
+        const focusedOutput = niri.focusedWorkspace()?.output ?? ""
         const out = []
         for (const ws of Object.values(niri.workspaces)) {
             const ww = byWs[ws.id] || []
@@ -92,14 +97,23 @@ PanelWindow {
             const active = ww.find(w => w.id === ws.active_window_id)
             out.push({
                 ws: ws,
-                recent: ws.is_focused ? Infinity : Math.max(0, ...ww.map(w => niri.stamp(w))),
+                recent: Math.max(0, ...ww.map(w => niri.stamp(w))),
                 label: ws.name ?? String(ws.idx),
                 title: active ? (active.title || active.app_id) : "Empty",
+                outputName: ws.output,
                 output: multiOutput ? niri.outputLabel(ws.output) : "",
                 tiles: niri.minimap(ww, ws.active_window_id, ws.output, root.cardW, root.screenH)
             })
         }
-        out.sort((a, b) => b.recent - a.recent)
+        // Pevné pořadí jako v niri: monitor, na kterém jsi, první, pak ostatní;
+        // v rámci monitoru podle čísla. Karty tak mají pořád stejné místo.
+        const outRank = o => o === focusedOutput ? "" : o
+        out.sort((a, b) => outRank(a.outputName).localeCompare(outRank(b.outputName))
+            || a.ws.idx - b.ws.idx)
+        // Název monitoru jen na první kartě každého monitoru
+        out.forEach((it, i) => {
+            if (i > 0 && out[i - 1].outputName === it.outputName) it.output = ""
+        })
         items = out
     }
 
@@ -206,6 +220,13 @@ PanelWindow {
                     anchors { top: scr.bottom; topMargin: 10; left: parent.left; right: parent.right }
                     spacing: 8
 
+                    // Tečka = workspace, na kterém právě jsi
+                    Rectangle {
+                        visible: card.modelData.ws.is_focused
+                        anchors.verticalCenter: num.verticalCenter
+                        width: 7; height: 7; radius: 3.5
+                        color: Colors.primary
+                    }
                     Text {
                         id: num
                         text: card.modelData.label
@@ -216,7 +237,7 @@ PanelWindow {
                     }
                     Text {
                         anchors.baseline: num.baseline
-                        width: parent.width - num.width - 8
+                        width: parent.width - num.x - num.width - 8
                         text: card.modelData.title
                         elide: Text.ElideRight
                         font.family: root.fontFamily
