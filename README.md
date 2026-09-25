@@ -293,6 +293,29 @@ The focused video card plays a muted preview after it settles (450 ms), unless
 `WallpaperVideoPreview.qml` behind a `Loader`, so a missing QtMultimedia breaks
 only the preview, not the picker.
 
+## Workspace switcher
+
+`Mod+Tab` is Alt+Tab for workspaces (`WorkspaceSwitcher.qml`): hold Mod, Tab
+cycles, releasing Mod switches. The Tab presses never reach quickshell. niri
+handles the bind and runs `rp-shell workspaces next`, so the window only sees the
+Mod release. If Mod is released before the window gets keyboard focus (an
+extremely fast tap), the switcher stays open; Enter switches and Esc closes.
+Workspaces are ordered by the newest `focus_timestamp` among their windows, with
+the current workspace first, so a quick Mod+Tab jumps back and forth. Empty
+workspaces are left out.
+
+The card is not a screenshot. niri reports no per-window position on screen
+(`tile_pos_in_workspace_view` is `null` for tiled windows), and grabbing each
+workspace with `grim` costs ~100 ms per shot, too much to run during games. Each
+card is a minimap instead: the columns of the scrolling layout in their real
+width ratio (`pos_in_scrolling_layout`, `tile_size`), with app icons, over the
+960 px wallpaper copy matugen already gets (`wal-matugen.png`).
+
+Workspace and window data come from `NiriState.qml`, one long-running
+`niri msg --json event-stream` that keeps the state live. Opening the switcher
+therefore needs no IPC round-trip. The snapshot is taken on open, so the order
+doesn't reshuffle while you cycle.
+
 ## Dashboard
 
 **Now Playing** talks to `Quickshell.Services.Mpris`. Two things it is easy to
@@ -434,7 +457,11 @@ above is what makes the mode not depend on TLP having already run.
 | `Mod+D` | Launcher |
 | `Mod+E` | Files (yazi) |
 | `Mod+Q` | Close window |
-| `Mod+Shift+W` | Pick wallpaper + apply theme |
+| `Mod+Shift+W` | Pick wallpaper + apply theme (←/→ one, ↑/↓ ten, type to filter) |
+| `Alt+Tab` / `Alt+Shift+Tab` | Window switcher (niri `recent-windows`) |
+| ``Alt+` `` | Switcher limited to the current app |
+| `Mod+Tab` / `Mod+Shift+Tab` | Workspace switcher (hold Mod, release to switch) |
+| `Mod+O` | Overview (zoom 0.35) |
 | `Mod+Shift+D` | Dashboard |
 | `Mod+Shift+O` | Audio output switcher |
 | `Mod+Ctrl+O` | Next audio output |

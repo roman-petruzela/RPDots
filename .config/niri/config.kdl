@@ -105,6 +105,14 @@ layer-rule {
         blur true
     }
 }
+// Mod+Tab workspace switcher (quickshell): a floating glass panel.
+layer-rule {
+    match namespace="^rp-switcher$"
+    geometry-corner-radius 22
+    background-effect {
+        blur true
+    }
+}
 // Wallpaper picker (quickshell): xray off, so the windows under the overlay get
 // blurred instead of being replaced by the blurred wallpaper. The preview of the
 // picked wallpaper sits below the windows (rp-wallpaper-preview, Bottom layer).
@@ -204,6 +212,35 @@ window-rule {
     clip-to-geometry true
 }
 
+// Mod+O: zoomed further out than the default 0.5, so more workspaces fit.
+overview {
+    zoom 0.35
+}
+
+// Alt+Tab: niri's built-in switcher (live window previews). Highlight colours
+// come from theme-colors.kdl (theme-modules/30-niri.sh) and merge into this.
+recent-windows {
+    // Default 150 ms made Alt+Tab feel laggy; a flick shorter than this still
+    // switches windows without flashing the switcher.
+    open-delay-ms 60
+    highlight {
+        padding 12
+        corner-radius 16
+    }
+    previews {
+        max-height 360
+        max-scale 0.4
+    }
+    // Replaces niri's defaults, which also bind the switcher to Mod+Tab —
+    // Mod+Tab is the quickshell workspace switcher instead (see binds).
+    binds {
+        Alt+Tab         { next-window; }
+        Alt+Shift+Tab   { previous-window; }
+        Alt+grave       { next-window     filter="app-id"; }
+        Alt+Shift+grave { previous-window filter="app-id"; }
+    }
+}
+
 binds {
 	Mod+Shift+A { spawn "~/.local/bin/wl-ocr/fastscreen.sh"; }
     Mod+Shift+Slash { show-hotkey-overlay; }
@@ -223,6 +260,10 @@ binds {
     XF86MonBrightnessUp   allow-when-locked=true { spawn "~/.local/bin/brightness-osd.sh" "up"; }
     XF86MonBrightnessDown allow-when-locked=true { spawn "~/.local/bin/brightness-osd.sh" "down"; }
     Mod+O repeat=false { toggle-overview; }
+    // Workspace switcher (quickshell WorkspaceSwitcher.qml): hold Mod, Tab cycles,
+    // releasing Mod switches. Mod+O stays the overview.
+    Mod+Tab       { spawn "~/.local/bin/rp-shell" "workspaces" "next"; }
+    Mod+Shift+Tab { spawn "~/.local/bin/rp-shell" "workspaces" "prev"; }
     Mod+Q repeat=false { close-window; }
     Mod+Left  { focus-column-left; }
     Mod+Down  { focus-window-down; }

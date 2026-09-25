@@ -43,6 +43,13 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "workspaces"
+        function next(): void { wsSwitcher.cycle(1) }
+        function prev(): void { wsSwitcher.cycle(-1) }
+        function hide(): void { wsSwitcher.hide() }
+    }
+
+    IpcHandler {
         target: "wallpaper"
         function toggle(): void { root.openFlyout(wallpaperPicker, true) }
         function open(): void   { root.openFlyout(wallpaperPicker, false) }
@@ -79,6 +86,10 @@ ShellRoot {
     }
 
     function dispatch(line) {
+        if (line === "workspaces next") return wsSwitcher.cycle(1)
+        if (line === "workspaces prev") return wsSwitcher.cycle(-1)
+        if (line === "workspaces hide") return wsSwitcher.hide()
+
         const flyouts = {
             dashboard: dashboard, audio: audioSwitcher, power: powerSwitcher,
             network: networkSwitcher, wallpaper: wallpaperPicker
@@ -129,6 +140,13 @@ ShellRoot {
 
     WallpaperPicker {
         id: wallpaperPicker
+    }
+
+    NiriState { id: niri }
+
+    WorkspaceSwitcher {
+        id: wsSwitcher
+        niri: niri
     }
 
     // Náhled vybrané tapety pod okny, na všech monitorech
