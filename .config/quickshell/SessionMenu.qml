@@ -135,11 +135,10 @@ PanelWindow {
                         color: Qt.alpha(Colors.onSurfaceVariant, 0.7)
                     }
 
-                    MouseArea {
+                    HoverSelect {
                         anchors.fill: parent
-                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onEntered: root.selected = tile.index
+                        onMoved: root.selected = tile.index
                         onClicked: root.run(tile.index)
                     }
                 }

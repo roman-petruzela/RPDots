@@ -228,10 +228,9 @@ PanelWindow {
                     icons: false
                 }
 
-                MouseArea {
+                HoverSelect {
                     anchors.fill: parent
-                    hoverEnabled: true
-                    onEntered: root.selected = card.index
+                    onMoved: root.selected = card.index
                     onClicked: {
                         root.selected = card.index
                         root.commit()

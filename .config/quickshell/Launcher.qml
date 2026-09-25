@@ -294,10 +294,9 @@ PanelWindow {
                     color: row.sel ? Colors.onPrimaryContainer : Colors.onSurface
                 }
 
-                MouseArea {
+                HoverSelect {
                     anchors.fill: parent
-                    hoverEnabled: true
-                    onEntered: root.selected = row.index
+                    onMoved: root.selected = row.index
                     onClicked: root.activate(row.index)
                 }
             }

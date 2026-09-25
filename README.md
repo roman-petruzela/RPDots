@@ -365,6 +365,12 @@ hicolor and draws generic names like `utilities-system-monitor` as a
 checkerboard. Pragmas are read at startup, so changing it needs
 `systemctl --user restart niri-rice-quickshell`.
 
+Mouse hover in all keyboard-driven lists (launcher, clipboard, session menu, both
+switchers) goes through `HoverSelect.qml`, which moves the selection only when
+the cursor itself moves. A plain `onEntered` also fires when the list scrolls
+under a still cursor during fast arrow-key scrolling, or when a switcher opens
+under it, and the selection then jumped to whatever was under the mouse.
+
 ## Clipboard history
 
 `niri-rice-cliphist.service` runs `wl-paste --watch cliphist store`, so every
