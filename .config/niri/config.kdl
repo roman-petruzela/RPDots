@@ -204,6 +204,14 @@ window-rule {
 }
 // Settings okno (quickshell Settings.qml): plovoucí, zaoblené. Blur si žádá
 // samo přes ext-background-effect, okno má 86% průhledné pozadí.
+// Launcher (Mod+D, quickshell Launcher.qml): plovoucí okno jako Settings, ať ho
+// niri otevírá a zavírá stejnou animací; blur si žádá samo
+window-rule {
+    match title="^RPRice Launcher$"
+    open-floating true
+    geometry-corner-radius 12
+    clip-to-geometry true
+}
 window-rule {
     match title="^RPRice Settings$"
     open-floating true
