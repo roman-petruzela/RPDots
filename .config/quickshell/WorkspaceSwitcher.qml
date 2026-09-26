@@ -45,12 +45,18 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "rp-switcher"
-    WlrLayershell.keyboardFocus: root.visible
+    WlrLayershell.keyboardFocus: pop.shown
         ? WlrKeyboardFocus.Exclusive
         : WlrKeyboardFocus.None
 
+    PopAnim { id: pop; window: root; target: panel }
+    BackgroundEffect.blurRegion: Region {
+        x: pop.blurX; y: pop.blurY; width: pop.blurW; height: pop.blurH
+        radius: pop.blurRadius
+    }
+
     function cycle(delta) {
-        if (!visible) {
+        if (!pop.shown) {
             build()
             if (items.length === 0) return
             // Začít na naposledy použitém workspace (ne na vedlejší kartě),
@@ -60,19 +66,23 @@ PanelWindow {
             selected = prev >= 0 ? prev : 0
             const fw = niri.focusedWorkspace()
             const scr = fw ? Quickshell.screens.find(s => s.name === fw.output) : null
-            if (scr) screen = scr
-            visible = true
+            // Otevření během doznívajícího zavírání: okno už na obrazovce je
+            if (!pop.cancelClose()) {
+                if (scr) screen = scr
+                visible = true
+            }
         } else {
             selected = (selected + delta + items.length) % items.length
         }
         grid.positionViewAtIndex(selected, GridView.Contain)
     }
 
-    function hide() { visible = false }
+    function hide() { pop.dismiss() }
 
     function commit() {
+        if (!pop.shown) return
         const it = items[selected]
-        visible = false
+        pop.dismiss()
         if (!it || it.ws.is_focused) return
         if (it.ws.active_window_id !== null && it.ws.active_window_id !== undefined)
             Quickshell.execDetached(["niri", "msg", "action", "focus-window", "--id", String(it.ws.active_window_id)])
@@ -127,7 +137,7 @@ PanelWindow {
         border.color: Qt.alpha(Colors.outlineVariant, 0.8)
         border.width: 1
 
-        focus: root.visible
+        focus: pop.shown
         Keys.onPressed: event => {
             switch (event.key) {
             case Qt.Key_Tab:

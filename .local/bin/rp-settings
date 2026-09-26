@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+# rp-settings — backend okna Settings v quickshellu (Settings.qml).
+#
+#   rp-settings dump               všechna nastavení jako JSON (hodnota, výchozí, rozsah)
+#   rp-settings get <klíč>         jedna hodnota (výchozí, když není nastavená)
+#   rp-settings set <klíč> <hod>   ověří, uloží a hned aplikuje
+#   rp-settings reset [<klíč>]     vrátí klíč (bez klíče všechny) na výchozí
+#   rp-settings apply              přegeneruje ~/.config/niri/settings.kdl
+#   rp-settings modules            theme moduly z modules.conf jako JSON
+#   rp-settings module <jméno> on|off
+#
+# Uložené hodnoty jsou v ~/.config/niri-rice/settings.json — jen ty, které se
+# liší od výchozích. Niri část se generuje do settings.kdl (gitignored, stejný
+# vzor jako power-mode.kdl u rp-power): každý zápis projde `niri validate`
+# a při chybě se vrátí předchozí verze, takže okno nemůže shodit desktop.
+#
+# settings.kdl vždycky obsahuje *všechny* spravované niri klíče, ne jen změněné.
+# Flagy jako `tap` nebo `natural-scroll` totiž include v niri umí jen zapnout,
+# `natural-scroll false` neprojde parserem — proto nejsou v config.kdl a jediný
+# zdroj je tenhle soubor. Když chybí, dogeneruje ho start-rice-services.sh.
+set -uo pipefail
+# printf %.2f by v české locale psal desetinnou čárku
+export LC_ALL=C
+
+CFG_DIR="$HOME/.config/niri-rice"
+STORE="$CFG_DIR/settings.json"
+MODULES="$CFG_DIR/modules.conf"
+NIRI_KDL="$HOME/.config/niri/settings.kdl"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/rp-settings.lock"
+
+# ---------------------------------------------------------------- schéma
+# klíč → "typ|výchozí|min|max" (int, float, bool) nebo "enum|výchozí|a,b,c"
+# Výchozí hodnoty odpovídají tomu, co bylo v config.kdl před zavedením okna.
+declare -A SCHEMA=(
+    [niri.gaps]="int|16|0|48"
+    [niri.focus_ring_width]="int|4|0|12"
+    [niri.shadow]="bool|true"
+    [niri.corner_radius]="int|0|0|24"
+    [niri.center_column]="enum|never|never,always,on-overflow"
+    [niri.default_width]="enum|0.5|0.33333,0.5,0.66667"
+    [input.focus_follows_mouse]="bool|true"
+    [input.touchpad_tap]="bool|true"
+    [input.natural_scroll]="bool|true"
+    [input.mouse_accel]="float|0.00|-1|1"
+    [theme.mono_mode]="enum|auto|auto,on,off"
+)
+# Pořadí pro dump (asociativní pole v bashi pořadí nedrží)
+KEYS=(niri.gaps niri.focus_ring_width niri.shadow niri.corner_radius
+      niri.center_column niri.default_width
+      input.focus_follows_mouse input.touchpad_tap input.natural_scroll input.mouse_accel
+      theme.mono_mode)
+
+die() { echo "rp-settings: $*" >&2; exit 1; }
+
+field() { cut -d'|' -f"$2" <<<"${SCHEMA[$1]}"; }
+
+store_json() {
+    if [[ -s "$STORE" ]] && jq -e 'type == "object"' "$STORE" >/dev/null 2>&1; then
+        cat "$STORE"
+    else
+        echo '{}'
+    fi
+}
+
+get() {
+    local key=$1
+    [[ -n "${SCHEMA[$key]:-}" ]] || die "neznámý klíč: $key"
+    local v
+    # ne `.[$k] // empty` — to by uložené false považovalo za chybějící
+    v=$(store_json | jq -r --arg k "$key" 'if has($k) then .[$k] | tostring else empty end')
+    [[ -n "$v" ]] && echo "$v" || field "$key" 2
+}
+
+# Ověří hodnotu podle schématu a vypíše ji v normalizovaném tvaru
+validate() {
+    local key=$1 val=$2 type
+    type=$(field "$key" 1)
+    case "$type" in
+        int)
+            [[ "$val" =~ ^-?[0-9]+$ ]] || die "$key: čekám celé číslo, dostal jsem '$val'"
+            (( val >= $(field "$key" 3) && val <= $(field "$key" 4) )) \
+                || die "$key: mimo rozsah $(field "$key" 3)–$(field "$key" 4)"
+            echo "$val" ;;
+        float)
+            [[ "$val" =~ ^-?[0-9]*\.?[0-9]+$ ]] || die "$key: čekám číslo, dostal jsem '$val'"
+            awk -v v="$val" -v lo="$(field "$key" 3)" -v hi="$(field "$key" 4)" \
+                'BEGIN { exit !(v >= lo && v <= hi) }' || die "$key: mimo rozsah"
+            printf '%.2f\n' "$val" ;;
+        bool)
+            case "$val" in
+                true|on|1)   echo true ;;
+                false|off|0) echo false ;;
+                *) die "$key: čekám true/false" ;;
+            esac ;;
+        enum)
+            [[ ",$(field "$key" 3)," == *",$val,"* ]] || die "$key: povolené jsou $(field "$key" 3)"
+            echo "$val" ;;
+    esac
+}
+
+write_store() {
+    mkdir -p "$CFG_DIR"
+    local tmp; tmp=$(mktemp "$STORE.XXXXXX")
+    cat > "$tmp" && mv "$tmp" "$STORE"
+}
+
+# --------------------------------------------------------------- niri KDL
+render_kdl() {
+    local ring shadow radius
+    ring=$(get niri.focus_ring_width)
+    shadow=$(get niri.shadow)
+    radius=$(get niri.corner_radius)
+
+    echo "// Generováno skriptem rp-settings (okno Settings) — needitovat ručně."
+    echo "// Kanonické hodnoty: ~/.config/niri-rice/settings.json + schéma v rp-settings."
+    echo "input {"
+    echo "    touchpad {"
+    [[ $(get input.touchpad_tap) == true ]] && echo "        tap"
+    [[ $(get input.natural_scroll) == true ]] && echo "        natural-scroll"
+    echo "    }"
+    echo "    mouse {"
+    echo "        accel-speed $(get input.mouse_accel)"
+    echo "    }"
+    [[ $(get input.focus_follows_mouse) == true ]] && echo '    focus-follows-mouse max-scroll-amount="0%"'
+    echo "}"
+    echo "layout {"
+    echo "    gaps $(get niri.gaps)"
+    echo "    center-focused-column \"$(get niri.center_column)\""
+    echo "    default-column-width { proportion $(get niri.default_width); }"
+    if (( ring == 0 )); then
+        echo "    focus-ring { off; }"
+    else
+        echo "    focus-ring { on; width $ring; }"
+    fi
+    [[ $shadow == true ]] && echo "    shadow { on; }" || echo "    shadow { off; }"
+    echo "}"
+    if (( radius > 0 )); then
+        echo "window-rule {"
+        echo "    geometry-corner-radius $radius"
+        echo "    clip-to-geometry true"
+        echo "}"
+    fi
+}
+
+# Zapíše settings.kdl jen tehdy, když s ním niri config projde validací
+apply_kdl() {
+    local tmp backup had=0
+    tmp=$(mktemp); backup=$(mktemp)
+    render_kdl > "$tmp"
+    if [[ -f "$NIRI_KDL" ]]; then
+        cmp -s "$tmp" "$NIRI_KDL" && { rm -f "$tmp" "$backup"; return 0; }
+        cp "$NIRI_KDL" "$backup"; had=1
+    fi
+    cp "$tmp" "$NIRI_KDL"
+    if ! niri validate >/dev/null 2>&1; then
+        if (( had )); then cp "$backup" "$NIRI_KDL"; else rm -f "$NIRI_KDL"; fi
+        rm -f "$tmp" "$backup"
+        die "niri config by byl neplatný, settings.kdl vrácen"
+    fi
+    rm -f "$tmp" "$backup"
+}
+
+# --------------------------------------------------------------- moduly
+modules_json() {
+    [[ -f "$MODULES" ]] || { echo '[]'; return; }
+    grep -v '^\s*#' "$MODULES" | grep -v '^\s*$' |
+        jq -R -s 'split("\n") | map(select(length > 0) | split("|"))
+                  | map({ name: .[0], enabled: (.[1] == "1"), priority: (.[2] | tonumber? // 0),
+                          requires: (.[3] // "") })'
+}
+
+set_module() {
+    local name=$1 state
+    case "$2" in on|1|true) state=1 ;; off|0|false) state=0 ;; *) die "module: on|off" ;; esac
+    [[ -f "$MODULES" ]] || die "chybí $MODULES"
+    grep -q "^${name//./\\.}|" "$MODULES" || die "neznámý modul: $name"
+    local tmp; tmp=$(mktemp "$MODULES.XXXXXX")
+    awk -F'|' -v OFS='|' -v n="$name" -v s="$state" '$1 == n { $2 = s } { print }' "$MODULES" > "$tmp" \
+        && mv "$tmp" "$MODULES"
+}
+
+dump() {
+    local store; store=$(store_json)
+    for key in "${KEYS[@]}"; do
+        local type def
+        type=$(field "$key" 1); def=$(field "$key" 2)
+        jq -n --arg k "$key" --arg t "$type" --arg d "$def" --arg v "$(get "$key")" \
+              --arg a "$(field "$key" 3)" --arg b "$(field "$key" 4)" \
+              --argjson set "$(jq --arg k "$key" 'has($k)' <<<"$store")" '
+            def conv: if $t == "int" or $t == "float" then tonumber
+                      elif $t == "bool" then . == "true" else . end;
+            { key: $k, type: $t, value: ($v | conv), default: ($d | conv), changed: $set }
+            + (if $t == "enum" then { options: ($a | split(",")) }
+               elif $t == "bool" then {}
+               else { min: ($a | tonumber), max: ($b | tonumber) } end)'
+    done | jq -s '{ settings: ., modules: $m }' --argjson m "$(modules_json)"
+}
+
+# ---------------------------------------------------------------- main
+exec 9>"$LOCK"
+flock 9
+
+case "${1:-dump}" in
+    dump) dump ;;
+    get)
+        [[ $# -eq 2 ]] || die "použití: rp-settings get <klíč>"
+        get "$2" ;;
+    set)
+        [[ $# -eq 3 ]] || die "použití: rp-settings set <klíč> <hodnota>"
+        [[ -n "${SCHEMA[$2]:-}" ]] || die "neznámý klíč: $2"
+        val=$(validate "$2" "$3") || exit 1
+        prev=$(store_json)
+        # Výchozí hodnota se neukládá, ať settings.json drží jen skutečné změny
+        if [[ "$val" == "$(field "$2" 2)" ]]; then
+            jq --arg k "$2" 'del(.[$k])' <<<"$prev" | write_store
+        else
+            jq --arg k "$2" --arg v "$val" --arg t "$(field "$2" 1)" \
+               '.[$k] = (if $t == "int" or $t == "float" then ($v | tonumber)
+                         elif $t == "bool" then ($v == "true") else $v end)' <<<"$prev" | write_store
+        fi
+        if [[ "$2" == niri.* || "$2" == input.* ]] && ! apply_kdl; then
+            write_store <<<"$prev"
+            exit 1
+        fi ;;
+    reset)
+        prev=$(store_json)
+        if [[ $# -ge 2 ]]; then
+            jq --arg k "$2" 'del(.[$k])' <<<"$prev" | write_store
+        else
+            echo '{}' | write_store
+        fi
+        apply_kdl || { write_store <<<"$prev"; exit 1; } ;;
+    apply) apply_kdl ;;
+    modules) modules_json ;;
+    module)
+        [[ $# -eq 3 ]] || die "použití: rp-settings module <jméno> on|off"
+        set_module "$2" "$3" ;;
+    *)
+        sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' >&2
+        exit 1 ;;
+esac

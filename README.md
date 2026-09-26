@@ -353,11 +353,32 @@ counter (↑/↓ or the wheel move by a row). Cards stay at full size rather tha
 shrinking to fit, because titles become unreadable below ~200 px. The shared pieces (`minimap()`, app icons, output labels) live in
 `NiriState.qml` and `Minimap.qml`.
 
+### Open/close animation
+
+The launcher and both switchers fade and scale in from 94 % and shrink slightly
+as they fade out, macOS-style (`PopAnim.qml`, ~220 ms `OutQuint` in, ~140 ms
+out). niri has no open/close animation for layer surfaces, so it is done inside
+the surface: `hide()` starts the fade-out and only the end of the animation sets
+`visible = false`. Keyboard focus is dropped as soon as the fade-out starts
+(`pop.shown`), so keys already go to the window you switched to.
+
+The blur is what makes this fiddly. A `blur true` layer-rule blurs the whole
+surface at full size from the first frame, leaving a sharp-edged blurred
+rectangle around the small transparent card. So these windows request the blur
+themselves through ext-background-effect (`BackgroundEffect.blurRegion`) with a
+region that tracks the scaled card and only switches on past ~30 % opacity. The
+launcher's namespace moved from fuzzel's `launcher` to `rp-launcher` for the
+same reason; fuzzel and the clipboard history keep the rule. `HoverSelect`
+rounds the scene position to whole pixels, because while the card is scaling,
+mapping through `scale` gives fractional jitter that looked like the mouse
+moving and made the selection jump under a still cursor.
+
 ## Launcher and session menu
 
-`Mod+D` opens `Launcher.qml` and `Mod+Shift+E` opens `SessionMenu.qml`. Both are
-full-screen `rp-overlay` layers that blur the windows underneath (`xray false`),
-like the wallpaper picker. The launcher lists recently launched apps first when
+`Mod+D` opens `Launcher.qml` and `Mod+Shift+E` opens `SessionMenu.qml`. The
+session menu is a full-screen `rp-overlay` layer that blurs the windows
+underneath (`xray false`), like the wallpaper picker; the launcher is a small
+centered card (see the open/close animation below). The launcher lists recently launched apps first when
 the query is empty (`~/.cache/niri-rice/launcher-recent.json`), ranks matches by
 name, word start, generic name, keywords, comment and in-order letters, and turns
 a sum like `12*7+3` into a result that Enter copies. The results refresh when
@@ -419,6 +440,37 @@ edit — the media buttons silently ended up as empty strings once. The ones in
 inline confirmation first (clicking the button again cancels); lock fires
 straight away, since it costs nothing to undo. Shut down is `systemctl poweroff`
 — it used to be `niri msg action quit`, which only ended the session.
+
+## Settings window
+
+`Mod+S` (`rp-shell settings toggle`, or `rp-shell settings <page>` to open a
+page directly) opens `Settings.qml`: a normal floating toplevel rather than a
+layer, so it can be moved and niri animates it (window-rule on the title
+`RPRice Settings`). Pages: Appearance (gaps, new column width, centering, focus
+ring, corner radius, shadows), Input (focus-follows-mouse, touchpad tap and
+natural scroll, pointer speed), Theme (wallpaper, monochrome mode, regenerate,
+per-app theme modules from `modules.conf`), Power (`rp-power` modes) and Tools
+(launchers for pavucontrol, blueman, nm-connection-editor, wdisplays, nwg-look,
+qt6ct, btop, whichever are installed).
+
+The window only draws. **`rp-settings`** owns the data: the schema (type,
+default, range) is in the script, `dump` hands it all to QML as JSON, and `set`
+validates and applies. Only values that differ from the default are stored, in
+`~/.config/niri-rice/settings.json`. The niri part is generated into
+`~/.config/niri/settings.kdl` (gitignored), included at the very end of
+`config.kdl` so it overrides the layout there, and every write goes through
+`niri validate` with a rollback, the same pattern as `power-mode.kdl`.
+
+`settings.kdl` always contains every managed key, not just the changed ones.
+An include can switch a flag on but not off: niri rejects `natural-scroll false`
+(and `tap false`, `focus-follows-mouse false`). So those flags were moved out of
+`config.kdl` and `settings.kdl` is their only source; `start-rice-services.sh`
+generates it when it is missing. `theme.mono_mode` is read by
+`apply-wallpaper-theme.sh` when `THEME_MONO_MODE` is not set in the environment.
+
+Changing the theme rewrites `Colors.js`, and quickshell reloads the whole shell.
+The window's open state and page live in `PersistentProperties`, so it comes
+back where it was.
 
 ## Power modes
 
@@ -536,6 +588,7 @@ above is what makes the mode not depend on TLP having already run.
 | `Mod+Tab` / `Mod+Shift+Tab` | Workspace switcher (hold Mod, release to switch) |
 | `Mod+O` | Overview (zoom 0.35) |
 | `Mod+Shift+D` | Dashboard |
+| `Mod+S` | Settings |
 | `Mod+Shift+O` | Audio output switcher |
 | `Mod+Ctrl+O` | Next audio output |
 | `Mod+Shift+S` | Screenshot |

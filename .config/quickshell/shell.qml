@@ -48,7 +48,7 @@ ShellRoot {
     IpcHandler {
         target: "launcher"
         function toggle(): void { root.openFlyout(launcher, true) }
-        function hide(): void   { launcher.visible = false }
+        function hide(): void   { launcher.hide() }
     }
 
     IpcHandler {
@@ -75,6 +75,13 @@ ShellRoot {
         function next(): void { wsSwitcher.cycle(1) }
         function prev(): void { wsSwitcher.cycle(-1) }
         function hide(): void { wsSwitcher.hide() }
+    }
+
+    IpcHandler {
+        target: "settings"
+        function toggle(): void { settingsWindow.toggle() }
+        function open(): void   { settingsWindow.open() }
+        function hide(): void   { settingsWindow.visible = false }
     }
 
     IpcHandler {
@@ -135,8 +142,17 @@ ShellRoot {
         if (flyout) {
             if (fn === "toggle") root.openFlyout(flyout, true)
             else if (fn === "open") root.openFlyout(flyout, false)
-            else if (fn === "hide") flyout.visible = false
+            // Okna s PopAnim se schovávají animací přes vlastní hide()
+            else if (fn === "hide") { if (flyout.hide) flyout.hide(); else flyout.visible = false }
             else if (fn === "next" && target === "audio") audioSwitcher.selectNext()
+            return
+        }
+        // Settings je normální okno, ne flyout — nevylučuje se s ostatními
+        if (target === "settings") {
+            if (fn === "toggle") settingsWindow.toggle()
+            else if (fn === "open") settingsWindow.open()
+            else if (fn === "hide") settingsWindow.visible = false
+            else if (!settingsWindow.openPage(fn)) console.warn("rp-shell: unknown settings page:", fn)
             return
         }
         if (line === "osd-volume trigger") osd.triggerVolume()
@@ -183,6 +199,8 @@ ShellRoot {
     SessionMenu { id: sessionMenu }
 
     ClipboardHistory { id: clipboardHistory }
+
+    Settings { id: settingsWindow }
 
     NiriState { id: niri }
 

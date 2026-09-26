@@ -85,6 +85,12 @@ if ! "$HOME/.local/bin/apply-wallpaper-theme.sh" --no-daemon-restart; then
   log "apply-wallpaper-theme failed, continuing startup with existing theme"
 fi
 
+# settings.kdl drží i tap/natural-scroll (config.kdl je nemá, viz rp-settings) —
+# na čisté instalaci ho vygenerovat, jinak by touchpad jel bez nich.
+if [[ ! -f "$HOME/.config/niri/settings.kdl" ]]; then
+  "$HOME/.local/bin/rp-settings" apply || log "rp-settings apply failed"
+fi
+
 write_session_env
 start_waybar_with_retry || true
 

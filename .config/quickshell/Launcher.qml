@@ -6,12 +6,12 @@ import QtQuick
 import "Colors.js" as Colors
 
 // Spouštěč aplikací (Mod+D), náhrada fuzzelu a schválně skoro jako on: malé
-// okno uprostřed, 12 řádků, zvýrazněná shoda, stejné barvy. Namespace
-// `launcher` je ten fuzzelí, takže dostane i jeho blur a zaoblení z niri
-// (layer-rule v config.kdl) — jen za panelem, okna kolem se nerozmazávají.
+// okno uprostřed, 12 řádků, zvýrazněná shoda, stejné barvy. Blur za panelem
+// si žádá samo (BackgroundEffect), ne přes fuzzelí layer-rule `launcher` —
+// ten by rozmazal celý povrch naplno i během animace otevření.
 // Prázdné pole ukáže naposledy spuštěné aplikace; psaní filtruje podle názvu,
 // obecného názvu, klíčových slov a popisu. Příklad jako `12*7+3` se spočítá
-// a Enter výsledek zkopíruje.
+// a Enter výsledek zkopíruje. Otevírá a zavírá se animací z PopAnim.qml.
 //
 // Pořadí posledních spuštění se ukládá do ~/.cache/niri-rice/launcher-recent.json.
 PanelWindow {
@@ -35,21 +35,29 @@ PanelWindow {
     implicitHeight: panel.height
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "launcher"
-    WlrLayershell.keyboardFocus: root.visible
+    WlrLayershell.namespace: "rp-launcher"
+    WlrLayershell.keyboardFocus: pop.shown
         ? WlrKeyboardFocus.Exclusive
         : WlrKeyboardFocus.None
+
+    PopAnim { id: pop; window: root; target: panel }
+    BackgroundEffect.blurRegion: Region {
+        x: pop.blurX; y: pop.blurY; width: pop.blurW; height: pop.blurH
+        radius: pop.blurRadius
+    }
 
     FocusedOutput { id: opener; window: root }
 
     function open() {
         input.text = ""
         refresh()
-        opener.show()
+        if (!pop.cancelClose()) opener.show()
     }
 
+    function hide() { pop.dismiss() }
+
     function toggle() {
-        if (visible) visible = false
+        if (pop.shown) hide()
         else open()
     }
 
@@ -145,7 +153,7 @@ PanelWindow {
     function activate(i) {
         const r = results[i]
         if (!r) return
-        visible = false
+        hide()
         if (r.kind === "calc") {
             Quickshell.execDetached(["wl-copy", r.value])
             return
@@ -210,7 +218,7 @@ PanelWindow {
                     left: glyph.right; leftMargin: 12; right: counter.left; rightMargin: 12
                     verticalCenter: parent.verticalCenter
                 }
-                focus: root.visible
+                focus: pop.shown
                 font.family: root.fontFamily
                 font.pixelSize: 16
                 color: Colors.onSurface
@@ -227,7 +235,7 @@ PanelWindow {
                     else if (event.key === Qt.Key_PageDown) root.move(root.maxRows)
                     else if (event.key === Qt.Key_PageUp) root.move(-root.maxRows)
                     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.activate(root.selected)
-                    else if (event.key === Qt.Key_Escape) root.visible = false
+                    else if (event.key === Qt.Key_Escape) root.hide()
                     else return
                     event.accepted = true
                 }

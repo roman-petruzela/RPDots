@@ -39,31 +39,41 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "rp-switcher"
-    WlrLayershell.keyboardFocus: root.visible
+    WlrLayershell.keyboardFocus: pop.shown
         ? WlrKeyboardFocus.Exclusive
         : WlrKeyboardFocus.None
 
+    PopAnim { id: pop; window: root; target: panel }
+    BackgroundEffect.blurRegion: Region {
+        x: pop.blurX; y: pop.blurY; width: pop.blurW; height: pop.blurH
+        radius: pop.blurRadius
+    }
+
     function cycle(delta, sameApp) {
-        if (!visible) {
+        if (!pop.shown) {
             build(sameApp)
             if (items.length === 0) return
             const n = items.length
             selected = n > 1 ? (delta > 0 ? 1 : n - 1) : 0
             const fw = niri.focusedWorkspace()
             const scr = fw ? Quickshell.screens.find(s => s.name === fw.output) : null
-            if (scr) screen = scr
-            visible = true
+            // Otevření během doznívajícího zavírání: okno už na obrazovce je
+            if (!pop.cancelClose()) {
+                if (scr) screen = scr
+                visible = true
+            }
         } else {
             selected = (selected + delta + items.length) % items.length
         }
         grid.positionViewAtIndex(selected, GridView.Contain)
     }
 
-    function hide() { visible = false }
+    function hide() { pop.dismiss() }
 
     function commit() {
+        if (!pop.shown) return
         const it = items[selected]
-        visible = false
+        pop.dismiss()
         if (!it || it.win.is_focused) return
         Quickshell.execDetached(["niri", "msg", "action", "focus-window", "--id", String(it.win.id)])
     }
@@ -106,7 +116,7 @@ PanelWindow {
         border.color: Qt.alpha(Colors.outlineVariant, 0.8)
         border.width: 1
 
-        focus: root.visible
+        focus: pop.shown
         Keys.onPressed: event => {
             switch (event.key) {
             case Qt.Key_Tab:

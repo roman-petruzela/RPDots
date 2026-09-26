@@ -437,7 +437,8 @@ PY
 # Measured over the wallpaper collection, the two groups sit far apart: the
 # monochrome ones land at 0.00 %, the darkest still-colourful one (void-space-
 # black-hole) at 5.19 %, everything else well above. 2 % separates them cleanly.
-MONO_MODE="${THEME_MONO_MODE:-auto}"
+# THEME_MONO_MODE z prostředí má přednost; jinak volba z okna Settings.
+MONO_MODE="${THEME_MONO_MODE:-$("$HOME/.local/bin/rp-settings" get theme.mono_mode 2>/dev/null || echo auto)}"
 MATUGEN_ARGS=()
 case "$MONO_MODE" in
 on) IS_MONO=1 ;;

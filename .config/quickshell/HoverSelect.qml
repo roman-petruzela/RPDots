@@ -7,6 +7,8 @@ import QtQuick
 //
 // Porovnává se poloha ve scéně: posun obsahu ji nemění, pohyb myši ano. První
 // událost po najetí se jen zapamatuje, takže se nic nevybere samo od sebe.
+// Zaokrouhluje se na pixely — během animace zmenšení (PopAnim) vychází přepočet
+// přes scale s desetinnými chybami a výběr by skočil i pod stojící myší.
 MouseArea {
     id: area
 
@@ -18,7 +20,8 @@ MouseArea {
 
     onExited: last = Qt.point(-1, -1)
     onPositionChanged: mouse => {
-        const p = area.mapToItem(null, mouse.x, mouse.y)
+        const m = area.mapToItem(null, mouse.x, mouse.y)
+        const p = Qt.point(Math.round(m.x), Math.round(m.y))
         const first = last.x < 0
         const same = p.x === last.x && p.y === last.y
         last = p

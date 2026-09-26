@@ -6,16 +6,15 @@ input {
         }
         numlock
     }
+    // tap, natural-scroll, accel-speed a focus-follows-mouse jsou v settings.kdl
+    // (okno Settings / rp-settings). Flag zapnutý tady by include nevypnul —
+    // niri nezná `natural-scroll false`.
     touchpad {
-        tap
-        natural-scroll
     }
     mouse {
-        accel-speed 0
     }
     trackpoint {
     }
-    focus-follows-mouse max-scroll-amount="0%"
 }
 output "Acer Technologies XZ240Q TQVEE0018511" {
     mode "1920x1080@165.003"
@@ -116,14 +115,10 @@ layer-rule {
         xray false
     }
 }
-// Mod+Tab / Alt+Tab switchers (quickshell): a floating glass panel.
-layer-rule {
-    match namespace="^rp-switcher$"
-    geometry-corner-radius 22
-    background-effect {
-        blur true
-    }
-}
+// Mod+Tab / Alt+Tab switchers and the Mod+D launcher (quickshell) need no rule:
+// they request their own blur shape via ext-background-effect (PopAnim.qml), so
+// it can follow the card while it scales in/out. `blur true` here would blur the
+// whole surface at full size from the first frame of the open animation.
 // Wallpaper picker (quickshell): xray off, so the windows under the overlay get
 // blurred instead of being replaced by the blurred wallpaper. The preview of the
 // picked wallpaper sits below the windows (rp-wallpaper-preview, Bottom layer).
@@ -205,6 +200,14 @@ window-rule {
     background-effect {
         blur true
     }
+}
+// Settings okno (quickshell Settings.qml): plovoucí, zaoblené. Blur si žádá
+// samo přes ext-background-effect, okno má 86% průhledné pozadí.
+window-rule {
+    match title="^RPRice Settings$"
+    open-floating true
+    geometry-corner-radius 16
+    clip-to-geometry true
 }
 /-window-rule {
     match app-id=r#"^org\.keepassxc\.KeePassXC$"#
@@ -410,6 +413,7 @@ binds {
     Mod+Shift+E { spawn-sh "~/.local/bin/rp-shell session toggle || niri msg action quit"; }
     Ctrl+Alt+Delete { quit; }
     Mod+Shift+P { power-off-monitors; }
+    Mod+S hotkey-overlay-title="Settings: quickshell" { spawn "~/.local/bin/rp-shell" "settings" "toggle"; }
 }
 
 // Displeje visí na AMD iGPU, ale niri renderovalo na NVIDII — každý snímek se
@@ -418,3 +422,8 @@ binds {
 debug {
     render-drm-device "/dev/dri/by-path/pci-0000:06:00.0-render"
 }
+
+// Okno Settings (quickshell Settings.qml → rp-settings): mezery, focus ring, stín,
+// zaoblení, touchpad… Generovaný soubor (gitignored), kanonické hodnoty jsou
+// v ~/.config/niri-rice/settings.json. Musí být poslední, ať přepíše layout výš.
+include optional=true "~/.config/niri/settings.kdl"
