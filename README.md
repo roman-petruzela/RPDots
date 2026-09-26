@@ -444,8 +444,9 @@ straight away, since it costs nothing to undo. Shut down is `systemctl poweroff`
 ## Settings window
 
 `Mod+S` (`rp-shell settings toggle`, or `rp-shell settings <page>` to open a
-page directly: `appearance`, `windows`, `keyboard`, `mouse`, `theme`,
-`notifications`, `power`, `tools`) opens `Settings.qml`. It is also in the
+page directly: `appearance`, `windows`, `theme`, `keyboard`, `mouse`,
+`notifications`, `about`, `updates`, `packages`, `firewall`, `power`, `tools`)
+opens `Settings.qml`. It is also in the
 launcher as **Settings** (`.local/share/applications/rp-settings.desktop`). It is
 a normal floating toplevel rather than a layer, so it can be moved and niri
 animates it (window-rule on the title `RPRice Settings`).
@@ -459,6 +460,43 @@ contrast, monochrome, wallpaper transition, terminal opacity and font, Spotify
 opacity, theme modules; notifications (do not disturb, position, timeout),
 idle lock and screen off; power modes; system tools. `Ctrl+F` searches all of
 them. A dot next to a label marks a changed value, and clicking it resets it.
+The wallpaper transition is deliberately not an option: the wallpaper picker
+animates the change itself and calls the transition with `none`.
+
+The **System** pages are their own components in `.config/quickshell/settings/`
+over **`rp-sys`**: About (OS, hardware, memory and disks, displays, versions,
+package counts; Copy puts it on the clipboard), Updates (repo, AUR and Flatpak
+separately), Packages (installed with filters for explicit/AUR/Flatpak/orphans,
+details, removal, browsing and installing from the repos and AUR, removing
+orphans, cleaning the cache) and Firewall (firewalld state, panic mode, allowed
+services and ports). Actions that need root go through polkit (the running
+polkit-gnome agent asks for the password) and their output streams into a log
+panel (`settings/SJob.qml`); each one also has a Terminal button that runs the
+same thing interactively in kitty. A running job can't be closed or cancelled,
+because pacman killed mid-transaction leaves a half-updated system. AUR goes
+through `paru --sudo pkexec`: it builds as you and installs through polkit.
+
+The update check never touches the system database. Like `checkupdates`, it
+syncs a copy into a temporary `--dbpath` under fakeroot, because a partial
+`pacman -Sy` would break the next install. It passes `--disable-sandbox`:
+pacman 7 otherwise downloads as the `alpm` user, which fakeroot can't do. The
+check takes ~15 s, so the window keeps the result while you switch pages.
+The Firewall page never reads through `firewall-cmd`. That tool asks polkit for
+everything up front (`authorizeAll`), and with firewalld's `server` policy (the
+default `org.fedoraproject.FirewallD1.policy` symlink on Arch) even `--state`
+popped a password dialog. When a timeout killed it, PAM counted the cancelled
+dialog as a failed login, and after three of those `pam_faillock` locked the
+account for 10 minutes, so even the right password failed everywhere. The page
+now reads the state, zones and panic mode through D-Bus methods with the `info`
+action (allowed without a password) and the services and ports from the
+world-readable zone XML. Writes run as one `pkexec sh -c` covering runtime and
+permanent, with no timeout: one dialog per change, and it stays open while you
+type.
+
+The shared controls (`SRow`, `SToggle`, `SSlider`, `SDropdown`, `SButton`, …)
+live in `settings/` too. In `Row`, children sit at the top, so a 13 px label
+next to a 16 px icon ends up higher than the icon. Everything that has to be
+vertically centred is anchored to the centre on its own instead.
 
 The window only draws. **`rp-settings`** owns the data: the schema (type,
 default, range or options) is one table in the script, `dump` hands it all to
@@ -472,12 +510,18 @@ are stored, in `~/.config/niri-rice/settings.json`. Outputs:
 | Keys | Output | Applied by |
 |---|---|---|
 | `niri.*`, `input.*`, `cursor.*`, Spotify opacity | `~/.config/niri/settings.kdl` | niri live reload, after `niri validate` (rollback on failure) |
-| `cursor.*` | also gsettings, GTK `settings.ini`, `icons/default/index.theme` | new apps |
+| `cursor.*` | also gsettings, GTK `settings.ini`, `icons/default/index.theme`, systemd/D-Bus `XCURSOR_*` | new apps; waybar is restarted |
 | `theme.terminal_*` | `~/.config/kitty/rp-settings.conf` (included last in `kitty.conf`) | `kitty @ set-background-opacity/set-font-size` on running terminals |
 | `notify.*` | `~/.config/mako/rp-settings` (`include=` in the mako template) | `makoctl reload`, `makoctl mode` for do not disturb |
 | `idle.*` | swayidle command line | `rp-settings idle` restarts swayidle (`start-rice-services.sh` starts it the same way) |
 | `theme.scheme`, `theme.contrast`, `theme.mono_mode` | read by `apply-wallpaper-theme.sh` | next theme regenerate |
 | `wallpaper.*` | read by `theme-modules/01-wallpaper-transition.sh` | next wallpaper change |
+
+niri reloads the cursor theme live, but only for the cursor it draws itself.
+Apps that draw their own (waybar, quickshell including this window, GTK3,
+XWayland) read `XCURSOR_THEME` once at start, and services launched by systemd
+never had it at all. So the change also goes into the systemd and D-Bus
+environment, waybar is restarted, and the rest update the next time they start.
 
 `settings.kdl` is included at the very end of `config.kdl`, so it overrides the
 layout, blur, overview and cursor there, and the animation speed and on/off from

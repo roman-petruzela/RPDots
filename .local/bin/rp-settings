@@ -19,7 +19,7 @@
 #   ~/.config/mako/rp-settings     pozice a timeout notifikací (include v šabloně)
 #
 # Ostatní klíče čtou skripty samy přes `rp-settings get` (theme.* bere
-# apply-wallpaper-theme.sh, wallpaper.* modul 01-wallpaper-transition.sh).
+# apply-wallpaper-theme.sh).
 #
 # settings.kdl vždycky obsahuje *všechny* spravované niri klíče, ne jen změněné.
 # Flagy jako `tap` nebo `natural-scroll` totiž include v niri umí jen zapnout,
@@ -105,8 +105,6 @@ theme.mono_mode|enum|auto|auto,on,off
 theme.terminal_opacity|float|0.45|0.10|1
 theme.terminal_font|float|11.50|7|24
 theme.spotify_opacity|float|0.75|0.30|1
-wallpaper.transition|enum|wave|none,simple,fade,wipe,wave,grow,center,outer,left,right,top,bottom,any,random
-wallpaper.transition_step|int|10|1|90
 notify.position|enum|top-right|top-left,top-center,top-right,bottom-left,bottom-center,bottom-right
 notify.timeout|int|6|0|60
 notify.max_visible|int|5|1|20
@@ -386,6 +384,14 @@ apply_cursor() {
     done
     f="$HOME/.local/share/icons/default/index.theme"
     [[ -f "$f" ]] && sed -i "s/^Inherits=.*/Inherits=$t/" "$f"
+    # niri si XCURSOR_* nastaví jen sobě a tomu, co spustí potom. Služby
+    # (quickshell, D-Bus aktivované aplikace) mají prostředí ze systemd — to
+    # je potřeba srovnat, jinak si při příštím startu načtou staré téma.
+    systemctl --user set-environment XCURSOR_THEME="$t" XCURSOR_SIZE="$s" 2>/dev/null
+    command -v dbus-update-activation-environment >/dev/null 2>&1 &&
+        XCURSOR_THEME="$t" XCURSOR_SIZE="$s" dbus-update-activation-environment XCURSOR_THEME XCURSOR_SIZE 2>/dev/null
+    # waybar (systemd unit) si kurzor načte jen při startu — restart s novým prostředím
+    systemctl --user try-restart waybar.service >/dev/null 2>&1 &
     return 0
 }
 
@@ -415,7 +421,7 @@ apply_for() {
         theme.terminal_*) apply_kitty ;;
         notify.*) apply_mako ;;
         idle.*) start_idle ;;
-        *) return 0 ;;   # theme.*, wallpaper.* čtou skripty samy
+        *) return 0 ;;   # theme.scheme/contrast/mono_mode čte apply-wallpaper-theme.sh
     esac
 }
 

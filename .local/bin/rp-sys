@@ -1,0 +1,319 @@
+#!/usr/bin/env bash
+# rp-sys — systémové stránky okna Settings (O systému, aktualizace, balíčky, firewall).
+#
+# Čtení (JSON na stdout, bez roota):
+#   rp-sys info                 O systému: OS, HW, paměť, disky, displeje, verze
+#   rp-sys updates              dostupné aktualizace: repo, AUR, flatpak
+#   rp-sys packages             nainstalované balíčky (pacman + flatpak)
+#   rp-sys pkginfo <jméno>      detail balíčku (pacman -Qi / -Si)
+#   rp-sys search <dotaz>       hledání v repozitářích a AUR
+#   rp-sys firewall             stav firewalld (zóna, služby, porty)
+#   rp-sys fw-services          seznam známých služeb firewalld
+#
+# Akce (streamují log na stdout; root přes polkit, dialog na heslo ukáže agent):
+#   rp-sys upgrade              pacman -Syu
+#   rp-sys upgrade-aur          paru -Sua (paru volá pacman přes pkexec)
+#   rp-sys upgrade-flatpak      flatpak update
+#   rp-sys install <pkg…>       pacman -S (AUR balíčky přes paru)
+#   rp-sys remove <pkg…>        pacman -Rns
+#   rp-sys remove-orphans       pacman -Rns $(pacman -Qdtq)
+#   rp-sys keep <pkg…>          pacman -D --asexplicit (už ne sirotek, remove-orphans ho mine)
+#   rp-sys clean-cache          pacman -Sc
+#   rp-sys fw <akce> [arg]      firewalld: add-service, remove-service,
+#                               add-port, remove-port, panic-on, panic-off, restart
+#
+# Kontrola repo aktualizací nepotřebuje roota ani nesahá na systémovou databázi:
+# stejně jako `checkupdates` synchronizuje kopii do dočasné dbpath přes fakeroot.
+# Částečný `pacman -Sy` do systémové databáze by jinak rozbil příští instalaci.
+set -uo pipefail
+export LC_ALL=C
+
+die() { echo "rp-sys: $*" >&2; exit 1; }
+has() { command -v "$1" >/dev/null 2>&1; }
+
+# Pacman bez barev a progress barů — výstup jde do logu v okně, ne do terminálu
+PACMAN_FLAGS=(--noconfirm --noprogressbar --color never)
+
+# --------------------------------------------------------------- info
+info() {
+    local os kernel host up cpu cores gpu mem swap disks outputs
+    os=$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-Linux}")
+    kernel=$(uname -r)
+    host=$(cat /etc/hostname 2>/dev/null || uname -n)
+    up=$(awk '{ d=int($1/86400); h=int($1%86400/3600); m=int($1%3600/60);
+                if (d) printf "%dd %dh %dm", d, h, m; else if (h) printf "%dh %dm", h, m; else printf "%dm", m }' /proc/uptime)
+    cpu=$(awk -F': ' '/^model name/ { print $2; exit }' /proc/cpuinfo)
+    cores=$(nproc)
+    gpu=$(lspci 2>/dev/null | grep -Ei 'vga|3d|display' | sed -E 's/^[0-9a-f:.]+ [^:]+: //; s/ \(rev [0-9a-f]+\)//' | jq -R . | jq -s .)
+    mem=$(awk '/^MemTotal/ { t=$2 } /^MemAvailable/ { a=$2 } /^SwapTotal/ { st=$2 } /^SwapFree/ { sf=$2 }
+               END { printf "{\"total\":%d,\"used\":%d,\"swapTotal\":%d,\"swapUsed\":%d}", t*1024, (t-a)*1024, st*1024, (st-sf)*1024 }' /proc/meminfo)
+    disks=$(df -B1 --output=target,size,used,fstype -x tmpfs -x devtmpfs -x efivarfs -x overlay 2>/dev/null |
+        awk 'NR > 1 && $1 !~ /^\/(boot|efi|var\/lib|snap)/' |
+        jq -R 'split(" ") | map(select(length > 0)) | { mount: .[0], size: (.[1] | tonumber), used: (.[2] | tonumber), fs: .[3] }' |
+        jq -s 'unique_by(.size, .used)')
+    outputs=$(niri msg --json outputs 2>/dev/null | jq '[to_entries[] | .value | {
+        name, model: ((.make // "") + " " + (.model // "") | ltrimstr(" ")),
+        mode: (if .current_mode != null then .modes[.current_mode] | "\(.width)×\(.height) @ \(.refresh_rate / 1000 | . * 10 | round / 10) Hz" else "off" end),
+        scale: (.logical.scale // 1) }]' 2>/dev/null || echo '[]')
+
+    local bat="null"
+    local b; for b in /sys/class/power_supply/BAT*; do
+        [[ -d "$b" ]] || continue
+        bat=$(jq -n --arg cap "$(cat "$b/capacity" 2>/dev/null)" --arg st "$(cat "$b/status" 2>/dev/null)" \
+                    --arg full "$(cat "$b/energy_full" 2>/dev/null || cat "$b/charge_full" 2>/dev/null)" \
+                    --arg design "$(cat "$b/energy_full_design" 2>/dev/null || cat "$b/charge_full_design" 2>/dev/null)" \
+            '{ capacity: ($cap | tonumber? // null), status: $st,
+               health: (if ($full | tonumber?) and ($design | tonumber? // 0) > 0
+                        then ($full | tonumber) * 100 / ($design | tonumber) | round else null end) }')
+        break
+    done
+
+    jq -n --arg os "$os" --arg kernel "$kernel" --arg host "$host" --arg user "$USER" --arg up "$up" \
+          --arg cpu "$cpu" --argjson cores "$cores" --argjson gpu "$gpu" --argjson mem "$mem" \
+          --argjson disks "$disks" --argjson outputs "$outputs" --argjson battery "$bat" \
+          --arg niri "$(niri --version 2>/dev/null | awk '{ print $2 }')" \
+          --arg qs "$(LC_ALL=C.UTF-8 qs --version 2>/dev/null | awk '{ print $2 }')" \
+          --arg shell "$(basename "${SHELL:-}") $(${SHELL:-sh} --version 2>/dev/null | grep -oE '[0-9]+\.[0-9.]+' | head -1)" \
+          --arg board "$(cat /sys/class/dmi/id/product_name 2>/dev/null) $(cat /sys/class/dmi/id/product_version 2>/dev/null)" \
+          --arg vendor "$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)" \
+          --arg pkgs "$(pacman -Qq 2>/dev/null | wc -l)" --arg aur "$(pacman -Qqm 2>/dev/null | wc -l)" \
+          --arg flat "$( has flatpak && flatpak list --app 2>/dev/null | wc -l || echo 0)" \
+          --arg boot "$(uptime -s 2>/dev/null)" \
+    '{ os: $os, kernel: $kernel, host: $host, user: $user, uptime: $up, boot: $boot,
+       cpu: $cpu, cores: $cores, gpu: $gpu, memory: $mem, disks: $disks, outputs: $outputs,
+       battery: $battery, niri: $niri, quickshell: $qs, shell: $shell,
+       machine: (($vendor + " " + $board) | gsub("\\s+$"; "")),
+       packages: { pacman: ($pkgs | tonumber), aur: ($aur | tonumber), flatpak: ($flat | tonumber) } }'
+}
+
+# --------------------------------------------------------------- aktualizace
+repo_updates() {
+    local db="${TMPDIR:-/tmp}/rp-sys-db-$UID"
+    local sysdb; sysdb=$(pacman-conf DBPath 2>/dev/null || echo /var/lib/pacman/)
+    mkdir -p "$db"
+    ln -sfn "${sysdb%/}/local" "$db/local"
+    # --disable-sandbox: pacman 7 jinak stahuje pod uživatelem alpm, na což
+    # fakeroot nestačí (stejně to dělá checkupdates)
+    fakeroot -- pacman -Sy --disable-sandbox --dbpath "$db" --logfile /dev/null >/dev/null 2>&1 || return 1
+    pacman -Qu --dbpath "$db" 2>/dev/null | grep -v '\[ignored\]'
+}
+
+updates() {
+    local repo aur flat err=""
+    repo=$(repo_updates) || err="Repository sync failed (offline?)"
+    aur=""; has paru && aur=$(timeout 30 paru -Qua 2>/dev/null)
+    flat=""; has flatpak && flat=$(timeout 30 flatpak remote-ls --updates --app --columns=application,version 2>/dev/null)
+    jq -n --arg repo "$repo" --arg aur "$aur" --arg flat "$flat" --arg err "$err" --arg checked "$(date +%H:%M)" '
+        def pac: split("\n") | map(select(length > 0) | capture("^(?<name>\\S+) (?<old>\\S+) -> (?<new>\\S+)"));
+        { repo: ($repo | pac), aur: ($aur | pac),
+          flatpak: ($flat | split("\n") | map(select(length > 0) | split("\t") | { name: .[0], old: "", new: (.[1] // "") })),
+          error: $err, checked: $checked }'
+}
+
+# --------------------------------------------------------------- balíčky
+packages() {
+    local foreign; foreign=$(pacman -Qqm 2>/dev/null | paste -sd' ' -)
+    local orphans; orphans=$(pacman -Qqdt 2>/dev/null | paste -sd' ' -)
+    {
+        pacman -Qi 2>/dev/null | awk -F' *: ' '
+            /^Name/ { n = $2 } /^Version/ { v = $2 } /^Description/ { d = $2 }
+            /^Installed Size/ { s = $2 } /^Install Reason/ { r = ($2 ~ /Explicitly/) ? "explicit" : "dependency" }
+            /^Install Date/ { t = $2 }
+            /^$/ { if (n != "") printf "pacman\t%s\t%s\t%s\t%s\t%s\t%s\n", n, v, s, r, t, d; n = "" }'
+        has flatpak && flatpak list --app --columns=application,version,size,name 2>/dev/null |
+            awk -F'\t' '{ printf "flatpak\t%s\t%s\t%s\texplicit\t\t%s\n", $1, $2, $3, $4 }'
+    } | jq -R -s --arg foreign " $foreign " --arg orphans " $orphans " '
+        def bytes: capture("(?<n>[0-9.]+)[^0-9A-Za-z]?(?<u>[KMGT]?i?B)") as $m
+            | ($m.n | tonumber) * ({ "B": 1, "KiB": 1024, "MiB": 1048576, "GiB": 1073741824,
+                                     "kB": 1000, "MB": 1e6, "GB": 1e9, "TiB": 1099511627776 }[$m.u] // 1);
+        split("\n") | map(select(length > 0) | split("\t") as $f | {
+            source: $f[0], name: $f[1], version: $f[2], size: (($f[3] | bytes?) // 0),
+            reason: $f[4], date: $f[5], description: ($f[6] // ""),
+            aur: ($f[0] == "pacman" and ($foreign | contains(" " + $f[1] + " "))),
+            orphan: ($f[0] == "pacman" and ($orphans | contains(" " + $f[1] + " "))) })'
+}
+
+pkginfo() {
+    local out
+    out=$(pacman -Qi "$1" 2>/dev/null || pacman -Si "$1" 2>/dev/null || (has paru && paru -Si "$1" 2>/dev/null))
+    [[ -n "$out" ]] || die "package not found: $1"
+    # "Klíč : hodnota" + pokračovací řádky odsazené mezerami
+    awk '
+        /^[A-Za-z][A-Za-z ]*[A-Za-z] +: / { if (k != "") print k "\t" v; split($0, a, / +: /); k = a[1]; v = substr($0, index($0, ": ") + 2); next }
+        /^ +/ { sub(/^ +/, ""); v = v "  " $0; next }
+        END { if (k != "") print k "\t" v }' <<<"$out" |
+        jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | { key: .[0], value: .[1] })'
+}
+
+search() {
+    local q=$1 repo aur
+    repo=$(pacman -Ss "$q" 2>/dev/null | paste - - | head -150)
+    aur=""; has paru && aur=$(timeout 20 paru -Ssa "$q" 2>/dev/null | paste - - | head -100)
+    local installed; installed=" $(pacman -Qq | paste -sd' ' -) "
+    jq -n --arg repo "$repo" --arg aur "$aur" --arg inst "$installed" '
+        def parse($src): split("\n") | map(select(length > 0)
+            | capture("^(?<repo>[^/]+)/(?<name>\\S+) (?<version>\\S+)[^\\t]*\\t\\s*(?<description>.*)$")?
+            | . as $p | $p + { source: $src, installed: ($inst | contains(" " + $p.name + " ")) });
+        ($repo | parse("repo")) + ($aur | parse("aur"))'
+}
+
+# --------------------------------------------------------------- firewall
+# Čtení bez polkitu. `firewall-cmd` si při startu vyžádá autorizaci pro vše
+# (authorizeAll), a s politikou `server` (Arch ji má jako výchozí symlink
+# org.fedoraproject.FirewallD1.policy) tak i `--state` otevřel dialog na heslo.
+# Když ho pak shodil timeout, PAM to započítal jako neúspěšné přihlášení
+# a po třech takových faillock zamkl účet na 10 minut.
+# Proto: stav, zóny a panic mode přes D-Bus metody s akcí `info` (povolené
+# bez hesla), služby a porty ze souborů zóny (čitelné pro všechny; zápisy
+# níž jdou do runtime i --permanent, takže se shodují).
+FWBUS=(busctl --system --json=short call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1)
+
+fwbus() { timeout 4 "${FWBUS[@]}" "$@" 2>/dev/null | jq -c '.data[0]'; }
+
+zone_file() {
+    local z=$1
+    [[ "$z" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
+    if [[ -r "/etc/firewalld/zones/$z.xml" ]]; then echo "/etc/firewalld/zones/$z.xml"
+    elif [[ -r "/usr/lib/firewalld/zones/$z.xml" ]]; then echo "/usr/lib/firewalld/zones/$z.xml"
+    else return 1; fi
+}
+
+firewall() {
+    local active=false zone="" zones="{}" panic=false err="" svc="[]" ports="[]" f
+    systemctl is-active --quiet firewalld && active=true
+    if [[ $active == true ]]; then
+        zone=$(fwbus org.fedoraproject.FirewallD1 getDefaultZone | jq -r . 2>/dev/null)
+        if [[ -z "$zone" || "$zone" == null ]]; then
+            err="firewalld is running but not answering on D-Bus"
+            zone=""
+        else
+            zones=$(fwbus org.fedoraproject.FirewallD1.zone getActiveZones || echo '{}')
+            panic=$(fwbus org.fedoraproject.FirewallD1 queryPanicMode || echo false)
+            if f=$(zone_file "$zone"); then
+                svc=$(python3 - "$f" <<'PY'
+import json, sys, xml.etree.ElementTree as ET
+r = ET.parse(sys.argv[1]).getroot()
+print(json.dumps({
+    "services": [s.get("name") for s in r.findall("service")],
+    "ports": [f'{p.get("port")}/{p.get("protocol")}' for p in r.findall("port")],
+}))
+PY
+)
+                ports=$(jq -c .ports <<<"$svc"); svc=$(jq -c .services <<<"$svc")
+            fi
+        fi
+    fi
+    jq -n --argjson active "$active" --arg zone "$zone" --argjson zones "${zones:-{\}}" \
+          --argjson panic "${panic:-false}" --argjson services "$svc" --argjson ports "$ports" \
+          --arg err "$err" --arg ufw "$(systemctl is-active ufw 2>/dev/null)" '
+        { backend: "firewalld", active: $active, responding: ($active and $err == ""), zone: $zone,
+          interfaces: ($zones[$zone].interfaces // []),
+          activeZones: ($zones | keys), services: $services, ports: $ports,
+          panic: $panic, ufw: ($ufw == "active"), error: $err }'
+}
+
+fw_services() {
+    local d
+    for d in /usr/lib/firewalld/services /etc/firewalld/services; do
+        [[ -d "$d" ]] && command ls "$d"
+    done | sed -n 's/\.xml$//p' | sort -u | jq -R -s 'split("\n") | map(select(length > 0))'
+}
+
+# Zápis: jeden pkexec = jeden dialog na heslo. Jako root firewall-cmd polkit
+# obchází; bez timeoutu, ať se dialog nezavře, zatímco píšeš heslo.
+fw() {
+    local act=$1 arg=${2:-} zone
+    case "$act" in
+        restart)   exec pkexec systemctl restart firewalld ;;
+        start)     exec pkexec systemctl enable --now firewalld ;;
+        stop)      exec pkexec systemctl disable --now firewalld ;;
+        panic-on)  exec pkexec firewall-cmd --panic-on ;;
+        panic-off) exec pkexec firewall-cmd --panic-off ;;
+    esac
+    zone=$(fwbus org.fedoraproject.FirewallD1 getDefaultZone | jq -r .)
+    [[ "$zone" =~ ^[A-Za-z0-9_-]+$ ]] || die "firewalld is not answering"
+    case "$act" in
+        add-service|remove-service)
+            [[ "$arg" =~ ^[a-z0-9._-]+$ ]] || die "invalid service: $arg" ;;
+        add-port|remove-port)
+            [[ "$arg" =~ ^[0-9]{1,5}(-[0-9]{1,5})?/(tcp|udp|sctp|dccp)$ ]] || die "invalid port (use 8080/tcp or 6000-6010/udp): $arg" ;;
+        *) die "unknown firewall action: $act" ;;
+    esac
+    echo ":: firewall-cmd --zone=$zone --$act=$arg (runtime + permanent)"
+    # runtime i permanent v jednom pkexec, ať je to jediný dialog
+    exec pkexec sh -c 'firewall-cmd --zone="$1" --"$2"="$3" && firewall-cmd --permanent --zone="$1" --"$2"="$3"' \
+        sh "$zone" "$act" "$arg"
+}
+
+# --------------------------------------------------------------- akce
+valid_pkgs() {
+    local p
+    for p in "$@"; do [[ "$p" =~ ^[a-zA-Z0-9@._+-]+$ ]] || die "invalid package name: $p"; done
+}
+
+case "${1:-}" in
+    info)        info ;;
+    updates)     updates ;;
+    packages)    packages ;;
+    pkginfo)     [[ $# -eq 2 ]] || die "usage: rp-sys pkginfo <name>"; pkginfo "$2" ;;
+    search)      [[ $# -eq 2 ]] || die "usage: rp-sys search <query>"; search "$2" ;;
+    firewall)    firewall ;;
+    fw-services) fw_services ;;
+
+    upgrade)
+        echo ":: pacman -Syu"
+        exec pkexec pacman -Syu "${PACMAN_FLAGS[@]}" 2>&1 ;;
+    upgrade-aur)
+        has paru || die "paru is not installed"
+        echo ":: paru -Sua (building as $USER, installing through pkexec)"
+        exec paru -Sua --noconfirm --sudo pkexec --skipreview --noprogressbar --color never 2>&1 ;;
+    upgrade-flatpak)
+        echo ":: flatpak update"
+        exec flatpak update -y --noninteractive 2>&1 ;;
+    install)
+        shift; [[ $# -gt 0 ]] || die "usage: rp-sys install <pkg…>"; valid_pkgs "$@"
+        repo=(); aurp=()
+        for p in "$@"; do
+            if pacman -Si "$p" >/dev/null 2>&1; then repo+=("$p"); else aurp+=("$p"); fi
+        done
+        if (( ${#repo[@]} )); then
+            echo ":: pacman -S ${repo[*]}"
+            pkexec pacman -S --needed "${PACMAN_FLAGS[@]}" "${repo[@]}" 2>&1 || exit $?
+        fi
+        if (( ${#aurp[@]} )); then
+            has paru || die "not in the repositories and paru is missing: ${aurp[*]}"
+            echo ":: paru -S ${aurp[*]} (AUR)"
+            paru -S --needed --noconfirm --sudo pkexec --skipreview --noprogressbar --color never "${aurp[@]}" 2>&1 || exit $?
+        fi ;;
+    remove)
+        shift; [[ $# -gt 0 ]] || die "usage: rp-sys remove <pkg…>"; valid_pkgs "$@"
+        # Flatpak aplikace mají v id tečky a v pacmanu nejsou
+        pac=(); flat=()
+        for p in "$@"; do
+            if pacman -Qq "$p" >/dev/null 2>&1; then pac+=("$p"); else flat+=("$p"); fi
+        done
+        if (( ${#pac[@]} )); then
+            echo ":: pacman -Rns ${pac[*]}"
+            pkexec pacman -Rns "${PACMAN_FLAGS[@]}" "${pac[@]}" 2>&1 || exit $?
+        fi
+        if (( ${#flat[@]} )); then
+            echo ":: flatpak uninstall ${flat[*]}"
+            flatpak uninstall -y --noninteractive "${flat[@]}" 2>&1 || exit $?
+        fi ;;
+    remove-orphans)
+        mapfile -t orphans < <(pacman -Qqdt)
+        (( ${#orphans[@]} )) || { echo "No orphaned packages."; exit 0; }
+        echo ":: pacman -Rns ${orphans[*]}"
+        exec pkexec pacman -Rns "${PACMAN_FLAGS[@]}" "${orphans[@]}" 2>&1 ;;
+    keep)
+        shift; [[ $# -gt 0 ]] || die "usage: rp-sys keep <pkg…>"; valid_pkgs "$@"
+        echo ":: pacman -D --asexplicit $*"
+        exec pkexec pacman -D --asexplicit "$@" 2>&1 ;;
+    clean-cache)
+        echo ":: pacman -Sc (keeps installed versions, drops the rest)"
+        exec pkexec pacman -Sc "${PACMAN_FLAGS[@]}" 2>&1 ;;
+    fw) shift; fw "$@" 2>&1 ;;
+    *)
+        sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' >&2
+        exit 1 ;;
+esac

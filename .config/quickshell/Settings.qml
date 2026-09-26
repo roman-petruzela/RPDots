@@ -4,20 +4,26 @@ import Quickshell.Wayland
 import QtQuick
 import QtQuick.Controls
 import "Colors.js" as Colors
+import "settings"
 
 // Okno nastavení ricu (Mod+S, `rp-shell settings toggle`, v launcheru jako
 // „Settings“). Je to obyčejné plovoucí okno (xdg toplevel), ne vrstva — dá se
 // přesouvat, niri mu kreslí otevírací animaci a window-rule v config.kdl ho
-// otevře plovoucí. `rp-shell settings <stránka>` ho otevře rovnou na stránce
-// (appearance, windows, keyboard, mouse, theme, notifications, power, tools).
+// otevře plovoucí. `rp-shell settings <id stránky>` ho otevře rovnou na stránce.
 //
-// Okno samo nic nepočítá ani nezapisuje: typy, rozsahy, volby i výchozí stavy
-// dodává `rp-settings dump`, změny jdou přes `rp-settings set`, které je ověří
-// a aplikuje (niri část projde `niri validate`). Tady je jen rozložení:
-// `pages` popisuje, který klíč patří na kterou stránku a jak se jmenuje;
-// ovládací prvek se vybere podle typu (bool → přepínač, číslo → posuvník,
-// enum → segmenty nebo rozbalovací seznam, string → textové pole). Nová volba
-// = klíč ve schématu rp-settings + jeden řádek tady.
+// Dva druhy stránek:
+//  - nastavení (Personalization): typy, rozsahy, volby i výchozí stavy dodává
+//    `rp-settings dump`, změny jdou přes `rp-settings set`, které je ověří
+//    a aplikuje. Tady je jen rozložení — `pages` říká, který klíč patří na
+//    kterou stránku a jak se jmenuje; ovládací prvek se vybere podle typu
+//    (bool → přepínač, číslo → posuvník, enum → segmenty/rozbalovací seznam,
+//    string → textové pole). Nová volba = klíč ve schématu rp-settings + řádek tady.
+//  - systémové (`view`): vlastní komponenty v settings/ (AboutPage, UpdatesPage,
+//    PackagesPage, FirewallPage) nad `rp-sys`. Root akce jdou přes polkit a jejich
+//    log ukazuje sdílený panel `job` (settings/SJob.qml).
+//
+// Ovládací prvky (SRow, SToggle, SSlider, …) jsou v settings/, aby je sdílely
+// obě skupiny stránek.
 //
 // Změna tématu přepíše Colors.js a quickshell se celý znovu načte — otevřené
 // okno a vybraná stránka proto přežívají v PersistentProperties.
@@ -33,7 +39,7 @@ Scope {
     //          percent (0–1 jako %), zero (popisek pro 0, např. "Off") }
     // nebo zvláštní druh: { kind: "button" | "modules" | "power" | "tools" | "note" }
     readonly property var pages: [
-        { id: "appearance", icon: "󰏘", label: "Appearance", sections: [
+        { id: "appearance", group: "PERSONALIZATION", icon: "󰏘", label: "Appearance", sections: [
             { title: "WINDOWS", rows: [
                 { key: "niri.gaps", label: "Gaps", hint: "Space between windows and around the screen edge.", suffix: " px" },
                 { key: "niri.corner_radius", label: "Corner radius", hint: "Rounds and clips every window.", suffix: " px", zero: "Off" },
@@ -56,7 +62,7 @@ Scope {
                 { key: "niri.anim_slowdown", label: "Animation duration", hint: "1× is niri's default speed, higher is slower.", step: 0.05, suffix: "×" },
             ]},
         ]},
-        { id: "windows", icon: "󰕰", label: "Windows", sections: [
+        { id: "windows", group: "PERSONALIZATION", icon: "󰕰", label: "Windows", sections: [
             { title: "LAYOUT", rows: [
                 { key: "niri.default_width", label: "New column width", hint: "Width of newly opened windows.", labels: ["1/3", "1/2", "2/3", "Full"] },
                 { key: "niri.default_display", label: "New column display", hint: "Tabbed columns stack windows as tabs.", labels: ["Columns", "Tabs"] },
@@ -75,7 +81,26 @@ Scope {
                 { key: "input.ws_back_forth", label: "Workspace back and forth", hint: "Switching to the current workspace jumps to the previous one." },
             ]},
         ]},
-        { id: "keyboard", icon: "󰌌", label: "Keyboard", sections: [
+        { id: "theme", group: "PERSONALIZATION", icon: "󰸌", label: "Theme", sections: [
+            { title: "COLORS", rows: [
+                { kind: "button", action: "wallpaper", label: "Wallpaper", hint: "Pick a wallpaper; the whole theme follows it.", icon: "󰸉", text: "Choose…" },
+                { key: "theme.scheme", label: "Color scheme", hint: "How matugen derives the palette from the wallpaper.",
+                  labels: ["Tonal spot", "Content", "Expressive", "Fidelity", "Fruit salad", "Rainbow", "Neutral"] },
+                { key: "theme.contrast", label: "Contrast", hint: "−1 softest, 0 standard, 1 strongest.", step: 0.1, decimals: 1 },
+                { key: "theme.mono_mode", label: "Monochrome scheme", hint: "Grey palette for black-and-white wallpapers.", labels: ["Auto", "On", "Off"] },
+                { kind: "button", action: "theme", label: "Regenerate theme", hint: "Scheme, contrast and monochrome apply on the next regenerate.", icon: "󰑓", text: "Apply now" },
+            ]},
+            { title: "TERMINAL & APPS", rows: [
+                { key: "theme.terminal_opacity", label: "Terminal opacity", hint: "kitty background; running terminals update live.", percent: true, step: 0.05 },
+                { key: "theme.terminal_font", label: "Terminal font size", suffix: " pt", step: 0.5, decimals: 1 },
+                { key: "theme.spotify_opacity", label: "Spotify opacity", hint: "Spotify can't do real transparency, so text fades too.", percent: true, step: 0.05 },
+            ]},
+            { title: "THEMED APPS", rows: [
+                { kind: "note", text: "Modules that repaint an app after each wallpaper change (modules.conf)." },
+                { kind: "modules" },
+            ]},
+        ]},
+        { id: "keyboard", group: "PERSONALIZATION", icon: "󰌌", label: "Keyboard", sections: [
             { title: "LAYOUT", rows: [
                 { key: "input.kb_layouts", label: "Layouts", hint: "Comma-separated XKB codes, e.g. cz,us or us,de." },
                 { key: "input.kb_switch", label: "Switch layout with", hint: "Mod+Space always switches too.",
@@ -90,7 +115,7 @@ Scope {
                 { key: "input.numlock", label: "Num Lock on at start" },
             ]},
         ]},
-        { id: "mouse", icon: "󰍽", label: "Mouse & touchpad", sections: [
+        { id: "mouse", group: "PERSONALIZATION", icon: "󰍽", label: "Mouse & touchpad", sections: [
             { title: "TOUCHPAD", rows: [
                 { key: "input.touchpad_tap", label: "Tap to click" },
                 { key: "input.touchpad_drag", label: "Tap and drag", hint: "Double-tap and hold to drag." },
@@ -101,7 +126,7 @@ Scope {
                 { key: "input.touchpad_accel", label: "Pointer speed", hint: "−1 slowest, 1 fastest.", step: 0.05 },
                 { key: "input.touchpad_profile", label: "Acceleration", labels: ["Adaptive", "Flat"] },
                 { key: "input.touchpad_scroll", label: "Scroll speed", step: 0.05, suffix: "×" },
-                { key: "input.touchpad_click", label: "Click method", hint: "Clickfinger: 2 fingers = right, 3 = middle.",
+                { key: "input.touchpad_click", label: "Click method", hint: "Fingers: 2 fingers = right, 3 = middle.",
                   labels: ["Default", "Areas", "Fingers"] },
                 { key: "input.touchpad_tap_map", label: "Two/three-finger tap", labels: ["Right / middle", "Middle / right"] },
             ]},
@@ -113,37 +138,13 @@ Scope {
                 { key: "input.mouse_left_handed", label: "Left-handed", hint: "Swap left and right buttons." },
             ]},
             { title: "CURSOR", rows: [
-                { key: "cursor.theme", label: "Cursor theme", hint: "Applied to niri, GTK and X11 apps; running apps may need a restart." },
+                { key: "cursor.theme", label: "Cursor theme", hint: "Changes right away where niri draws the cursor; apps that draw their own (waybar, GTK3, XWayland, this window) pick it up after a restart." },
                 { key: "cursor.size", label: "Cursor size", suffix: " px", step: 2 },
                 { key: "cursor.hide_typing", label: "Hide while typing", hint: "Can confuse mouselook in some Wine games." },
                 { key: "cursor.hide_after", label: "Hide when idle", hint: "Hide the pointer after this long without movement.", suffix: " s", zero: "Never" },
             ]},
         ]},
-        { id: "theme", icon: "󰸌", label: "Theme", sections: [
-            { title: "COLORS", rows: [
-                { kind: "button", action: "wallpaper", label: "Wallpaper", hint: "Pick a wallpaper; the whole theme follows it.", icon: "󰸉", text: "Choose…" },
-                { key: "theme.scheme", label: "Color scheme", hint: "How matugen derives the palette from the wallpaper.",
-                  labels: ["Tonal spot", "Content", "Expressive", "Fidelity", "Fruit salad", "Rainbow", "Neutral"] },
-                { key: "theme.contrast", label: "Contrast", hint: "−1 softest, 0 standard, 1 strongest.", step: 0.1, decimals: 1 },
-                { key: "theme.mono_mode", label: "Monochrome scheme", hint: "Grey palette for black-and-white wallpapers.", labels: ["Auto", "On", "Off"] },
-                { kind: "button", action: "theme", label: "Regenerate theme", hint: "Scheme, contrast and monochrome apply on the next regenerate.", icon: "󰑓", text: "Apply now" },
-            ]},
-            { title: "WALLPAPER", rows: [
-                { key: "wallpaper.transition", label: "Transition", hint: "Animation when the wallpaper changes.",
-                  labels: ["None", "Simple", "Fade", "Wipe", "Wave", "Grow", "Center", "Outer", "Left", "Right", "Top", "Bottom", "Any", "Random"] },
-                { key: "wallpaper.transition_step", label: "Transition speed", hint: "Higher is faster." },
-            ]},
-            { title: "TERMINAL & APPS", rows: [
-                { key: "theme.terminal_opacity", label: "Terminal opacity", hint: "kitty background; running terminals update live.", percent: true, step: 0.05 },
-                { key: "theme.terminal_font", label: "Terminal font size", suffix: " pt", step: 0.5, decimals: 1 },
-                { key: "theme.spotify_opacity", label: "Spotify opacity", hint: "Spotify can't do real transparency, so text fades too.", percent: true, step: 0.05 },
-            ]},
-            { title: "THEMED APPS", rows: [
-                { kind: "note", text: "Modules that repaint an app after each wallpaper change (modules.conf)." },
-                { kind: "modules" },
-            ]},
-        ]},
-        { id: "notifications", icon: "󰂚", label: "Notifications & idle", sections: [
+        { id: "notifications", group: "PERSONALIZATION", icon: "󰂚", label: "Notifications & idle", sections: [
             { title: "NOTIFICATIONS", rows: [
                 { key: "notify.dnd", label: "Do not disturb", hint: "Hide notifications until turned off." },
                 { key: "notify.position", label: "Position",
@@ -159,10 +160,14 @@ Scope {
                 { kind: "button", action: "lock", label: "Lock now", icon: "󰌾", text: "Lock" },
             ]},
         ]},
-        { id: "power", icon: "󰂄", label: "Power", sections: [
+        { id: "about", group: "SYSTEM", icon: "󰋼", label: "About", view: "about", keywords: "system info hardware cpu gpu memory disk kernel version" },
+        { id: "updates", group: "SYSTEM", icon: "󰚰", label: "Updates", view: "updates", keywords: "upgrade pacman paru aur flatpak" },
+        { id: "packages", group: "SYSTEM", icon: "󰏖", label: "Packages", view: "packages", keywords: "install remove uninstall pacman aur flatpak orphans cache" },
+        { id: "firewall", group: "SYSTEM", icon: "󰒃", label: "Firewall", view: "firewall", keywords: "firewalld ports services security network" },
+        { id: "power", group: "SYSTEM", icon: "󰂄", label: "Power", sections: [
             { title: "MODE", rows: [ { kind: "power" } ]},
         ]},
-        { id: "tools", icon: "󰒓", label: "Tools", sections: [
+        { id: "tools", group: "SYSTEM", icon: "󰒓", label: "Tools", sections: [
             { title: "SYSTEM TOOLS", rows: [ { kind: "tools" } ]},
             { title: "MAINTENANCE", rows: [
                 { kind: "button", action: "reset", label: "Reset everything", hint: "Forget everything set in this window (settings.json).", icon: "󰦛", text: "Reset" },
@@ -201,9 +206,9 @@ Scope {
             readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
 
             title: "RPRice Settings"
-            implicitWidth: 940
-            implicitHeight: 680
-            minimumSize: Qt.size(800, 520)
+            implicitWidth: 980
+            implicitHeight: 720
+            minimumSize: Qt.size(860, 600)
             visible: true
             color: "transparent"
             onClosed: outer.hide()
@@ -218,22 +223,34 @@ Scope {
             property var tools: []
             property bool applyingTheme: false
             property string query: ""
+            // Výsledek `rp-sys updates` — přežije přepnutí stránky (kontrola trvá ~15 s)
+            property var updatesCache: null
+            property alias job: jobPanel
 
             readonly property var pages: outer.pages
+            readonly property var page: pages[persist.page]
 
-            // Hledání: všechny řádky s klíčem nebo tlačítkem, které sedí na popis
+            // Hledání: řádky s klíčem nebo tlačítkem a systémové stránky podle názvu
             readonly property var results: {
                 const q = query.trim().toLowerCase()
                 if (q === "") return []
+                const words = q.split(/\s+/)
                 const out = []
-                for (const p of pages)
+                for (const p of pages) {
+                    if (p.view) {
+                        const hay = [p.label, p.keywords ?? ""].join(" ").toLowerCase()
+                        if (words.every(w => hay.includes(w)))
+                            out.push({ kind: "page", label: p.label, hint: "Open " + p.label, icon: p.icon, pageId: p.id, where: "System" })
+                        continue
+                    }
                     for (const s of p.sections)
                         for (const r of s.rows) {
                             if (!r.key && r.kind !== "button") continue
                             const hay = [r.label, r.hint, r.key, p.label, s.title].join(" ").toLowerCase()
-                            if (q.split(/\s+/).every(w => hay.includes(w)))
+                            if (words.every(w => hay.includes(w)))
                                 out.push(Object.assign({}, r, { where: p.label }))
                         }
+                }
                 return out
             }
 
@@ -246,6 +263,16 @@ Scope {
                 powerProc.running = true
                 toolsProc.running = false
                 toolsProc.running = true
+            }
+
+            function showError(msg) {
+                error = msg
+                errorTimer.restart()
+            }
+
+            function goTo(id) {
+                search.text = ""
+                persist.page = pages.findIndex(p => p.id === id)
             }
 
             // Hned překreslit (optimisticky), zapsat na pozadí; chyba vrátí stav z dumpu
@@ -308,10 +335,8 @@ Scope {
                 id: runner
                 stdout: StdioCollector {
                     onStreamFinished: {
-                        if (text.startsWith("ERR ")) {
-                            root.error = text.slice(4).trim().split("\n").pop().replace(/^rp-settings: /, "")
-                            errorTimer.restart()
-                        }
+                        if (text.startsWith("ERR "))
+                            root.showError(text.slice(4).trim().split("\n").pop().replace(/^rp-settings: /, ""))
                     }
                 }
                 // Po poslední změně si stáhnout skutečný stav (rp-settings hodnoty normalizuje)
@@ -335,7 +360,7 @@ Scope {
                             root.settings = m
                             root.modules = d.modules
                         } catch (e) {
-                            root.error = "rp-settings dump failed"
+                            root.showError("rp-settings dump failed")
                         }
                     }
                 }
@@ -412,396 +437,6 @@ Scope {
                 themeProc.running = true
             }
 
-            // ------------------------------------------------------------- ovládací prvky
-
-            component Label: Text {
-                font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 13
-                color: Colors.onSurface
-            }
-
-            component Hint: Text {
-                font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 11
-                color: Colors.onSurfaceVariant
-                wrapMode: Text.WordWrap
-            }
-
-            component Heading: Text {
-                font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-                font.letterSpacing: 1.2
-                color: Colors.primary
-                topPadding: 18
-                bottomPadding: 6
-                leftPadding: 4
-            }
-
-            // Řádek: popis vlevo, ovládací prvek vpravo
-            component SettingRow: Item {
-                id: row
-                property string label
-                property string hint
-                property bool changed: false
-                signal resetRequested()
-                default property alias control: slot.data
-
-                width: parent ? parent.width : 0
-                height: Math.max(52, texts.implicitHeight + 22)
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 12
-                    color: hover.hovered ? Qt.alpha(Colors.onSurface, 0.04) : "transparent"
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                }
-                HoverHandler { id: hover }
-
-                Column {
-                    id: texts
-                    anchors {
-                        left: parent.left; leftMargin: 14
-                        right: slot.left; rightMargin: 20
-                        verticalCenter: parent.verticalCenter
-                    }
-                    spacing: 3
-                    Row {
-                        spacing: 8
-                        Label { text: row.label }
-                        // Tečka = hodnota se liší od výchozí; kliknutí ji vrátí
-                        Rectangle {
-                            visible: row.changed
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 14; height: 14; radius: 7
-                            color: dotHover.hovered ? Qt.alpha(Colors.tertiary, 0.2) : "transparent"
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 6; height: 6; radius: 3
-                                color: Colors.tertiary
-                            }
-                            HoverHandler { id: dotHover; cursorShape: Qt.PointingHandCursor }
-                            TapHandler { onTapped: row.resetRequested() }
-                            ToolTip.visible: dotHover.hovered
-                            ToolTip.text: "Changed — click to reset"
-                            ToolTip.delay: 400
-                        }
-                    }
-                    Hint { visible: row.hint !== ""; text: row.hint; width: parent.width }
-                }
-
-                Item {
-                    id: slot
-                    anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
-                    width: childrenRect.width
-                    height: childrenRect.height
-                }
-            }
-
-            component Toggle: Rectangle {
-                id: tg
-                property bool checked
-                signal toggled(bool value)
-
-                width: 46; height: 26; radius: 13
-                color: checked ? Colors.primary : Colors.surfaceContainerHighest
-                border.width: 1
-                border.color: checked ? Colors.primary : Colors.outlineVariant
-                Behavior on color { ColorAnimation { duration: 140 } }
-
-                Rectangle {
-                    width: 20; height: 20; radius: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: tg.checked ? tg.width - width - 3 : 3
-                    color: tg.checked ? Colors.onPrimary : Colors.outline
-                    Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: tg.toggled(!tg.checked)
-                }
-            }
-
-            // Posuvník; zapisuje až po puštění, ať se niri config nepřepisuje při tažení
-            component Slider: Item {
-                id: sl
-                property real from: 0
-                property real to: 1
-                property real value: 0
-                property real step: 1
-                property int decimals: 0
-                property string suffix: ""
-                property bool percent: false
-                property string zero: ""
-                property real live: value
-                property bool dragging: false
-                signal moved(real value)
-
-                width: 280; height: 26
-                onValueChanged: if (!dragging) live = value
-
-                function at(x) {
-                    const f = Math.max(0, Math.min(1, x / track.width))
-                    const v = from + Math.round((to - from) * f / step) * step
-                    return Number(Math.max(from, Math.min(to, v)).toFixed(Math.max(decimals, 2)))
-                }
-
-                function label(v) {
-                    if (zero !== "" && v === 0) return zero
-                    if (percent) return Math.round(v * 100) + "%"
-                    return v.toFixed(decimals) + suffix
-                }
-
-                Item {
-                    id: track
-                    width: parent.width - 70
-                    height: parent.height
-                    readonly property real frac: (sl.live - sl.from) / Math.max(sl.to - sl.from, 1e-9)
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width; height: 4; radius: 2
-                        color: Colors.surfaceContainerHighest
-                    }
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width * track.frac; height: 4; radius: 2
-                        color: Colors.primary
-                    }
-                    Rectangle {
-                        width: 18; height: 18; radius: 9
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: parent.width * track.frac - width / 2
-                        color: Colors.primary
-                        border.width: 3
-                        border.color: Colors.surfaceContainer
-                        scale: sl.dragging ? 1.15 : 1
-                        Behavior on scale { NumberAnimation { duration: 120 } }
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        anchors.margins: -6
-                        preventStealing: true
-                        cursorShape: Qt.PointingHandCursor
-                        onPressed: mouse => { sl.dragging = true; sl.live = sl.at(mouse.x - 6) }
-                        onPositionChanged: mouse => { if (pressed) sl.live = sl.at(mouse.x - 6) }
-                        onReleased: { sl.dragging = false; sl.moved(sl.live) }
-                    }
-                    WheelHandler {
-                        onWheel: event => sl.moved(Number(Math.max(sl.from, Math.min(sl.to,
-                            sl.value + (event.angleDelta.y > 0 ? sl.step : -sl.step))).toFixed(Math.max(sl.decimals, 2))))
-                    }
-                }
-                Text {
-                    anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                    width: 62
-                    horizontalAlignment: Text.AlignRight
-                    text: sl.label(sl.live)
-                    font.family: "JetBrainsMono Nerd Font"
-                    font.pixelSize: 12
-                    color: Colors.onSurfaceVariant
-                }
-            }
-
-            component Segmented: Rectangle {
-                id: seg
-                property var options: []
-                property var labels: []
-                property string current
-                signal picked(string value)
-
-                width: segRow.width + 6
-                height: 32
-                radius: 10
-                color: Colors.surfaceContainerHighest
-
-                Row {
-                    id: segRow
-                    x: 3; y: 3
-                    spacing: 2
-                    Repeater {
-                        model: seg.options
-                        Rectangle {
-                            required property var modelData
-                            required property int index
-                            readonly property bool sel: String(modelData) === seg.current
-                            width: Math.max(56, segText.implicitWidth + 22)
-                            height: 26
-                            radius: 8
-                            color: sel ? Colors.primary : segHover.hovered ? Qt.alpha(Colors.onSurface, 0.06) : "transparent"
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                            HoverHandler { id: segHover }
-                            Text {
-                                id: segText
-                                anchors.centerIn: parent
-                                text: seg.labels[index] ?? String(modelData)
-                                font.family: "JetBrainsMono Nerd Font"
-                                font.pixelSize: 12
-                                color: sel ? Colors.onPrimary : Colors.onSurfaceVariant
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: seg.picked(String(modelData))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Rozbalovací seznam pro enumy s víc volbami (nebo dlouhými popisky)
-            component Dropdown: ComboBox {
-                id: dd
-                property var options: []
-                property var labels: []
-                property string current
-                signal picked(string value)
-
-                width: 240
-                height: 32
-                model: options.map((o, i) => labels[i] ?? o)
-                currentIndex: options.indexOf(current)
-                onActivated: i => dd.picked(options[i])
-                font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 12
-
-                background: Rectangle {
-                    radius: 10
-                    color: dd.hovered ? Qt.alpha(Colors.onSurface, 0.08) : Colors.surfaceContainerHighest
-                    border.width: 1
-                    border.color: dd.popup.visible ? Colors.primary : Colors.outlineVariant
-                }
-                contentItem: Text {
-                    leftPadding: 12
-                    rightPadding: 30
-                    text: dd.displayText
-                    font: dd.font
-                    color: Colors.onSurface
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                }
-                indicator: Text {
-                    x: dd.width - width - 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: dd.popup.visible ? "󰅃" : "󰅀"
-                    font.family: "JetBrainsMono Nerd Font"
-                    font.pixelSize: 14
-                    color: Colors.onSurfaceVariant
-                }
-                delegate: ItemDelegate {
-                    id: ddItem
-                    required property var modelData
-                    required property int index
-                    width: dd.width - 12
-                    height: 30
-                    highlighted: dd.highlightedIndex === index
-                    contentItem: Text {
-                        text: ddItem.modelData
-                        font: dd.font
-                        color: ddItem.index === dd.currentIndex ? Colors.primary : Colors.onSurface
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
-                    }
-                    background: Rectangle {
-                        radius: 8
-                        color: ddItem.highlighted ? Qt.alpha(Colors.primary, 0.18) : "transparent"
-                    }
-                }
-                popup: Popup {
-                    y: dd.height + 4
-                    width: dd.width
-                    implicitHeight: Math.min(contentItem.implicitHeight + 12, 320)
-                    padding: 6
-                    contentItem: ListView {
-                        clip: true
-                        implicitHeight: contentHeight
-                        model: dd.popup.visible ? dd.delegateModel : null
-                        currentIndex: dd.highlightedIndex
-                        boundsBehavior: Flickable.StopAtBounds
-                        ScrollIndicator.vertical: ScrollIndicator {}
-                    }
-                    background: Rectangle {
-                        radius: 12
-                        color: Colors.surfaceContainerHigh
-                        border.width: 1
-                        border.color: Colors.outlineVariant
-                    }
-                }
-            }
-
-            // Textové pole; zapisuje Enterem nebo po opuštění pole
-            component TextBox: Rectangle {
-                id: tb
-                property string value
-                signal committed(string value)
-
-                width: 240
-                height: 32
-                radius: 10
-                color: Colors.surfaceContainerHighest
-                border.width: 1
-                border.color: input.activeFocus ? Colors.primary : Colors.outlineVariant
-                onValueChanged: if (!input.activeFocus) input.text = value
-
-                TextInput {
-                    id: input
-                    anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-                    verticalAlignment: TextInput.AlignVCenter
-                    text: tb.value
-                    font.family: "JetBrainsMono Nerd Font"
-                    font.pixelSize: 12
-                    color: Colors.onSurface
-                    selectionColor: Qt.alpha(Colors.primary, 0.4)
-                    clip: true
-                    onAccepted: { tb.committed(text); focus = false }
-                    onActiveFocusChanged: if (!activeFocus && text !== tb.value) tb.committed(text)
-                    Keys.onEscapePressed: { text = tb.value; focus = false }
-                }
-            }
-
-            component Button: Rectangle {
-                id: btn
-                property string text
-                property string icon: ""
-                property bool busy: false
-                signal clicked()
-
-                width: btnRow.width + 28
-                height: 34
-                radius: 10
-                color: btnHover.hovered ? Qt.alpha(Colors.primary, 0.22) : Qt.alpha(Colors.primary, 0.12)
-                border.width: 1
-                border.color: Qt.alpha(Colors.primary, 0.45)
-                opacity: busy ? 0.6 : 1
-                Behavior on color { ColorAnimation { duration: 120 } }
-                HoverHandler { id: btnHover }
-
-                Row {
-                    id: btnRow
-                    anchors.centerIn: parent
-                    spacing: 8
-                    Text {
-                        visible: btn.icon !== ""
-                        text: btn.icon
-                        font.family: "JetBrainsMono Nerd Font"
-                        font.pixelSize: 14
-                        color: Colors.primary
-                    }
-                    Text {
-                        text: btn.text
-                        font.family: "JetBrainsMono Nerd Font"
-                        font.pixelSize: 12
-                        color: Colors.onSurface
-                    }
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: if (!btn.busy) btn.clicked()
-                }
-            }
-
             // Jeden řádek z `pages`: vybere ovládací prvek podle typu klíče.
             // Obyčejná Component (ne inline `component`), aby viděla id `root`.
             property Component rowDelegate: Component {
@@ -814,7 +449,7 @@ Scope {
                     width: parent ? parent.width : 0
 
                     // ── nastavení s klíčem
-                    SettingRow {
+                    SRow {
                         visible: rd.s !== null
                         label: rd.d.label ?? ""
                         hint: (rd.d.where ? rd.d.where + " · " : "") + (rd.d.hint ?? "")
@@ -843,14 +478,14 @@ Scope {
 
                     Component {
                         id: toggleC
-                        Toggle {
+                        SToggle {
                             checked: rd.s.value
                             onToggled: v => root.set(rd.d.key, v)
                         }
                     }
                     Component {
                         id: sliderC
-                        Slider {
+                        SSlider {
                             from: rd.s.min
                             to: rd.s.max
                             value: rd.s.value
@@ -864,7 +499,7 @@ Scope {
                     }
                     Component {
                         id: segC
-                        Segmented {
+                        SSegmented {
                             options: rd.s.options
                             labels: rd.d.labels ?? []
                             current: String(rd.s.value)
@@ -873,7 +508,7 @@ Scope {
                     }
                     Component {
                         id: dropC
-                        Dropdown {
+                        SDropdown {
                             options: rd.s.options
                             labels: rd.d.labels ?? []
                             current: String(rd.s.value)
@@ -882,18 +517,18 @@ Scope {
                     }
                     Component {
                         id: textC
-                        TextBox {
+                        STextBox {
                             value: rd.s.value
                             onCommitted: v => root.set(rd.d.key, v)
                         }
                     }
 
                     // ── tlačítko
-                    SettingRow {
+                    SRow {
                         visible: rd.kind === "button"
                         label: rd.d.label ?? ""
                         hint: (rd.d.where ? rd.d.where + " · " : "") + (rd.d.hint ?? "")
-                        Button {
+                        SButton {
                             readonly property bool isTheme: rd.d.action === "theme"
                             icon: isTheme && root.applyingTheme ? "󰔟" : (rd.d.icon ?? "")
                             text: isTheme && root.applyingTheme ? "Applying…" : (rd.d.text ?? "")
@@ -902,8 +537,20 @@ Scope {
                         }
                     }
 
+                    // ── odkaz na systémovou stránku (výsledek hledání)
+                    SRow {
+                        visible: rd.kind === "page"
+                        icon: rd.d.icon ?? ""
+                        label: rd.d.label ?? ""
+                        hint: rd.d.where ? rd.d.where + " page" : ""
+                        SButton {
+                            icon: "󰁔"; text: "Open"
+                            onClicked: root.goTo(rd.d.pageId)
+                        }
+                    }
+
                     // ── poznámka
-                    Hint {
+                    SHint {
                         visible: rd.kind === "note"
                         width: parent.width
                         leftPadding: 14; rightPadding: 14; bottomPadding: 6
@@ -914,12 +561,12 @@ Scope {
                     Repeater {
                         model: rd.kind === "modules"
                             ? root.modules.filter(m => !/cache-hygiene|smoke-test|postprocess/.test(m.name)) : []
-                        SettingRow {
+                        SRow {
                             required property var modelData
                             label: modelData.name.replace(/^\d+-/, "").replace(/\.sh$/, "")
                             hint: modelData.requires !== "" ? "needs " + modelData.requires : ""
                             height: 46
-                            Toggle {
+                            SToggle {
                                 checked: modelData.enabled
                                 onToggled: v => root.setModule(modelData.name, v)
                             }
@@ -927,7 +574,7 @@ Scope {
                     }
 
                     // ── power režimy
-                    Hint {
+                    SHint {
                         visible: rd.kind === "power"
                         width: parent.width
                         leftPadding: 14; rightPadding: 14; bottomPadding: 8
@@ -936,11 +583,12 @@ Scope {
                     }
                     Repeater {
                         model: rd.kind === "power" ? root.powerModes : []
-                        SettingRow {
+                        SRow {
                             required property var modelData
-                            label: modelData.icon + "  " + modelData.label
+                            icon: modelData.icon
+                            label: modelData.label
                             hint: modelData.hint
-                            Toggle {
+                            SToggle {
                                 checked: root.powerMode === modelData.id
                                 onToggled: root.setPower(modelData.id)
                             }
@@ -950,11 +598,12 @@ Scope {
                     // ── nástroje
                     Repeater {
                         model: rd.kind === "tools" ? root.tools : []
-                        SettingRow {
+                        SRow {
                             required property var modelData
-                            label: modelData.icon + "  " + modelData.label
+                            icon: modelData.icon
+                            label: modelData.label
                             hint: modelData.hint
-                            Button {
+                            SButton {
                                 icon: "󰏌"; text: "Open"
                                 onClicked: Quickshell.execDetached(modelData.term
                                     ? ["kitty", "-e", modelData.cmd] : [modelData.cmd])
@@ -973,13 +622,14 @@ Scope {
                 focus: true
                 Keys.onEscapePressed: {
                     if (root.query !== "") search.text = ""
+                    else if (jobPanel.open && !jobPanel.running) jobPanel.open = false
                     else outer.hide()
                 }
                 Keys.onPressed: event => {
                     // Ctrl+F hledá, Ctrl+Tab / Ctrl+Shift+Tab listují stránky
                     const ctrl = event.modifiers & Qt.ControlModifier
                     if (ctrl && event.key === Qt.Key_F) {
-                        search.forceActiveFocus()
+                        search.inputItem.forceActiveFocus()
                     } else if (ctrl && event.key === Qt.Key_Tab) {
                         persist.page = (persist.page + 1) % root.pages.length
                     } else if (ctrl && event.key === Qt.Key_Backtab) {
@@ -994,7 +644,7 @@ Scope {
                 // ── Postranní panel
                 Rectangle {
                     id: sidebar
-                    width: 236
+                    width: 240
                     anchors { top: parent.top; bottom: parent.bottom; left: parent.left }
                     color: Qt.alpha(Colors.surfaceContainer, 0.7)
 
@@ -1005,105 +655,95 @@ Scope {
                     }
 
                     Column {
-                        anchors { fill: parent; margins: 14; topMargin: 22 }
-                        spacing: 4
+                        id: nav
+                        anchors { left: parent.left; right: parent.right; top: parent.top; margins: 14; topMargin: 20 }
+                        spacing: 2
 
-                        Text {
-                            text: "Settings"
-                            leftPadding: 10
-                            bottomPadding: 12
-                            font.family: root.fontFamily
-                            font.pixelSize: 20
-                            font.weight: Font.DemiBold
-                            color: Colors.onSurface
-                        }
-
-                        // Hledání napříč stránkami
-                        Rectangle {
+                        Item {
                             width: parent.width
-                            height: 36
-                            radius: 10
-                            color: Colors.surfaceContainerHighest
-                            border.width: 1
-                            border.color: search.activeFocus ? Colors.primary : "transparent"
-
-                            Text {
-                                id: searchIcon
+                            height: 40
+                            SLabel {
                                 anchors { left: parent.left; leftMargin: 12; verticalCenter: parent.verticalCenter }
-                                text: "󰍉"
-                                font.family: root.fontFamily
-                                font.pixelSize: 14
-                                color: Colors.onSurfaceVariant
-                            }
-                            TextInput {
-                                id: search
-                                anchors {
-                                    left: searchIcon.right; leftMargin: 8; right: parent.right; rightMargin: 10
-                                    verticalCenter: parent.verticalCenter
-                                }
-                                font.family: root.fontFamily
-                                font.pixelSize: 12
-                                color: Colors.onSurface
-                                selectionColor: Qt.alpha(Colors.primary, 0.4)
-                                clip: true
-                                onTextChanged: root.query = text
-                                Keys.onEscapePressed: { text = ""; bg.forceActiveFocus() }
-                                Text {
-                                    visible: search.text === ""
-                                    text: "Search  (Ctrl+F)"
-                                    font: search.font
-                                    color: Colors.outline
-                                }
+                                text: "Settings"
+                                font.pixelSize: 20
+                                font.weight: Font.DemiBold
                             }
                         }
 
-                        Item { width: 1; height: 8 }
+                        STextBox {
+                            id: search
+                            width: parent.width
+                            icon: "󰍉"
+                            placeholder: "Search  (Ctrl+F)"
+                            commitOnBlur: false
+                            onEdited: v => root.query = v
+                        }
 
                         Repeater {
                             model: root.pages
-                            Rectangle {
+                            Column {
                                 required property var modelData
                                 required property int index
                                 readonly property bool sel: root.query === "" && persist.page === index
-                                width: parent.width
-                                height: 38
-                                radius: 10
-                                color: sel ? Qt.alpha(Colors.primary, 0.18)
-                                    : navHover.hovered ? Qt.alpha(Colors.onSurface, 0.05) : "transparent"
-                                Behavior on color { ColorAnimation { duration: 120 } }
-                                HoverHandler { id: navHover }
+                                readonly property bool firstInGroup: index === 0 || root.pages[index - 1].group !== modelData.group
+                                width: nav.width
 
-                                Row {
-                                    anchors { left: parent.left; leftMargin: 12; verticalCenter: parent.verticalCenter }
-                                    spacing: 12
+                                // Nadpis skupiny (Personalization / System)
+                                Item {
+                                    visible: firstInGroup
+                                    width: parent.width
+                                    height: 34
+                                    SHeading {
+                                        anchors.bottom: parent.bottom
+                                        leftPadding: 12; topPadding: 0; bottomPadding: 6
+                                        text: modelData.group
+                                        color: Colors.outline
+                                        font.pixelSize: 10
+                                    }
+                                }
+
+                                // Položka: ikona i text svisle na středu (Row by je zarovnal nahoru)
+                                Rectangle {
+                                    width: parent.width
+                                    height: 36
+                                    radius: 10
+                                    color: sel ? Qt.alpha(Colors.primary, 0.18)
+                                        : navHover.hovered ? Qt.alpha(Colors.onSurface, 0.05) : "transparent"
+                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    HoverHandler { id: navHover }
+
                                     Text {
-                                        width: 18
+                                        id: navIcon
+                                        anchors { left: parent.left; leftMargin: 12; verticalCenter: parent.verticalCenter }
+                                        width: 20
+                                        horizontalAlignment: Text.AlignHCenter
                                         text: modelData.icon
                                         font.family: root.fontFamily
                                         font.pixelSize: 16
                                         color: sel ? Colors.primary : Colors.onSurfaceVariant
                                     }
                                     Text {
+                                        anchors { left: navIcon.right; leftMargin: 12; right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
                                         text: modelData.label
+                                        elide: Text.ElideRight
                                         font.family: root.fontFamily
                                         font.pixelSize: 13
                                         font.weight: sel ? Font.Medium : Font.Normal
                                         color: sel ? Colors.onSurface : Colors.onSurfaceVariant
                                     }
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: { search.text = ""; persist.page = index }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.goTo(modelData.id)
+                                    }
                                 }
                             }
                         }
                     }
 
-                    Text {
-                        anchors { left: parent.left; bottom: parent.bottom; margins: 24 }
+                    SHint {
+                        anchors { left: parent.left; bottom: parent.bottom; leftMargin: 26; bottomMargin: 18 }
                         text: "Esc to close"
-                        font.family: root.fontFamily
                         font.pixelSize: 10
                         color: Colors.outline
                     }
@@ -1115,24 +755,29 @@ Scope {
                     anchors {
                         top: parent.top; bottom: parent.bottom
                         left: sidebar.right; right: parent.right
-                        leftMargin: 24; rightMargin: 24; topMargin: 22
+                        leftMargin: 24; rightMargin: 12; topMargin: 20
                     }
 
-                    Text {
+                    // Nadpis ve stejné výšce jako „Settings“ vlevo
+                    Item {
                         id: pageTitle
-                        leftPadding: 4
-                        text: root.query !== ""
-                            ? (root.results.length + (root.results.length === 1 ? " result" : " results"))
-                            : root.pages[persist.page].label
-                        font.family: root.fontFamily
-                        font.pixelSize: 22
-                        font.weight: Font.DemiBold
-                        color: Colors.onSurface
+                        width: parent.width
+                        height: 40
+                        SLabel {
+                            anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
+                            text: root.query !== ""
+                                ? (root.results.length + (root.results.length === 1 ? " result" : " results"))
+                                : root.page.label
+                            font.pixelSize: 22
+                            font.weight: Font.DemiBold
+                        }
                     }
 
+                    // Stránky nastavení: sekce s nadpisem a řádky
                     Flickable {
                         id: flick
-                        anchors { top: pageTitle.bottom; topMargin: 6; left: parent.left; right: parent.right; bottom: parent.bottom }
+                        visible: root.query !== "" || !root.page.view
+                        anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom }
                         contentHeight: pageCol.implicitHeight + 32
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
@@ -1143,14 +788,13 @@ Scope {
                             width: flick.width - 12
                             spacing: 2
 
-                            // Stránka: sekce s nadpisem a řádky
                             Repeater {
-                                model: root.query === "" ? root.pages[persist.page].sections : []
+                                model: root.query === "" && !root.page.view ? root.page.sections : []
                                 Column {
                                     required property var modelData
                                     width: pageCol.width
                                     spacing: 2
-                                    Heading { text: modelData.title }
+                                    SHeading { text: modelData.title }
                                     Repeater {
                                         model: modelData.rows
                                         delegate: root.rowDelegate
@@ -1163,12 +807,31 @@ Scope {
                                 model: root.results
                                 delegate: root.rowDelegate
                             }
-                            Hint {
+                            SHint {
                                 visible: root.query !== "" && root.results.length === 0
-                                leftPadding: 4; topPadding: 12
+                                leftPadding: 14; topPadding: 12
                                 text: "Nothing matches “" + root.query + "”."
                             }
                         }
+                    }
+
+                    // Systémové stránky (vlastní rozložení)
+                    Loader {
+                        anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: 12 }
+                        active: root.query === "" && !!root.page.view
+                        sourceComponent: ({ about: aboutC, updates: updatesC, packages: packagesC, firewall: firewallC })[root.page.view] ?? null
+                    }
+                    Component { id: aboutC; AboutPage { host: root } }
+                    Component { id: updatesC; UpdatesPage { host: root } }
+                    Component { id: packagesC; PackagesPage { host: root } }
+                    Component { id: firewallC; FirewallPage { host: root } }
+
+                    // Log akcí (aktualizace, instalace, firewall) — vyjede zespodu
+                    SJob {
+                        id: jobPanel
+                        x: 0
+                        width: parent.width - 12
+                        height: Math.min(parent.height * 0.6, 420)
                     }
                 }
 
