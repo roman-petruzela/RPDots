@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# rp-display — monitory pro okno Settings (stránka Displays).
+#
+#   rp-display list                    výstupy s režimy a aktuálním nastavením (JSON)
+#   rp-display set <výstup> <klíč> <hodnota>
+#        mode <W>x<H>@<Hz> | scale <0.5–3> | transform normal|90|180|270|flipped…
+#        position <x>,<y> | vrr off|on|on-demand | enabled true|false
+#   rp-display identify                na každém monitoru na 2 s jeho název (notifikace)
+#
+# Změna se hned projeví (niri msg output) a uloží se na dvě místa:
+#   ~/.config/niri/displays.kdl   bloky output (include na konci config.kdl),
+#                                 před zápisem `niri validate`, při chybě zpět
+#   ~/.config/kanshi/config       profil pro právě připojenou sadu monitorů —
+#                                 kanshi při každém připojení monitoru přepíše
+#                                 režim a pozici, bez tohohle by změnu vrátil
+# Uložené hodnoty drží ~/.config/niri-rice/displays.json.
+#
+# Výstupy se v niri configu jmenují stejně jako v config.kdl: "výrobce model
+# sériové číslo", když ho monitor hlásí, jinak konektor (eDP-1). Blok se stejným
+# jménem z include pak přepíše ten v config.kdl místo toho, aby vznikl druhý.
+set -uo pipefail
+export LC_ALL=C
+
+STORE="$HOME/.config/niri-rice/displays.json"
+KDL="$HOME/.config/niri/displays.kdl"
+KANSHI="$HOME/.config/kanshi/config"
+
+die() { echo "rp-display: $*" >&2; exit 1; }
+
+outputs_json() { niri msg --json outputs 2>/dev/null || echo '{}'; }
+
+list() {
+    outputs_json | jq --slurpfile store <(cat "$STORE" 2>/dev/null || echo '{}') '
+        ($store[0] // {}) as $s
+        | [to_entries[] | .value
+           | . as $o
+           | ((if .serial then "\(.make) \(.model) \(.serial)" else .name end)) as $id
+           | { name, id: $id, make, model,
+               enabled: (.logical != null),
+               modes: [.modes | to_entries[] | { index: .key, width: .value.width, height: .value.height,
+                        refresh: (.value.refresh_rate / 1000), preferred: .value.is_preferred,
+                        label: "\(.value.width)×\(.value.height) @ \(.value.refresh_rate / 1000 | . * 100 | round / 100) Hz",
+                        spec: "\(.value.width)x\(.value.height)@\(.value.refresh_rate / 1000 | tostring)" }],
+               mode: (if .current_mode != null then .modes[.current_mode]
+                      | "\(.width)x\(.height)@\(.refresh_rate / 1000 | tostring)" else null end),
+               scale: (.logical.scale // 1),
+               transform: ((.logical.transform // "Normal") | ascii_downcase | sub("^flipped"; "flipped-") | sub("--"; "-") | sub("-$"; "")),
+               x: (.logical.x // 0), y: (.logical.y // 0),
+               width: (.logical.width // 0), height: (.logical.height // 0),
+               vrrSupported: .vrr_supported, vrr: ($s[$id].vrr // (if .vrr_enabled then "on" else "off" end)),
+               physical: .physical_size }]
+        | sort_by(.x)'
+}
+
+# Uložené hodnoty → displays.kdl
+render_kdl() {
+    echo "// Generováno skriptem rp-display (okno Settings → Displays) — needitovat ručně."
+    jq -r 'to_entries[] | .key as $id | .value as $v
+        | "output \"\($id)\" {",
+          (if $v.enabled == false then "    off" else empty end),
+          (if $v.mode then "    mode \"\($v.mode)\"" else empty end),
+          (if $v.scale then "    scale \($v.scale)" else empty end),
+          (if $v.transform then "    transform \"\($v.transform)\"" else empty end),
+          (if $v.x != null and $v.y != null then "    position x=\($v.x) y=\($v.y)" else empty end),
+          (if $v.vrr == "on" then "    variable-refresh-rate"
+           elif $v.vrr == "on-demand" then "    variable-refresh-rate on-demand=true" else empty end),
+          "}"' "$STORE"
+}
+
+apply_kdl() {
+    local tmp backup had=0
+    tmp=$(mktemp); backup=$(mktemp)
+    render_kdl > "$tmp"
+    [[ -f "$KDL" ]] && { cp "$KDL" "$backup"; had=1; }
+    cp "$tmp" "$KDL"
+    if ! niri validate >/dev/null 2>&1; then
+        if (( had )); then cp "$backup" "$KDL"; else rm -f "$KDL"; fi
+        rm -f "$tmp" "$backup"
+        die "niri rejected the display config, restored"
+    fi
+    rm -f "$tmp" "$backup"
+}
+
+# Profil kanshi pro aktuálně připojenou sadu výstupů: přepsat, nebo přidat
+sync_kanshi() {
+    [[ -f "$KANSHI" ]] || return 0
+    local cur; cur=$(list)
+    python3 - "$KANSHI" "$cur" <<'PY'
+import json, re, sys
+path, outs = sys.argv[1], json.loads(sys.argv[2])
+text = open(path).read()
+names = sorted(o["name"] for o in outs)
+
+def line(o):
+    if not o["enabled"]:
+        return f'  output "{o["name"]}" disable'
+    parts = [f'  output "{o["name"]}"']
+    if o["mode"]:
+        parts.append(f'mode {o["mode"]}')
+    parts.append(f'position {o["x"]},{o["y"]}')
+    if o["scale"] != 1:
+        parts.append(f'scale {o["scale"]}')
+    if o["transform"] != "normal":
+        parts.append(f'transform {o["transform"]}')
+    return " ".join(parts)
+
+new = "profile {\n" + "\n".join(line(o) for o in outs) + "\n}\n"
+# profil = blok "profile [jméno] { … }"; porovnává se sada výstupů
+blocks = list(re.finditer(r'profile[^{]*\{(.*?)\n\}\n?', text, re.S))
+for b in blocks:
+    got = sorted(re.findall(r'output\s+"([^"]+)"', b.group(1)))
+    if got == names:
+        head = text[b.start():text.index("{", b.start())]
+        text = text[:b.start()] + head.rstrip() + " " + new[len("profile "):] + text[b.end():]
+        break
+else:
+    text = text.rstrip() + "\n\n" + new
+open(path, "w").write(text)
+PY
+    command -v kanshictl >/dev/null 2>&1 && kanshictl reload >/dev/null 2>&1
+    return 0
+}
+
+set_value() {
+    local out=$1 key=$2 val=$3 id
+    id=$(list | jq -r --arg n "$out" '.[] | select(.name == $n) | .id')
+    [[ -n "$id" ]] || die "unknown output: $out"
+    local jval
+    case "$key" in
+        mode)
+            [[ "$val" =~ ^[0-9]+x[0-9]+@[0-9.]+$ ]] || die "mode must look like 1920x1080@60"
+            niri msg output "$out" mode "$val" >/dev/null 2>&1 || die "niri refused mode $val"
+            jval=$(jq -n --arg v "$val" '$v') ;;
+        scale)
+            awk -v v="$val" 'BEGIN { exit !(v >= 0.5 && v <= 3) }' || die "scale must be 0.5–3"
+            niri msg output "$out" scale "$val" >/dev/null 2>&1 || die "niri refused scale $val"
+            jval=$val ;;
+        transform)
+            [[ "$val" =~ ^(normal|90|180|270|flipped|flipped-90|flipped-180|flipped-270)$ ]] || die "bad transform"
+            niri msg output "$out" transform "$val" >/dev/null 2>&1 || die "niri refused transform"
+            jval=$(jq -n --arg v "$val" '$v') ;;
+        position)
+            [[ "$val" =~ ^-?[0-9]+,-?[0-9]+$ ]] || die "position must be x,y"
+            niri msg output "$out" position set "${val%,*}" "${val#*,}" >/dev/null 2>&1 || die "niri refused position"
+            jval=$(jq -n --argjson x "${val%,*}" --argjson y "${val#*,}" '{x: $x, y: $y}') ;;
+        vrr)
+            [[ "$val" =~ ^(off|on|on-demand)$ ]] || die "vrr: off|on|on-demand"
+            case "$val" in
+                off) niri msg output "$out" vrr off ;;
+                on) niri msg output "$out" vrr on ;;
+                on-demand) niri msg output "$out" vrr on --on-demand ;;
+            esac >/dev/null 2>&1 || die "niri refused vrr $val"
+            jval=$(jq -n --arg v "$val" '$v') ;;
+        enabled)
+            [[ "$val" =~ ^(true|false)$ ]] || die "enabled: true|false"
+            if [[ "$val" == false ]]; then
+                # Posledního zapnutého nevypínat — zůstala by černá obrazovka
+                (( $(list | jq '[.[] | select(.enabled)] | length') > 1 )) || die "can't turn off the last display"
+                niri msg output "$out" off >/dev/null 2>&1
+            else
+                niri msg output "$out" on >/dev/null 2>&1
+            fi
+            jval=$val ;;
+        *) die "unknown key: $key" ;;
+    esac
+
+    mkdir -p "$(dirname "$STORE")"
+    local prev; prev=$(cat "$STORE" 2>/dev/null || echo '{}')
+    if [[ "$key" == position ]]; then
+        jq --arg id "$id" --argjson v "$jval" '.[$id] = ((.[$id] // {}) + $v)' <<<"$prev" > "$STORE.tmp"
+    else
+        jq --arg id "$id" --arg k "$key" --argjson v "$jval" '.[$id][$k] = $v' <<<"$prev" > "$STORE.tmp"
+    fi
+    mv "$STORE.tmp" "$STORE"
+    if ! apply_kdl; then echo "$prev" > "$STORE"; exit 1; fi
+    sync_kanshi
+}
+
+identify() {
+    local o
+    for o in $(niri msg --json outputs | jq -r 'to_entries[] | select(.value.logical) | .key'); do
+        niri msg action focus-monitor "$o" >/dev/null 2>&1
+        notify-send -a Displays -t 2500 "$o" "$(niri msg --json outputs | jq -r --arg o "$o" '.[$o] | "\(.make) \(.model)"')"
+        sleep 0.3
+    done
+}
+
+case "${1:-list}" in
+    list)     list ;;
+    set)      [[ $# -eq 4 ]] || die "usage: rp-display set <output> <key> <value>"; set_value "$2" "$3" "$4" ;;
+    identify) identify ;;
+    *)        sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1 ;;
+esac

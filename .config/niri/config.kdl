@@ -75,7 +75,7 @@ include optional=true "~/.config/niri/theme-colors.kdl"
 spawn-sh-at-startup "~/.local/bin/start-rice-services.sh"
 hotkey-overlay {
 }
-prefer-no-csd
+// prefer-no-csd je v settings.kdl (okno Settings → Appearance) — flag by include nevypnul
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 // Křivky animací žijí v power-mode.kdl (rp-power); rychlost a vypnutí přebíjí
 // settings.kdl z okna Settings, includovaný na konci.
@@ -428,3 +428,6 @@ debug {
 // zaoblení, touchpad… Generovaný soubor (gitignored), kanonické hodnoty jsou
 // v ~/.config/niri-rice/settings.json. Musí být poslední, ať přepíše layout výš.
 include optional=true "~/.config/niri/settings.kdl"
+// Monitory z okna Settings → Displays (rp-display): režim, škála, otočení, pozice, VRR.
+// Generovaný soubor; bloky output se jmenují stejně jako výše, takže je přepíšou.
+include optional=true "~/.config/niri/displays.kdl"

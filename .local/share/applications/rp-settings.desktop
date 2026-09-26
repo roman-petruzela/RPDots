@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Settings
-GenericName=RPRice Settings
+Name=RPSettings
+GenericName=Settings
 Comment=Gaps, focus ring, touchpad, theme, power modes
 Keywords=settings;preferences;config;rice;niri;theme;touchpad;power;rp-settings;
 Icon=preferences-system

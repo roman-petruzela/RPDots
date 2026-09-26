@@ -235,13 +235,14 @@ Item {
     }
 
     // ── Seznam
+    SWheel { flick: list }
     ListView {
         id: list
         anchors { left: parent.left; right: parent.right; top: toolbar.bottom; topMargin: 10; bottom: footer.top }
         clip: true
         spacing: 2
         boundsBehavior: Flickable.StopAtBounds
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: SScrollBar {}
         model: page.mode === "installed" ? page.shown : page.searchResults
         reuseItems: true
 

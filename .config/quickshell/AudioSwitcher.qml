@@ -22,7 +22,8 @@ Flyout {
     readonly property real volume: active && active.audio ? active.audio.volume : 0
     readonly property bool muted: active && active.audio ? active.audio.muted : false
 
-    Process { id: mixerProc; command: ["pavucontrol"] }
+    // „Sound settings" otevře stránku Sound v okně Settings (pavucontrol je odkázaný odtamtud)
+    Process { id: mixerProc; command: ["bash", "-c", "$HOME/.local/bin/rp-shell settings sound"] }
     Process { id: unpinProc; command: ["bash", "-c", "$HOME/.local/bin/rp-audio unpin"] }
 
     function selectSink(node) {

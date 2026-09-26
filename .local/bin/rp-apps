@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+"""rp-apps — aplikace pro okno Settings (stránka Apps).
+
+  rp-apps list                        nainstalované aplikace (.desktop) jako JSON
+  rp-apps hide <id> on|off            skrýt/ukázat aplikaci v launcheru (NoDisplay)
+  rp-apps defaults                    výchozí aplikace po kategoriích + kandidáti
+  rp-apps set-default <kat> <id>      nastavit výchozí aplikaci pro kategorii
+  rp-apps autostart                   položky autostartu (XDG) a jestli běží
+  rp-apps autostart-set <soubor> on|off
+  rp-apps autostart-add <id>          přidat aplikaci do autostartu
+  rp-apps autostart-remove <soubor>   odebrat položku přidanou uživatelem
+
+Výchozí aplikace jdou přes `xdg-mime default` (zapisuje ~/.config/mimeapps.list).
+Autostart spouští systemd (xdg-desktop-autostart.target → app-*@autostart.service),
+takže stačí upravit .desktop v ~/.config/autostart: stejné jméno souboru jako
+v /etc/xdg/autostart ho přebije, Hidden=true vypne. Skrytí z launcheru je kopie
+.desktop do ~/.local/share/applications s NoDisplay=true (systémový zůstane).
+"""
+import configparser
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+APP_DIRS = [
+    f"{HOME}/.local/share/applications",
+    f"{HOME}/.local/share/flatpak/exports/share/applications",
+    "/var/lib/flatpak/exports/share/applications",
+    "/usr/local/share/applications",
+    "/usr/share/applications",
+]
+USER_APPS = APP_DIRS[0]
+USER_AUTOSTART = f"{HOME}/.config/autostart"
+SYS_AUTOSTART = "/etc/xdg/autostart"
+DESKTOP = os.environ.get("XDG_CURRENT_DESKTOP", "niri")
+HIDE_MARK = "X-RP-Hidden"
+
+CATEGORIES = [
+    ("browser", "Web browser", ["x-scheme-handler/http", "x-scheme-handler/https", "text/html"]),
+    ("mail", "Email", ["x-scheme-handler/mailto"]),
+    ("files", "File manager", ["inode/directory"]),
+    ("images", "Images", ["image/png", "image/jpeg", "image/webp", "image/gif"]),
+    ("video", "Video", ["video/mp4", "video/x-matroska", "video/webm"]),
+    ("music", "Music", ["audio/mpeg", "audio/flac", "audio/ogg", "audio/x-wav"]),
+    ("pdf", "PDF", ["application/pdf"]),
+    ("text", "Text files", ["text/plain"]),
+    ("archives", "Archives", ["application/zip", "application/x-tar", "application/x-7z-compressed", "application/vnd.rar"]),
+]
+
+
+def die(msg):
+    print(f"rp-apps: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def read_desktop(path):
+    cp = configparser.RawConfigParser(interpolation=None, strict=False)
+    cp.optionxform = str
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            cp.read_file(f)
+    except (configparser.Error, OSError):
+        return None
+    return dict(cp["Desktop Entry"]) if cp.has_section("Desktop Entry") else None
+
+
+def shown_here(e):
+    only = [x for x in e.get("OnlyShowIn", "").split(";") if x]
+    never = [x for x in e.get("NotShowIn", "").split(";") if x]
+    desk = DESKTOP.split(":")
+    if only and not any(d in only for d in desk):
+        return False
+    return not any(d in never for d in desk)
+
+
+def all_apps():
+    """id → (cesta, položka); první výskyt vyhrává (uživatelské přebíjí systémové)."""
+    apps = {}
+    for d in APP_DIRS:
+        for path in glob.glob(f"{d}/**/*.desktop", recursive=True):
+            aid = os.path.relpath(path, d).replace("/", "-")
+            if aid in apps:
+                continue
+            e = read_desktop(path)
+            if e and e.get("Type", "Application") == "Application":
+                apps[aid] = (path, e)
+    return apps
+
+
+def cmd_list():
+    out = []
+    for aid, (path, e) in all_apps().items():
+        if e.get("Hidden") == "true":
+            continue
+        out.append({
+            "id": aid, "name": e.get("Name", aid), "comment": e.get("Comment", ""),
+            "icon": e.get("Icon", ""), "exec": e.get("Exec", ""),
+            "categories": [c for c in e.get("Categories", "").split(";") if c],
+            "hidden": e.get("NoDisplay") == "true",
+            "hiddenByUs": e.get(HIDE_MARK) == "true",
+            "user": path.startswith(USER_APPS),
+            "flatpak": "flatpak" in path,
+            "path": path,
+        })
+    out.sort(key=lambda a: a["name"].lower())
+    print(json.dumps(out, ensure_ascii=False))
+
+
+def set_key(path, key, value):
+    """Nastaví klíč v sekci [Desktop Entry] (ostatní sekce, např. akce, nechá)."""
+    lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
+    sec, done, out = None, False, []
+    for l in lines:
+        m = re.match(r"^\[(.+)\]\s*$", l)
+        if m:
+            if sec == "Desktop Entry" and not done and value is not None:
+                out.append(f"{key}={value}")
+                done = True
+            sec = m.group(1)
+        elif sec == "Desktop Entry" and re.match(rf"^{re.escape(key)}\s*=", l):
+            if value is not None and not done:
+                out.append(f"{key}={value}")
+                done = True
+            continue
+        out.append(l)
+    if sec == "Desktop Entry" and not done and value is not None:
+        out.append(f"{key}={value}")
+    open(path, "w").write("\n".join(out))
+
+
+def cmd_hide(aid, state):
+    apps = all_apps()
+    if aid not in apps:
+        die(f"unknown app: {aid}")
+    path, e = apps[aid]
+    user_path = os.path.join(USER_APPS, aid)
+    if state == "on":
+        if not path.startswith(USER_APPS):
+            os.makedirs(USER_APPS, exist_ok=True)
+            shutil.copy(path, user_path)
+        set_key(user_path, "NoDisplay", "true")
+        set_key(user_path, HIDE_MARK, "true")
+    else:
+        if not path.startswith(USER_APPS):
+            return
+        if e.get(HIDE_MARK) == "true" and os.path.exists(os.path.join("/usr/share/applications", aid)):
+            os.remove(user_path)          # naše kopie — prostě ji smazat
+        else:
+            set_key(user_path, "NoDisplay", None)
+            set_key(user_path, HIDE_MARK, None)
+    subprocess.run(["update-desktop-database", USER_APPS], capture_output=True)
+
+
+def xdg_default(mime):
+    r = subprocess.run(["xdg-mime", "query", "default", mime], capture_output=True, text=True)
+    return r.stdout.strip()
+
+
+def cmd_defaults():
+    apps = all_apps()
+    out = []
+    for cid, label, mimes in CATEGORIES:
+        cands = []
+        for aid, (_, e) in apps.items():
+            types = e.get("MimeType", "").split(";")
+            if any(m in types for m in mimes) and e.get("NoDisplay") != "true":
+                cands.append({"id": aid, "name": e.get("Name", aid), "icon": e.get("Icon", "")})
+        cands.sort(key=lambda c: c["name"].lower())
+        cur = xdg_default(mimes[0])
+        out.append({"id": cid, "label": label, "mimes": mimes, "current": cur,
+                    "currentName": apps[cur][1].get("Name", cur) if cur in apps else cur,
+                    "candidates": cands})
+    print(json.dumps(out, ensure_ascii=False))
+
+
+def cmd_set_default(cid, aid):
+    cat = next((c for c in CATEGORIES if c[0] == cid), None)
+    if not cat:
+        die(f"unknown category: {cid}")
+    if aid not in all_apps():
+        die(f"unknown app: {aid}")
+    subprocess.run(["xdg-mime", "default", aid, *cat[2]], check=True)
+    if cid == "browser":
+        subprocess.run(["xdg-settings", "set", "default-web-browser", aid], capture_output=True)
+
+
+def autostart_entries():
+    files = {}
+    for d in (SYS_AUTOSTART, USER_AUTOSTART):
+        for path in glob.glob(f"{d}/*.desktop"):
+            files[os.path.basename(path)] = path      # uživatelský přebije systémový
+    return files
+
+
+def unit_name(fname):
+    # systemd-xdg-autostart-generator: app-<escapované jméno bez .desktop>@autostart.service
+    base = fname[:-len(".desktop")]
+    esc = subprocess.run(["systemd-escape", base], capture_output=True, text=True).stdout.strip()
+    return f"app-{esc}@autostart.service"
+
+
+def cmd_autostart():
+    out = []
+    files = autostart_entries()
+    units = {}
+    r = subprocess.run(["systemctl", "--user", "list-units", "--all", "--no-legend", "--plain", "app-*@autostart.service"],
+                       capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 4:
+            units[parts[0]] = parts[3]
+    for fname, path in sorted(files.items()):
+        e = read_desktop(path)
+        if not e:
+            continue
+        enabled = e.get("Hidden") != "true" and e.get("X-GNOME-Autostart-enabled", "true") != "false"
+        out.append({
+            "file": fname, "name": e.get("Name", fname), "comment": e.get("Comment", ""),
+            "icon": e.get("Icon", ""), "exec": e.get("Exec", ""),
+            "enabled": enabled, "here": shown_here(e),
+            "user": path.startswith(USER_AUTOSTART),
+            "system": os.path.exists(os.path.join(SYS_AUTOSTART, fname)),
+            "state": units.get(unit_name(fname), "inactive"),
+        })
+    out.sort(key=lambda a: (not a["here"], a["name"].lower()))
+    print(json.dumps(out, ensure_ascii=False))
+
+
+def cmd_autostart_set(fname, state):
+    files = autostart_entries()
+    if fname not in files or "/" in fname:
+        die(f"unknown autostart entry: {fname}")
+    os.makedirs(USER_AUTOSTART, exist_ok=True)
+    user_path = os.path.join(USER_AUTOSTART, fname)
+    if files[fname] != user_path:
+        shutil.copy(files[fname], user_path)
+    set_key(user_path, "Hidden", None if state == "on" else "true")
+    set_key(user_path, "X-GNOME-Autostart-enabled", "true" if state == "on" else "false")
+    # Kopie shodná se systémovou (jen zapnutá) je zbytečná — smazat
+    sys_path = os.path.join(SYS_AUTOSTART, fname)
+    if state == "on" and os.path.exists(sys_path):
+        se = read_desktop(sys_path) or {}
+        if se.get("Hidden") != "true" and se.get("X-GNOME-Autostart-enabled", "true") != "false":
+            os.remove(user_path)
+    subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+
+
+def cmd_autostart_add(aid):
+    apps = all_apps()
+    if aid not in apps:
+        die(f"unknown app: {aid}")
+    os.makedirs(USER_AUTOSTART, exist_ok=True)
+    dst = os.path.join(USER_AUTOSTART, aid)
+    shutil.copy(apps[aid][0], dst)
+    set_key(dst, "Hidden", None)
+    set_key(dst, "X-GNOME-Autostart-enabled", "true")
+    subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+
+
+def cmd_autostart_remove(fname):
+    path = os.path.join(USER_AUTOSTART, fname)
+    if "/" in fname or not os.path.exists(path):
+        die(f"not a user autostart entry: {fname}")
+    if os.path.exists(os.path.join(SYS_AUTOSTART, fname)):
+        die("this one comes with the system — turn it off instead")
+    os.remove(path)
+    subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+
+
+def main():
+    a = sys.argv[1:] or ["list"]
+    cmds = {
+        ("list", 1): lambda: cmd_list(),
+        ("hide", 3): lambda: cmd_hide(a[1], a[2]),
+        ("defaults", 1): lambda: cmd_defaults(),
+        ("set-default", 3): lambda: cmd_set_default(a[1], a[2]),
+        ("autostart", 1): lambda: cmd_autostart(),
+        ("autostart-set", 3): lambda: cmd_autostart_set(a[1], a[2]),
+        ("autostart-add", 2): lambda: cmd_autostart_add(a[1]),
+        ("autostart-remove", 2): lambda: cmd_autostart_remove(a[1]),
+    }
+    fn = cmds.get((a[0], len(a)))
+    if not fn:
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+    fn()
+
+
+if __name__ == "__main__":
+    main()

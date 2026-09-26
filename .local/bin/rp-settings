@@ -7,6 +7,7 @@
 #   rp-settings reset [<klíč>]     vrátí klíč (bez klíče všechny) na výchozí
 #   rp-settings apply              přegeneruje všechny výstupy (niri, kitty, mako, idle)
 #   rp-settings idle               (re)startuje swayidle s aktuálními časy
+#   rp-settings nightlight         (re)startuje wlsunset (noční světlo), nebo ho zastaví
 #   rp-settings modules            theme moduly z modules.conf jako JSON
 #   rp-settings module <jméno> on|off
 #
@@ -50,6 +51,18 @@ LOCK="${XDG_RUNTIME_DIR:-/tmp}/rp-settings.lock"
 SCHEMA='
 niri.gaps|int|16|0|48
 niri.corner_radius|int|0|0|24
+niri.border|bool|false
+niri.border_width|int|4|1|16
+niri.tab_indicator|bool|true
+niri.tab_single|bool|false
+niri.tab_position|enum|left|left,right,top,bottom
+niri.tab_width|int|4|1|16
+niri.insert_hint|bool|true
+niri.struts_h|int|0|0|400
+niri.struts_v|int|0|0|300
+niri.shadow_offset|int|5|-20|40
+niri.prefer_no_csd|bool|true
+niri.hotkey_overlay|bool|true
 niri.focus_ring_width|int|4|0|12
 niri.shadow|bool|true
 niri.shadow_softness|int|30|0|100
@@ -112,6 +125,14 @@ notify.dnd|bool|false
 idle.lock_min|int|5|0|120
 idle.screen_off_min|int|10|0|180
 idle.lock_on_sleep|bool|true
+a11y.text_scale|float|1.00|0.75|2
+nightlight.enabled|bool|false
+nightlight.temp|int|4000|2500|6000
+nightlight.mode|enum|schedule|schedule,sun,always
+nightlight.start|string|21:00|^([01][0-9]|2[0-3]):[0-5][0-9]$
+nightlight.end|string|07:00|^([01][0-9]|2[0-3]):[0-5][0-9]$
+nightlight.lat|string|50.08|^-?[0-9]{1,2}(\.[0-9]+)?$
+nightlight.lon|string|14.42|^-?[0-9]{1,3}(\.[0-9]+)?$
 '
 
 declare -A TYPE DEF A B
@@ -175,7 +196,11 @@ validate() {
             [[ ",$(options "$key")," == *",$val,"* ]] || die "$key: allowed values are $(options "$key")"
             echo "$val" ;;
         string)
-            [[ "$val" =~ ${A[$key]} ]] || die "$key: invalid value '$val'"
+            # regex smí obsahovat |, který je v SCHEMA oddělovač — read dá zbytek
+            # řádku do posledního pole, tady se zase spojí
+            local re="${A[$key]}"
+            [[ -n "${B[$key]}" ]] && re+="|${B[$key]}"
+            [[ "$val" =~ $re ]] || die "$key: invalid value '$val'"
             echo "$val" ;;
     esac
 }
@@ -254,8 +279,26 @@ render_kdl() {
     on niri.shadow && echo "        on" || echo "        off"
     echo "        softness ${V[niri.shadow_softness]}"
     echo "        spread ${V[niri.shadow_spread]}"
+    echo "        offset x=0 y=${V[niri.shadow_offset]}"
     echo "    }"
+    # Barvy rámečku dodává theme-colors.kdl (30-niri.sh), tady jen zapnutí a šířka
+    if on niri.border; then
+        echo "    border { on; width ${V[niri.border_width]}; }"
+    else
+        echo "    border { off; }"
+    fi
+    echo "    tab-indicator {"
+    on niri.tab_indicator && echo "        on" || echo "        off"
+    on niri.tab_single && echo "        hide-when-single-tab"
+    echo "        position \"${V[niri.tab_position]}\""
+    echo "        width ${V[niri.tab_width]}"
+    echo "    }"
+    on niri.insert_hint && echo "    insert-hint { on; }" || echo "    insert-hint { off; }"
+    echo "    struts { left ${V[niri.struts_h]}; right ${V[niri.struts_h]}; top ${V[niri.struts_v]}; bottom ${V[niri.struts_v]}; }"
     echo "}"
+    # Flagy: v config.kdl nejsou, include by je neuměl vypnout
+    on niri.prefer_no_csd && echo "prefer-no-csd"
+    on niri.hotkey_overlay || echo "hotkey-overlay { skip-at-startup; }"
 
     echo "blur {"
     echo "    passes ${V[niri.blur_passes]}"
@@ -413,6 +456,23 @@ start_idle() {
     echo $! > "$pidfile"
 }
 
+# Noční světlo: wlsunset přes wlr-gamma-control (niri ho podporuje, samo gamma
+# neumí). Režimy: plán (od–do), podle slunce (souřadnice), pořád.
+start_nightlight() {
+    pkill -x wlsunset 2>/dev/null
+    on nightlight.enabled || return 0
+    command -v wlsunset >/dev/null 2>&1 || return 0
+    local t=${V[nightlight.temp]} args
+    args=(-t "$t" -T 6500)
+    case ${V[nightlight.mode]} in
+        schedule) args+=(-s "${V[nightlight.start]}" -S "${V[nightlight.end]}" -d 1800) ;;
+        sun)      args+=(-l "${V[nightlight.lat]}" -L "${V[nightlight.lon]}") ;;
+        # „Pořád": západ v 00:00, východ v 23:59 → celý den je noc
+        always)   args+=(-s 00:00 -S 23:59 -d 60) ;;
+    esac
+    setsid wlsunset "${args[@]}" >/dev/null 2>&1 < /dev/null 9>&- &
+}
+
 # Co se má po změně klíče přegenerovat
 apply_for() {
     case "$1" in
@@ -421,6 +481,9 @@ apply_for() {
         theme.terminal_*) apply_kitty ;;
         notify.*) apply_mako ;;
         idle.*) start_idle ;;
+        nightlight.*) start_nightlight ;;
+        # GTK (3 i 4) čte na Waylandu text-scaling-factor z gsettings, i za běhu
+        a11y.text_scale) gsettings set org.gnome.desktop.interface text-scaling-factor "${V[a11y.text_scale]}" 2>/dev/null ;;
         *) return 0 ;;   # theme.scheme/contrast/mono_mode čte apply-wallpaper-theme.sh
     esac
 }
@@ -510,9 +573,11 @@ case "${1:-dump}" in
             apply_all || { write_store <<<"$prev"; exit 1; }
             apply_cursor
             start_idle
+            start_nightlight
         fi ;;
     apply) apply_all ;;
     idle) start_idle ;;
+    nightlight) start_nightlight ;;
     modules) modules_json ;;
     module)
         [[ $# -eq 3 ]] || die "usage: rp-settings module <name> on|off"

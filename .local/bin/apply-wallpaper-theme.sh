@@ -32,13 +32,33 @@ waybar_css_changed=0
 waybar_config_changed=0
 
 mkdir -p "$STATE_DIR"
+# Zámek drží PID majitele. Zabitý běh (SIGKILL, nebo quickshell reload, který
+# zabil proces spuštěný z okna Settings) trap nespustí a zámek by zůstal viset
+# navždy — každý další běh by si pak jen zapsal pending a skončil, takže by
+# nešla změnit ani tapeta. Mrtvého majitele proto převzít; zámek bez PID
+# (ze starší verze skriptu) jen když je starší než 10 minut.
+lock_is_stale() {
+    local owner
+    owner=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+    if [[ -n "$owner" ]]; then
+        ! kill -0 "$owner" 2>/dev/null
+    else
+        [[ -n "$(find "$LOCK_DIR" -maxdepth 0 -mmin +10 2>/dev/null)" ]]
+    fi
+}
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    printf '%s\0' "$@" >"$PENDING_ARGS"
-    : >"$PENDING_FLAG"
-    exit 0
+    if lock_is_stale; then
+        rm -f "$LOCK_DIR/pid"
+    else
+        printf '%s\0' "$@" >"$PENDING_ARGS"
+        : >"$PENDING_FLAG"
+        exit 0
+    fi
 fi
+echo $$ >"$LOCK_DIR/pid"
 
 cleanup_lock() {
+    rm -f "$LOCK_DIR/pid"
     rmdir "$LOCK_DIR" 2>/dev/null || true
 }
 trap cleanup_lock EXIT

@@ -20,6 +20,14 @@ layout {
       inactive-color "${color8}"
       urgent-color "${accent_urgent}"
   }
+
+  // Rámeček je vypnutý v config.kdl; zapíná ho okno Settings (settings.kdl
+  // mu dá jen on/šířku, barvy jdou odsud, ať sedí s tapetou)
+  border {
+      active-color "${accent}"
+      inactive-color "${color8}"
+      urgent-color "${accent_urgent}"
+  }
 }
 EOF
 

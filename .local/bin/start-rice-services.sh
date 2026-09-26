@@ -135,6 +135,9 @@ fi
 # QuickShell běží jako systemd unit (viz start_user_unit výše).
 # Bar je v shell.qml vypnutý přepínačem useBar — barem je waybar.
 
+# Noční světlo (wlsunset), když je v okně Settings zapnuté a nainstalované
+"$HOME/.local/bin/rp-settings" nightlight || log "rp-settings nightlight failed"
+
 # swayidle startuje rp-settings — časy zamknutí/vypnutí obrazovky jsou v okně Settings
 if ! pgrep -x swayidle >/dev/null 2>&1; then
   "$HOME/.local/bin/rp-settings" idle || log "rp-settings idle failed"

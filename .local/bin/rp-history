@@ -1,0 +1,201 @@
+#!/usr/bin/env python3
+"""rp-history — historie pro okno Settings (stránka History).
+
+  rp-history notifications          zavřené notifikace z mako (JSON, nejnovější první)
+  rp-history clipboard              historie schránky z cliphist (JSON)
+  rp-history clip-copy <id>         zkopírovat položku zpět do schránky
+  rp-history clip-delete <id>       smazat položku
+  rp-history clip-wipe              smazat celou historii schránky
+  rp-history clip-thumb <id>        obrázek z historie do cache, vypíše cestu
+  rp-history shell [N]              posledních N příkazů ze zsh (výchozí 400, bez duplicit)
+  rp-history shell-delete <příkaz>  smazat příkaz z ~/.zsh_history (všechny výskyty)
+  rp-history shell-clear            vyprázdnit ~/.zsh_history
+
+mako drží historii jen v paměti (ListHistory na D-Bus, víc než `makoctl history`
+— i tělo zprávy a ikonu). zsh zapisuje ve formátu EXTENDED_HISTORY
+(`: <čas>:<trvání>;<příkaz>`), víceřádkové příkazy pokračují po `\\`.
+"""
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+HOME = os.path.expanduser("~")
+ZSH_HIST = os.environ.get("HISTFILE", f"{HOME}/.zsh_history")
+THUMBS = os.path.join(os.environ.get("XDG_CACHE_HOME", f"{HOME}/.cache"), "niri-rice", "clip-thumbs")
+
+
+def die(msg):
+    print(f"rp-history: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def run(args, **kw):
+    return subprocess.run(args, capture_output=True, text=True, **kw)
+
+
+def notifications():
+    r = run(["busctl", "--user", "--json=short", "call", "org.freedesktop.Notifications",
+             "/fr/emersion/Mako", "fr.emersion.Mako", "ListHistory"])
+    if r.returncode != 0:
+        print("[]")
+        return
+    items = json.loads(r.stdout)["data"][0]
+    out = []
+    for n in items:
+        v = {k: x.get("data") for k, x in n.items()}
+        out.append({
+            "id": v.get("id"), "app": v.get("app-name", ""), "summary": v.get("summary", ""),
+            "body": re.sub(r"<[^>]+>", "", v.get("body", "")), "icon": v.get("app-icon", ""),
+            "urgency": v.get("urgency", 1), "desktop": v.get("desktop-entry", ""),
+        })
+    print(json.dumps(out, ensure_ascii=False))
+
+
+def clipboard():
+    r = run(["cliphist", "list"])
+    out = []
+    for line in r.stdout.splitlines():
+        cid, _, text = line.partition("\t")
+        m = re.match(r"\[\[ binary data (.+?) (\w+) (\d+)x(\d+) \]\]", text)
+        out.append({"id": cid, "text": text, "image": bool(m),
+                    "size": m.group(1) if m else "", "format": m.group(2) if m else "",
+                    "width": int(m.group(3)) if m else 0, "height": int(m.group(4)) if m else 0})
+    print(json.dumps(out, ensure_ascii=False))
+
+
+def clip_line(cid):
+    if not cid.isdigit():
+        die("bad id")
+    for line in run(["cliphist", "list"]).stdout.splitlines():
+        if line.split("\t", 1)[0] == cid:
+            return line
+    die(f"no clipboard item {cid}")
+
+
+def clip_copy(cid):
+    line = clip_line(cid)
+    dec = subprocess.run(["cliphist", "decode"], input=line.encode(), capture_output=True)
+    subprocess.run(["wl-copy"], input=dec.stdout)
+
+
+def clip_delete(cid):
+    line = clip_line(cid)
+    subprocess.run(["cliphist", "delete"], input=line.encode())
+
+
+def clip_thumb(cid):
+    line = clip_line(cid)
+    os.makedirs(THUMBS, exist_ok=True)
+    path = os.path.join(THUMBS, hashlib.sha1(line.encode()).hexdigest()[:16] + ".png")
+    if not os.path.exists(path):
+        dec = subprocess.run(["cliphist", "decode"], input=line.encode(), capture_output=True)
+        with open(path, "wb") as f:
+            f.write(dec.stdout)
+    print(path)
+
+
+def read_zsh():
+    """[(čas, příkaz)] v pořadí souboru; zsh píše metafikované bajty, dekódovat opatrně."""
+    try:
+        raw = open(ZSH_HIST, "rb").read()
+    except OSError:
+        return []
+    # zsh "metafy": 0x83 + (bajt ^ 0x20)
+    buf, i = bytearray(), 0
+    while i < len(raw):
+        if raw[i] == 0x83 and i + 1 < len(raw):
+            buf.append(raw[i + 1] ^ 0x20)
+            i += 2
+        else:
+            buf.append(raw[i])
+            i += 1
+    text = buf.decode("utf-8", errors="replace")
+    entries, cur = [], None
+    for line in text.split("\n"):
+        m = re.match(r"^: (\d+):\d+;(.*)$", line)
+        if m:
+            if cur:
+                entries.append(cur)
+            cur = [int(m.group(1)), m.group(2)]
+        elif cur is not None and cur[1].endswith("\\"):
+            cur[1] = cur[1][:-1] + "\n" + line
+        elif line:
+            if cur:
+                entries.append(cur)
+            cur = [0, line]
+    if cur:
+        entries.append(cur)
+    return entries
+
+
+def shell(n):
+    seen, out = set(), []
+    for ts, cmd in reversed(read_zsh()):
+        c = cmd.strip()
+        if not c or c in seen:
+            continue
+        seen.add(c)
+        out.append({"time": ts, "command": c})
+        if len(out) >= n:
+            break
+    print(json.dumps(out, ensure_ascii=False))
+
+
+def rewrite_zsh(keep):
+    """Zapíše zpět jen položky, pro které keep(cmd) platí. Metafikace se zachová."""
+    raw = open(ZSH_HIST, "rb").read().split(b"\n")
+    out, drop = [], False
+    for line in raw:
+        m = re.match(rb"^: \d+:\d+;(.*)$", line)
+        if m:
+            cmd = m.group(1)
+            dec = bytearray()
+            i = 0
+            while i < len(cmd):
+                if cmd[i] == 0x83 and i + 1 < len(cmd):
+                    dec.append(cmd[i + 1] ^ 0x20); i += 2
+                else:
+                    dec.append(cmd[i]); i += 1
+            drop = not keep(dec.decode("utf-8", errors="replace").rstrip("\\").strip())
+        if not drop:
+            out.append(line)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(ZSH_HIST))
+    with os.fdopen(fd, "wb") as f:
+        f.write(b"\n".join(out))
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, ZSH_HIST)
+
+
+def main():
+    a = sys.argv[1:] or ["notifications"]
+    c = a[0]
+    if c == "notifications":
+        notifications()
+    elif c == "clipboard":
+        clipboard()
+    elif c == "clip-copy" and len(a) == 2:
+        clip_copy(a[1])
+    elif c == "clip-delete" and len(a) == 2:
+        clip_delete(a[1])
+    elif c == "clip-wipe":
+        run(["cliphist", "wipe"])
+    elif c == "clip-thumb" and len(a) == 2:
+        clip_thumb(a[1])
+    elif c == "shell":
+        shell(int(a[1]) if len(a) > 1 else 400)
+    elif c == "shell-delete" and len(a) == 2:
+        target = a[1].strip()
+        rewrite_zsh(lambda cmd: cmd != target)
+    elif c == "shell-clear":
+        open(ZSH_HIST, "w").close()
+    else:
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

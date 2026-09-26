@@ -22,6 +22,18 @@
 #   rp-sys fw <akce> [arg]      firewalld: add-service, remove-service,
 #                               add-port, remove-port, panic-on, panic-off, restart
 #
+# Další systémové stránky (Storage, Date & time, Language, Account, Privacy,
+# Gaming, Printers, Backup):
+#   rp-sys storage | storage-home          obsazení disků, co jde uklidit / obsah ~
+#   rp-sys clean <co> [arg]                trash, cache-dir <jméno>, pacman, coredumps,
+#                                          journal, flatpak, smart (zdraví disků)
+#   rp-sys time | set-timezone <tz> | set-ntp true|false | set-clock <formát waybaru>
+#   rp-sys locale | set-locale <jazyk> [formáty]   (chybějící locale vygeneruje)
+#   rp-sys account | privacy | privacy-clear recent|thumbs|launcher
+#   rp-sys gaming | mango-set <klíč> <hodnota|on|off> | mango-everywhere on|off
+#   rp-sys printers | printer default|test|cancel <tiskárna>
+#   rp-sys backup | snapshot list|create <config> [popis] | settings-export [soubor] | settings-import <soubor>
+#
 # Kontrola repo aktualizací nepotřebuje roota ani nesahá na systémovou databázi:
 # stejně jako `checkupdates` synchronizuje kopii do dočasné dbpath přes fakeroot.
 # Částečný `pacman -Sy` do systémové databáze by jinak rozbil příští instalaci.
@@ -251,6 +263,279 @@ valid_pkgs() {
     for p in "$@"; do [[ "$p" =~ ^[a-zA-Z0-9@._+-]+$ ]] || die "invalid package name: $p"; done
 }
 
+# --------------------------------------------------------------- úložiště
+# Velikosti v bajtech; du na ~/.cache trvá u 19 GB pár sekund, proto zvlášť
+# `storage` (rychlé) a `storage-home` (obsah domovské složky, pomalé).
+dsize() { du -sb "$1" 2>/dev/null | awk '{ print $1 + 0 }'; }
+
+storage() {
+    local cache="${XDG_CACHE_HOME:-$HOME/.cache}" trash="$HOME/.local/share/Trash" journal core flat
+    journal=$(journalctl --disk-usage 2>/dev/null | grep -oE '[0-9.]+[KMGT]' | head -1)
+    core=$(dsize /var/lib/systemd/coredump)
+    local caches
+    caches=$(du -sb "$cache"/* 2>/dev/null | sort -rn | head -10 |
+        jq -R 'split("\t") | { size: (.[0] | tonumber), path: .[1], name: (.[1] | split("/") | last) }' | jq -s .)
+    df -B1 --output=target,size,used,avail,source -x tmpfs -x devtmpfs -x efivarfs -x overlay 2>/dev/null |
+        awk 'NR > 1 && $1 !~ /^\/(boot|efi|var\/lib|snap|\.snapshots)/' |
+        jq -R 'split(" ") | map(select(length > 0)) | { mount: .[0], size: (.[1] | tonumber), used: (.[2] | tonumber), free: (.[3] | tonumber), device: .[4] }' |
+        jq -s 'unique_by(.device)' > /tmp/rp-sys-df.$$
+    jq -n --slurpfile disks /tmp/rp-sys-df.$$ --argjson caches "$caches" \
+          --arg trash "$(dsize "$trash")" --arg trashn "$(find "$trash/files" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)" \
+          --arg cache "$(dsize "$cache")" --arg pkg "$(dsize /var/cache/pacman/pkg)" \
+          --arg journal "$journal" --arg core "${core:-0}" --arg thumbs "$(dsize "$cache/thumbnails")" '
+        def n: tonumber? // 0;
+        { disks: $disks[0], caches: $caches,
+          items: [
+            { id: "trash", label: "Trash", size: ($trash | n), detail: "\($trashn) items", root: false },
+            { id: "pacman", label: "Package cache", size: ($pkg | n), detail: "old versions of installed packages", root: true },
+            { id: "cache", label: "App caches (~/.cache)", size: ($cache | n), detail: "per-app below", root: false },
+            { id: "coredumps", label: "Crash dumps", size: ($core | n), detail: "/var/lib/systemd/coredump", root: true },
+            { id: "journal", label: "System logs", size: 0, detail: ("journal takes " + $journal + "; trimmed to 50 MB"), root: true },
+            { id: "flatpak", label: "Unused Flatpak runtimes", size: 0, detail: "runtimes no app needs any more", root: false }
+          ] }'
+    rm -f /tmp/rp-sys-df.$$
+}
+
+storage_home() {
+    du -sb "$HOME"/* "$HOME"/.[!.]* 2>/dev/null | sort -rn | head -15 |
+        jq -R 'split("\t") | { size: (.[0] | tonumber), path: .[1], name: (.[1] | split("/") | last) }' | jq -s .
+}
+
+clean() {
+    local what=$1 arg=${2:-} cache="${XDG_CACHE_HOME:-$HOME/.cache}"
+    case "$what" in
+        trash)
+            echo ":: emptying the trash"
+            find "$HOME/.local/share/Trash/files" "$HOME/.local/share/Trash/info" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>&1
+            echo "done" ;;
+        cache-dir)
+            # Jen přímá podsložka ~/.cache, žádné ../
+            [[ "$arg" =~ ^[A-Za-z0-9._@+-]+$ && -d "$cache/$arg" ]] || die "invalid cache folder: $arg"
+            echo ":: clearing ~/.cache/$arg"
+            find "$cache/$arg" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>&1
+            echo "done" ;;
+        pacman)    echo ":: pacman -Sc"; exec pkexec pacman -Sc "${PACMAN_FLAGS[@]}" 2>&1 ;;
+        coredumps) echo ":: removing crash dumps"; exec pkexec find /var/lib/systemd/coredump -mindepth 1 -delete 2>&1 ;;
+        journal)   echo ":: journalctl --vacuum-size=50M"; exec pkexec journalctl --vacuum-size=50M 2>&1 ;;
+        flatpak)   echo ":: flatpak uninstall --unused"; exec flatpak uninstall --unused -y --noninteractive 2>&1 ;;
+        smart)
+            echo ":: smartctl -H -A (disk health)"
+            exec pkexec sh -c 'for d in $(lsblk -dno NAME,TYPE | awk '"'"'$2 == "disk" && $1 !~ /^zram/ { print $1 }'"'"'); do
+                echo "── /dev/$d"; smartctl -H -A /dev/$d | grep -Ei "result|overall|percentage used|power_on|wear|temperature" ; done' 2>&1 ;;
+        *) die "unknown clean target: $what" ;;
+    esac
+}
+
+# --------------------------------------------------------------- čas a jazyk
+timeinfo() {
+    local fmt; fmt=$(grep -A2 '"clock"' "$HOME/.config/waybar/config.jsonc" 2>/dev/null | grep -oP '"format":\s*"\K[^"]*' | head -1)
+    timedatectl show 2>/dev/null | jq -R -s --arg fmt "$fmt" --arg zones "$(timedatectl list-timezones 2>/dev/null)" '
+        split("\n") | map(select(contains("=")) | capture("^(?<k>[^=]+)=(?<v>.*)$") | { (.k): .v }) | add
+        | { timezone: .Timezone, ntp: (.NTP == "yes"), synced: (.NTPSynchronized == "yes"), canNtp: (.CanNTP == "yes"),
+            localRtc: (.LocalRTC == "yes"), clockFormat: $fmt,
+            zones: ($zones | split("\n") | map(select(length > 0))) }'
+}
+
+localeinfo() {
+    local st; st=$(localectl status 2>/dev/null)
+    jq -n --arg st "$st" --arg have "$(localectl list-locales 2>/dev/null)" \
+          --arg all "$(grep -E '^#?[a-z]{2,3}_[A-Z]{2}\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null | sed 's/^#//; s/ UTF-8$//')" '
+        ($st | split("\n") | map(select(test("LANG=|LC_"))) | map(gsub("^\\s*(System Locale:)?\\s*"; "")) | join(" ")
+         | [scan("(LANG|LC_[A-Z]+)=([^ ]+)")] | map({ (.[0]): .[1] }) | add // {}) as $cur
+        | { current: $cur, lang: ($cur.LANG // "C"),
+            formats: ($cur.LC_TIME // $cur.LANG // "C"),
+            generated: ($have | split("\n") | map(select(length > 0))),
+            available: ($all | split("\n") | map(select(length > 0))) }'
+}
+
+set_locale() {
+    local lang=$1 formats=$2 l
+    for l in "$lang" "$formats"; do [[ "$l" =~ ^[A-Za-z_]+(\.UTF-8)?$ ]] || die "invalid locale: $l"; done
+    # Chybějící locale nejdřív vygenerovat (odkomentovat v /etc/locale.gen + locale-gen) — jeden pkexec
+    echo ":: LANG=$lang, formats $formats (applies after you log in again)"
+    exec pkexec sh -c '
+        for l in "$1" "$2"; do
+            [ "$l" = C.UTF-8 ] && continue
+            if ! locale -a | grep -qix "$(echo "$l" | sed "s/UTF-8/utf8/")"; then
+                sed -i "s/^#\s*\($l UTF-8\)/\1/" /etc/locale.gen && echo "generating $l" && regen=1
+            fi
+        done
+        [ -n "$regen" ] && locale-gen
+        localectl set-locale LANG="$1" LC_TIME="$2" LC_NUMERIC="$2" LC_MONETARY="$2" LC_PAPER="$2" LC_MEASUREMENT="$2"
+    ' sh "$lang" "$formats" 2>&1
+}
+
+# Formát hodin ve waybaru — upraví "format" v bloku "clock" (živý config, a repo
+# když má stejný řádek); waybar watchdog změnu configu pozná a waybar restartuje
+set_clock() {
+    local fmt=$1 f
+    [[ "$fmt" =~ ^[^\"\\]+$ ]] || die "invalid clock format"
+    for f in "$HOME/.config/waybar/config.jsonc" "$HOME/dotfiles/.config/waybar/config.jsonc"; do
+        [[ -f "$f" ]] || continue
+        python3 - "$f" "$fmt" <<'PY'
+import re, sys
+path, fmt = sys.argv[1], sys.argv[2]
+s = open(path).read()
+new = re.sub(r'("clock"\s*:\s*\{[^}]*?"format"\s*:\s*")[^"]*(")', lambda m: m.group(1) + fmt + m.group(2), s, count=1)
+if new != s:
+    open(path, "w").write(new)
+PY
+    done
+    systemctl --user restart waybar.service 2>/dev/null
+}
+
+# --------------------------------------------------------------- účet
+account() {
+    local ent; ent=$(getent passwd "$USER")
+    jq -n --arg ent "$ent" --arg groups "$(id -nG)" --arg last "$(last -n 6 -F "$USER" 2>/dev/null | grep -v '^$\|^wtmp' | head -6)" \
+          --arg keyring "$(pgrep -x gnome-keyring-d >/dev/null && echo running || echo stopped)" \
+          --arg seahorse "$(command -v seahorse >/dev/null && echo yes)" '
+        ($ent | split(":")) as $p
+        | { user: $p[0], uid: ($p[2] | tonumber), name: ($p[4] | split(",")[0]), home: $p[5], shell: $p[6],
+            groups: ($groups | split(" ")), admin: ($groups | split(" ") | index("wheel") != null),
+            logins: ($last | split("\n") | map(select(length > 0))),
+            keyring: $keyring, seahorse: ($seahorse == "yes") }'
+}
+
+# --------------------------------------------------------------- soukromí
+privacy() {
+    local mic cam screen
+    mic=$(pactl -f json list source-outputs 2>/dev/null | jq -c --argjson mon "$(pactl -f json list sources 2>/dev/null | jq '[.[] | select(.monitor_source != "" and .monitor_source != null) | .index]')" \
+        '[.[] | select(.source as $s | $mon | index($s) | not) | .properties."application.name" // .properties."application.process.binary" // "?"] | unique')
+    cam=$(for d in /dev/video*; do [[ -e "$d" ]] && fuser "$d" 2>/dev/null; done | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -u |
+        while read -r p; do cat "/proc/$p/comm" 2>/dev/null; done | sort -u | jq -R . | jq -s -c .)
+    screen=$(pw-dump 2>/dev/null | jq -c '[.[] | select(.type == "PipeWire:Interface:Node")
+        | select((.info.props."media.class" // "") == "Stream/Input/Video")
+        | .info.props."application.name" // .info.props."node.name" // "?"] | unique')
+    jq -n --argjson mic "${mic:-[]}" --argjson cam "${cam:-[]}" --argjson screen "${screen:-[]}" \
+          --arg recent "$(grep -c '<bookmark' "$HOME/.local/share/recently-used.xbel" 2>/dev/null || echo 0)" \
+          --arg thumbs "$(dsize "${XDG_CACHE_HOME:-$HOME/.cache}/thumbnails")" \
+          --arg launcher "$(jq length "${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/launcher-recent.json" 2>/dev/null || echo 0)" '
+        { microphone: $mic, camera: $cam, screen: $screen,
+          recentFiles: ($recent | tonumber? // 0), thumbnails: ($thumbs | tonumber? // 0), launcherRecent: ($launcher | tonumber? // 0) }'
+}
+
+privacy_clear() {
+    local cache="${XDG_CACHE_HOME:-$HOME/.cache}"
+    case "$1" in
+        recent)   printf '<?xml version="1.0" encoding="UTF-8"?>\n<xbel version="1.0"\n      xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks"\n      xmlns:mime="http://www.freedesktop.org/standards/shared-mime-info"\n>\n</xbel>\n' > "$HOME/.local/share/recently-used.xbel" ;;
+        thumbs)   rm -rf "$cache/thumbnails" ;;
+        launcher) echo '[]' > "$cache/niri-rice/launcher-recent.json" ;;
+        *) die "unknown: $1" ;;
+    esac
+}
+
+# --------------------------------------------------------------- hraní
+MANGO="$HOME/.config/MangoHud/MangoHud.conf"
+GAMING_ENV="$HOME/.config/environment.d/rp-gaming.conf"
+
+gaming() {
+    local mh="{}"
+    [[ -f "$MANGO" ]] && mh=$(grep -Ev '^\s*(#|$)' "$MANGO" | jq -R -s 'split("\n") | map(select(length > 0) | capture("^(?<k>[^=]+?)\\s*(=\\s*(?<v>.*))?$") | { (.k): (.v // true) }) | add // {}')
+    jq -n --argjson mh "$mh" --arg gm "$(gamemoded -s 2>/dev/null)" \
+          --arg env "$(cat "$GAMING_ENV" 2>/dev/null)" \
+          --arg tools "$(for t in gamemoded mangohud gamescope steam lutris heroic vkbasalt; do command -v $t >/dev/null && echo $t; done)" '
+        { gamemode: ($gm | test("is active")), mangohud: $mh, mangoConfig: ($mh != {}),
+          mangoEverywhere: ($env | test("MANGOHUD=1")), tools: ($tools | split("\n") | map(select(length > 0))) }'
+}
+
+# Jedna volba v MangoHud.conf (klíč=hodnota, „on" = holý klíč, „off" = smazat)
+mango_set() {
+    local k=$1 v=$2
+    [[ "$k" =~ ^[a-z_]+$ ]] || die "invalid MangoHud key"
+    [[ "$v" =~ ^[A-Za-z0-9_.,+-]*$ ]] || die "invalid MangoHud value"
+    mkdir -p "$(dirname "$MANGO")"; touch "$MANGO"
+    python3 - "$MANGO" "$k" "$v" <<'PY'
+import re, sys
+path, k, v = sys.argv[1:4]
+lines = open(path).read().split("\n")
+pat = re.compile(rf"^\s*#?\s*{re.escape(k)}\s*(=|$)")
+new = None if v == "off" else (k if v == "on" else f"{k}={v}")
+out, done = [], False
+for l in lines:
+    if pat.match(l) and not l.lstrip().startswith("#"):
+        if new and not done:
+            out.append(new); done = True
+        continue
+    out.append(l)
+if new and not done:
+    out.append(new)
+open(path, "w").write("\n".join(out))
+PY
+}
+
+mango_everywhere() {
+    mkdir -p "$(dirname "$GAMING_ENV")"
+    if [[ "$1" == on ]]; then
+        printf '# Z okna Settings → Gaming: MangoHud ve všech Vulkan hrách (platí po novém přihlášení)\nMANGOHUD=1\n' > "$GAMING_ENV"
+        systemctl --user set-environment MANGOHUD=1
+    else
+        rm -f "$GAMING_ENV"
+        systemctl --user unset-environment MANGOHUD
+    fi
+}
+
+# --------------------------------------------------------------- tiskárny
+printers() {
+    local def; def=$(lpstat -d 2>/dev/null | sed -n 's/^system default destination: //p')
+    jq -n --arg p "$(lpstat -p 2>/dev/null)" --arg jobs "$(lpstat -o 2>/dev/null)" --arg def "$def" \
+          --arg cups "$(systemctl is-active cups 2>/dev/null)" \
+          --arg scp "$(command -v system-config-printer >/dev/null && echo yes)" '
+        { cups: ($cups == "active"), default: $def, configTool: ($scp == "yes"),
+          printers: ($p | split("\n") | map(select(startswith("printer ")) | capture("^printer (?<name>\\S+) (is |now )?(?<state>[^.]+)")
+                     | . + { default: (.name == $def), enabled: (.state | test("disabled") | not) })),
+          jobs: ($jobs | split("\n") | map(select(length > 0) | capture("^(?<id>\\S+)\\s+(?<user>\\S+)\\s+(?<size>\\d+)\\s+(?<date>.*)$"))) }'
+}
+
+printer_action() {
+    local act=$1 p=${2:-}
+    [[ -z "$p" || "$p" =~ ^[A-Za-z0-9_.-]+$ ]] || die "invalid printer name"
+    case "$act" in
+        default) lpoptions -d "$p" >/dev/null ;;
+        test)    lp -d "$p" /usr/share/cups/data/testprint 2>&1 ;;
+        cancel)  cancel -a "$p" 2>&1 ;;
+        *) die "unknown printer action: $act" ;;
+    esac
+}
+
+# --------------------------------------------------------------- zálohy
+backup() {
+    jq -n --arg configs "$(snapper --csvout list-configs 2>/dev/null | tail -n +2)" \
+          --arg fs "$(findmnt -no FSTYPE /)" \
+          --arg timeline "$(systemctl is-enabled snapper-timeline.timer 2>/dev/null)" \
+          --arg cleanup "$(systemctl is-enabled snapper-cleanup.timer 2>/dev/null)" \
+          --arg snapPac "$(pacman -Qq snap-pac 2>/dev/null)" '
+        { fs: $fs, snapper: ($configs != ""),
+          configs: ($configs | split("\n") | map(select(length > 0) | split(",") | { name: .[0], subvolume: .[1] })),
+          timeline: ($timeline == "enabled"), cleanup: ($cleanup == "enabled"), snapPac: ($snapPac != "") }'
+}
+
+snapshot() {
+    local act=$1 cfg=${2:-root} desc=${3:-}
+    [[ "$cfg" =~ ^[a-z0-9_-]+$ ]] || die "invalid snapper config"
+    case "$act" in
+        list)   echo ":: snapper -c $cfg list"; exec pkexec snapper -c "$cfg" list 2>&1 ;;
+        create)
+            [[ "$desc" =~ ^[A-Za-z0-9\ ._,:-]{1,60}$ ]] || die "description: letters, digits, spaces, up to 60 chars"
+            echo ":: snapper -c $cfg create -d \"$desc\""
+            exec pkexec snapper -c "$cfg" create -d "$desc" --print-number 2>&1 ;;
+        *) die "unknown snapshot action: $act" ;;
+    esac
+}
+
+# Export/import nastavení okna Settings (settings.json, displays.json, modules.conf)
+settings_export() {
+    local out="${1:-$HOME/rprice-settings-$(date +%Y%m%d-%H%M).tar.gz}"
+    tar -czf "$out" -C "$HOME/.config/niri-rice" $(cd "$HOME/.config/niri-rice" && ls settings.json displays.json modules.conf 2>/dev/null) && echo "$out"
+}
+
+settings_import() {
+    local f=$1
+    [[ -f "$f" ]] || die "no such file: $f"
+    tar -tzf "$f" | grep -qvE '^(settings\.json|displays\.json|modules\.conf)$' && die "unexpected files in archive"
+    tar -xzf "$f" -C "$HOME/.config/niri-rice" && "$HOME/.local/bin/rp-settings" apply && echo "imported $f"
+}
+
 case "${1:-}" in
     info)        info ;;
     updates)     updates ;;
@@ -313,6 +598,27 @@ case "${1:-}" in
         echo ":: pacman -Sc (keeps installed versions, drops the rest)"
         exec pkexec pacman -Sc "${PACMAN_FLAGS[@]}" 2>&1 ;;
     fw) shift; fw "$@" 2>&1 ;;
+    storage)       storage ;;
+    storage-home)  storage_home ;;
+    clean)         shift; clean "$@" ;;
+    time)          timeinfo ;;
+    set-timezone)  [[ "${2:-}" =~ ^[A-Za-z_+/-]+$ ]] || die "invalid timezone"; timedatectl set-timezone "$2" 2>&1 ;;
+    set-ntp)       timedatectl set-ntp "${2:-true}" 2>&1 ;;
+    set-clock)     set_clock "${2:-}" ;;
+    locale)        localeinfo ;;
+    set-locale)    set_locale "${2:-}" "${3:-${2:-}}" ;;
+    account)       account ;;
+    privacy)       privacy ;;
+    privacy-clear) privacy_clear "${2:-}" ;;
+    gaming)        gaming ;;
+    mango-set)     mango_set "${2:-}" "${3:-}" ;;
+    mango-everywhere) mango_everywhere "${2:-off}" ;;
+    printers)      printers ;;
+    printer)       printer_action "${2:-}" "${3:-}" ;;
+    backup)        backup ;;
+    snapshot)      snapshot "${2:-}" "${3:-root}" "${4:-}" ;;
+    settings-export) settings_export "${2:-}" ;;
+    settings-import) settings_import "${2:-}" ;;
     *)
         sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' >&2
         exit 1 ;;

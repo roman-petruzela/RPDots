@@ -38,11 +38,13 @@ Scope {
     // Řádek: { key, label, hint, labels (pro enum), suffix, step, decimals,
     //          percent (0–1 jako %), zero (popisek pro 0, např. "Off") }
     // nebo zvláštní druh: { kind: "button" | "modules" | "power" | "tools" | "note" }
-    readonly property var pages: [
+    readonly property var pageList: [
         { id: "network", group: "CONNECTIONS", icon: "󰛳", label: "Network", view: "network",
           keywords: "wifi wi-fi ethernet ip address dns vpn proton airplane speed test public" },
         { id: "sound", group: "CONNECTIONS", icon: "󰕾", label: "Sound", view: "sound",
           keywords: "audio volume output input microphone speakers headphones apps profile" },
+        { id: "bluetooth", group: "CONNECTIONS", icon: "󰂯", label: "Bluetooth", view: "bluetooth",
+          keywords: "pair devices headphones controller battery" },
         { id: "appearance", group: "PERSONALIZATION", icon: "󰏘", label: "Appearance", sections: [
             { title: "WINDOWS", rows: [
                 { key: "niri.gaps", label: "Gaps", hint: "Space between windows and around the screen edge.", suffix: " px" },
@@ -54,6 +56,17 @@ Scope {
                 { key: "niri.shadow", label: "Window shadows" },
                 { key: "niri.shadow_softness", label: "Softness", hint: "Blur radius of the shadow.", suffix: " px" },
                 { key: "niri.shadow_spread", label: "Spread", hint: "How far the shadow reaches past the window.", suffix: " px" },
+                { key: "niri.shadow_offset", label: "Vertical offset", hint: "Positive drops the shadow below the window.", suffix: " px" },
+            ]},
+            { title: "BORDER", rows: [
+                { key: "niri.border", label: "Window border", hint: "A solid border inside the window edge, in the wallpaper's colors. Unlike the focus ring it takes up space." },
+                { key: "niri.border_width", label: "Border width", suffix: " px" },
+            ]},
+            { title: "TABBED COLUMNS", rows: [
+                { key: "niri.tab_indicator", label: "Tab indicator", hint: "Bar showing the tabs of a tabbed column (Mod+W)." },
+                { key: "niri.tab_position", label: "Position", labels: ["Left", "Right", "Top", "Bottom"] },
+                { key: "niri.tab_width", label: "Thickness", suffix: " px" },
+                { key: "niri.tab_single", label: "Hide with a single tab" },
             ]},
             { title: "BLUR", rows: [
                 { key: "niri.blur_passes", label: "Passes", hint: "More passes = stronger blur, more GPU work." },
@@ -74,6 +87,11 @@ Scope {
                 { key: "niri.center_single", label: "Center a lone window", hint: "A single column on a workspace sits in the middle." },
                 { key: "niri.empty_ws_first", label: "Empty workspace on top", hint: "Keep an empty workspace above the first one too." },
             ]},
+            { title: "SPACE", rows: [
+                { key: "niri.struts_h", label: "Side margins", hint: "Keep this much free on the left and right; windows still scroll into it.", suffix: " px", step: 4 },
+                { key: "niri.struts_v", label: "Top & bottom margins", suffix: " px", step: 4 },
+                { key: "niri.insert_hint", label: "Insert hint", hint: "Show where a dragged window will land." },
+            ]},
             { title: "OVERVIEW", rows: [
                 { key: "niri.overview_zoom", label: "Overview zoom", hint: "Size of workspaces in the overview (Mod+O).", percent: true, step: 0.05 },
                 { key: "niri.hot_corner", label: "Hot corner", hint: "Push the pointer into this corner to open the overview.",
@@ -83,6 +101,10 @@ Scope {
                 { key: "input.focus_follows_mouse", label: "Focus follows mouse", hint: "Hovering a window focuses it, without scrolling the view." },
                 { key: "input.warp_mouse", label: "Pointer follows focus", hint: "Move the pointer to windows focused from the keyboard." },
                 { key: "input.ws_back_forth", label: "Workspace back and forth", hint: "Switching to the current workspace jumps to the previous one." },
+            ]},
+            { title: "DECORATIONS", rows: [
+                { key: "niri.prefer_no_csd", label: "Ask apps not to draw their own title bars", hint: "Apps started afterwards get plain windows; some (Zed, browsers) draw theirs anyway." },
+                { key: "niri.hotkey_overlay", label: "Shortcut cheat sheet at login", hint: "niri's overlay of important shortcuts (Mod+Shift+/ shows it any time)." },
             ]},
         ]},
         { id: "theme", group: "PERSONALIZATION", icon: "󰸌", label: "Theme", sections: [
@@ -164,6 +186,33 @@ Scope {
                 { kind: "button", action: "lock", label: "Lock now", icon: "󰌾", text: "Lock" },
             ]},
         ]},
+        { id: "apps", group: "APPS", icon: "󰀻", label: "Applications", view: "apps",
+          keywords: "installed default open with browser mail pdf autostart startup login launcher hide uninstall" },
+        { id: "history", group: "APPS", icon: "󰋚", label: "History", view: "history",
+          keywords: "notifications clipboard terminal shell zsh commands recent" },
+        { id: "nightlight", group: "PERSONALIZATION", icon: "󰖔", label: "Night light", view: "nightlight",
+          keywords: "blue light warm color temperature evening wlsunset redshift" },
+        { id: "accessibility", group: "PERSONALIZATION", icon: "󰖷", label: "Accessibility", sections: [
+            { title: "VISION", rows: [
+                { key: "a11y.text_scale", label: "Text size", hint: "Scales text in GTK apps (Thunar, pavucontrol…), live.", percent: true, step: 0.05 },
+                { key: "cursor.size", label: "Cursor size", suffix: " px", step: 2 },
+                { key: "niri.focus_ring_width", label: "Focus ring", hint: "A thicker ring makes the focused window easier to spot.", suffix: " px", zero: "Off" },
+                { kind: "button", action: "orca", label: "Screen reader", hint: "Orca reads the screen aloud (needs the orca package). Super+Alt+S toggles it too.", icon: "󰗅", text: "Start / stop" },
+            ]},
+            { title: "MOTION", rows: [
+                { key: "niri.animations", label: "Animations", hint: "Turn off to reduce motion." },
+                { key: "niri.anim_slowdown", label: "Animation duration", step: 0.05, suffix: "×" },
+            ]},
+            { title: "TIMING", rows: [
+                { key: "notify.timeout", label: "Keep notifications for", suffix: " s", zero: "Until dismissed" },
+                { key: "input.repeat_delay", label: "Key repeat delay", hint: "Longer avoids accidental repeated letters.", suffix: " ms", step: 25 },
+                { key: "input.repeat_rate", label: "Key repeat rate", suffix: "/s" },
+            ]},
+        ]},
+        { id: "shortcuts", group: "APPS", icon: "󰌌", label: "Shortcuts", view: "shortcuts",
+          keywords: "keybindings keys binds hotkeys remap niri" },
+        { id: "displays", group: "SYSTEM", icon: "󰍹", label: "Displays", view: "displays",
+          keywords: "monitor screen resolution refresh rate hz scale rotation orientation vrr arrange" },
         { id: "about", group: "SYSTEM", icon: "󰋼", label: "About", view: "about", keywords: "system info hardware cpu gpu memory disk kernel version" },
         { id: "updates", group: "SYSTEM", icon: "󰚰", label: "Updates", view: "updates", keywords: "upgrade pacman paru aur flatpak" },
         { id: "packages", group: "SYSTEM", icon: "󰏖", label: "Packages", view: "packages", keywords: "install remove uninstall pacman aur flatpak orphans cache" },
@@ -171,6 +220,20 @@ Scope {
         { id: "power", group: "SYSTEM", icon: "󰂄", label: "Power", sections: [
             { title: "MODE", rows: [ { kind: "power" } ]},
         ]},
+        { id: "storage", icon: "󰋊", label: "Storage", view: "storage",
+          keywords: "disk space clean cache trash smart health free" },
+        { id: "timelang", icon: "󰥔", label: "Time & language", view: "timelang",
+          keywords: "date clock timezone ntp locale language region formats" },
+        { id: "account", icon: "󰀄", label: "Account", view: "account",
+          keywords: "user password name shell keyring login" },
+        { id: "privacy", icon: "󰒃", label: "Privacy", view: "privacy",
+          keywords: "microphone camera screen sharing recent files thumbnails" },
+        { id: "backup", icon: "󰁯", label: "Backup", view: "backup",
+          keywords: "snapshot snapper btrfs restore export import" },
+        { id: "printers", icon: "󰐪", label: "Printers", view: "printers",
+          keywords: "print cups queue scanner" },
+        { id: "gaming", icon: "󰊴", label: "Gaming", view: "gaming",
+          keywords: "gamemode mangohud fps overlay steam gamescope" },
         { id: "tools", group: "SYSTEM", icon: "󰒓", label: "Tools", sections: [
             { title: "SYSTEM TOOLS", rows: [ { kind: "tools" } ]},
             { title: "MAINTENANCE", rows: [
@@ -180,6 +243,25 @@ Scope {
         ]},
     ]
 
+    // Pořadí v postranním panelu: skupiny jdou za sebou a každá jen jednou, bez
+    // ohledu na to, kde je stránka v pageList (a jakou skupinu tam má napsanou)
+    readonly property var groups: [
+        { name: "SYSTEM", ids: ["about", "displays", "network", "sound", "bluetooth", "power", "storage", "updates",
+                                "packages", "timelang", "account", "privacy", "backup", "printers", "firewall", "tools"] },
+        { name: "APPS", ids: ["apps", "shortcuts", "history", "gaming"] },
+        { name: "PERSONALIZATION", ids: ["appearance", "windows", "theme", "keyboard", "mouse", "notifications",
+                                         "nightlight", "accessibility"] },
+    ]
+    readonly property var pages: {
+        // QML seznam není JS pole (chybí mu flatMap) — nejdřív převést
+        const gs = Array.from(groups), all = Array.from(pageList)
+        const listed = [].concat(...gs.map(g => Array.from(g.ids)))
+        const out = [].concat(...gs.map(g => Array.from(g.ids).map(id => all.find(p => p.id === id))
+                                           .filter(p => p).map(p => Object.assign({}, p, { group: g.name }))))
+        // Stránka, kterou někdo zapomněl zařadit, skončí na konci Systému — ne zmizí
+        return out.concat(all.filter(p => !listed.includes(p.id)).map(p => Object.assign({}, p, { group: "OTHER" })))
+    }
+
     PersistentProperties {
         id: persist
         reloadableId: "rpSettings"
@@ -187,16 +269,20 @@ Scope {
         property int page: 0
     }
 
-    function open()   { persist.open = true }
+    // Otevření okna začíná na About; odkaz na konkrétní stránku (openPage) ne
+    function open() {
+        if (!persist.open) persist.page = Math.max(0, pages.findIndex(p => p.id === "about"))
+        persist.open = true
+    }
     function hide()   { persist.open = false }
-    function toggle() { persist.open = !persist.open }
+    function toggle() { if (persist.open) hide(); else open() }
 
     // `rp-shell settings theme` apod. — otevřít rovnou na stránce
     function openPage(name) {
         const i = pages.findIndex(p => p.id === name || p.label.toLowerCase() === name)
         if (i < 0) return false
         persist.page = i
-        open()
+        persist.open = true
         return true
     }
 
@@ -231,8 +317,9 @@ Scope {
             property var updatesCache: null
             property alias job: jobPanel
 
-            readonly property var pages: outer.pages
-            readonly property var page: pages[persist.page]
+            readonly property var pages: outer.pages ?? []
+            // Pojistka: při (re)loadu může být seznam ještě prázdný nebo index mimo
+            readonly property var page: pages[persist.page] ?? pages[0] ?? ({ id: "", label: "", sections: [] })
 
             // Hledání: řádky s klíčem nebo tlačítkem a systémové stránky podle názvu
             readonly property var results: {
@@ -269,8 +356,19 @@ Scope {
                 toolsProc.running = true
             }
 
+            property bool errorIsInfo: false
+
             function showError(msg) {
+                errorIsInfo = false
                 error = msg
+                errorTimer.restart()
+            }
+
+            // Stejná bublina, ale neutrální (potvrzení akce, ne chyba)
+            function showInfo(msg) {
+                errorIsInfo = true
+                error = msg
+                errorTimer.interval = 2500
                 errorTimer.restart()
             }
 
@@ -308,6 +406,7 @@ Scope {
                 else if (name === "theme") applyTheme()
                 else if (name === "reset") run(["rp-settings", "reset"])
                 else if (name === "lock") Quickshell.execDetached(["swaylock", "-f"])
+                else if (name === "orca") Quickshell.execDetached(["sh", "-c", "pkill orca || exec orca"])
                 else if (name === "test-notify")
                     Quickshell.execDetached(["notify-send", "-a", "Settings", "Test notification",
                                              "This is how notifications look now."])
@@ -350,7 +449,7 @@ Scope {
                 }
             }
 
-            Timer { id: errorTimer; interval: 7000; onTriggered: root.error = "" }
+            Timer { id: errorTimer; interval: 7000; onTriggered: { root.error = ""; interval = 7000 } }
 
             Process {
                 id: dumpProc
@@ -427,11 +526,16 @@ Scope {
             }
 
             // Bez argumentu by apply-wallpaper-theme.sh u stejné tapety nic neudělal —
-            // s cestou k aktuální tapetě téma přegeneruje
+            // s cestou k aktuální tapetě téma přegeneruje. Spouští se přes
+            // `setsid -f`: matugen uprostřed běhu přepíše Colors.js, quickshell se
+            // přenačte a zabil by i skript, kdyby byl potomkem tohohle okna
+            // (a nechal by po sobě zámek). Tenhle proces jen čeká, než zámek zmizí.
             Process {
                 id: themeProc
-                command: ["bash", "-c", "$HOME/.local/bin/apply-wallpaper-theme.sh "
-                    + "\"$(cat \"${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/current-wallpaper-source\")\""]
+                command: ["bash", "-c",
+                    'c="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"; '
+                    + 'setsid -f "$HOME/.local/bin/apply-wallpaper-theme.sh" "$(cat "$c/current-wallpaper-source")" >/dev/null 2>&1; '
+                    + 'sleep 1; while [ -d "$c/theme-apply.lock.d" ]; do sleep 0.5; done']
                 onExited: root.applyingTheme = false
             }
 
@@ -686,13 +790,14 @@ Scope {
                     }
 
                     // Stránky — posuvné, ať se vejdou i na nižší okno
+                    SWheel { flick: navFlick }
                     Flickable {
                         id: navFlick
                         anchors { left: parent.left; right: parent.right; top: nav.bottom; bottom: parent.bottom; leftMargin: 14; rightMargin: 14; bottomMargin: 14 }
                         contentHeight: navCol.implicitHeight
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
-                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                        ScrollBar.vertical: SScrollBar {}
 
                         Column {
                             id: navCol
@@ -789,6 +894,7 @@ Scope {
                     }
 
                     // Stránky nastavení: sekce s nadpisem a řádky
+                    SWheel { flick: flick }
                     Flickable {
                         id: flick
                         visible: root.query !== "" || !root.page.view
@@ -796,7 +902,7 @@ Scope {
                         contentHeight: pageCol.implicitHeight + 32
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
-                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                        ScrollBar.vertical: SScrollBar {}
 
                         Column {
                             id: pageCol
@@ -835,7 +941,12 @@ Scope {
                         anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: 12 }
                         active: root.query === "" && !!root.page.view
                         sourceComponent: ({ about: aboutC, updates: updatesC, packages: packagesC, firewall: firewallC,
-                                            network: networkC, sound: soundC })[root.page.view] ?? null
+                                            network: networkC, sound: soundC, bluetooth: bluetoothC,
+                                            displays: displaysC, shortcuts: shortcutsC,
+                                            apps: appsC, history: historyC, nightlight: nightlightC,
+                                            storage: storageC, timelang: timelangC, account: accountC,
+                                            privacy: privacyC, backup: backupC, printers: printersC,
+                                            gaming: gamingC })[root.page.view] ?? null
                     }
                     Component { id: aboutC; AboutPage { host: root } }
                     Component { id: updatesC; UpdatesPage { host: root } }
@@ -843,6 +954,19 @@ Scope {
                     Component { id: firewallC; FirewallPage { host: root } }
                     Component { id: networkC; NetworkPage { host: root } }
                     Component { id: soundC; SoundPage { host: root } }
+                    Component { id: bluetoothC; BluetoothPage { host: root } }
+                    Component { id: displaysC; DisplaysPage { host: root } }
+                    Component { id: shortcutsC; ShortcutsPage { host: root } }
+                    Component { id: appsC; AppsPage { host: root } }
+                    Component { id: historyC; HistoryPage { host: root } }
+                    Component { id: nightlightC; NightLightPage { host: root } }
+                    Component { id: storageC; StoragePage { host: root } }
+                    Component { id: timelangC; TimeLanguagePage { host: root } }
+                    Component { id: accountC; AccountPage { host: root } }
+                    Component { id: privacyC; PrivacyPage { host: root } }
+                    Component { id: backupC; BackupPage { host: root } }
+                    Component { id: printersC; PrintersPage { host: root } }
+                    Component { id: gamingC; GamingPage { host: root } }
 
                     // Log akcí (aktualizace, instalace, firewall) — vyjede zespodu
                     SJob {
@@ -866,9 +990,9 @@ Scope {
                     width: Math.min(contentArea.width, errText.implicitWidth + 32)
                     height: errText.implicitHeight + 18
                     radius: 10
-                    color: Qt.alpha(Colors.errorColor, 0.18)
+                    color: Qt.alpha(root.errorIsInfo ? Colors.primary : Colors.errorColor, 0.18)
                     border.width: 1
-                    border.color: Qt.alpha(Colors.errorColor, 0.6)
+                    border.color: Qt.alpha(root.errorIsInfo ? Colors.primary : Colors.errorColor, 0.6)
                     Text {
                         id: errText
                         anchors.centerIn: parent

@@ -443,14 +443,26 @@ straight away, since it costs nothing to undo. Shut down is `systemctl poweroff`
 
 ## Settings window
 
-`Mod+S` (`rp-shell settings toggle`, or `rp-shell settings <page>` to open a
-page directly: `network`, `sound`, `appearance`, `windows`, `theme`, `keyboard`,
-`mouse`, `notifications`, `about`, `updates`, `packages`, `firewall`, `power`,
-`tools`)
-opens `Settings.qml`. It is also in the
-launcher as **Settings** (`.local/share/applications/rp-settings.desktop`). It is
-a normal floating toplevel rather than a layer, so it can be moved and niri
-animates it (window-rule on the title `RPRice Settings`).
+`Mod+S` (`rp-shell settings toggle`) opens `Settings.qml` on **About**;
+`rp-shell settings <page>` opens a page directly (waybar's volume right-click
+and the audio flyout's "Sound settings" open `sound`). It is in the launcher as
+**RPSettings** (`.local/share/applications/rp-settings.desktop`). It is a normal
+floating toplevel rather than a layer, so it can be moved and niri animates it
+(window-rule on the title `RPRice Settings`).
+
+The sidebar has three groups in a fixed order, each exactly once: **System**
+(About, Displays, Network, Sound, Bluetooth, Power, Storage, Updates, Packages,
+Time & language, Account, Privacy, Backup, Printers, Firewall, Tools), **Apps**
+(Applications, Shortcuts, History, Gaming) and **Personalization** (Appearance,
+Windows, Theme, Keyboard, Mouse & touchpad, Notifications & idle, Night light,
+Accessibility). The order comes from `groups` in `Settings.qml`, not from where
+a page sits in `pageList`, so adding a page can't split a group again.
+
+Scrolling: Qt moves a `Flickable` only a few pixels per wheel notch, so every
+list has `SWheel`: ~3 lines per notch with a short ease-out (the next notch
+continues from the animation's target), touchpad deltas 1:1. It sits on top of
+the list, so the wheel no longer changes a slider or dropdown the page is
+scrolling past. `SScrollBar` is thin and only shows while scrolling or hovered.
 
 About 65 options across the pages: gaps, corner radius, focus ring, inactive
 opacity, shadows, blur, animation speed; column width and display, centering,
@@ -567,6 +579,44 @@ reloads the whole shell. The open state and page live in `PersistentProperties`
 (the wrapping `Scope` needs a `reloadableId` for that), so the window comes back
 where it was. `qs ipc call shell reload` is a *hard* reload and drops that state
 on purpose.
+
+**Regenerate theme** runs `apply-wallpaper-theme.sh` through `setsid -f`. As a
+child of the window it was killed halfway: matugen rewrites `Colors.js`,
+quickshell reloads and takes its children with it. SIGKILL skips the `trap`, so
+`theme-apply.lock.d` stayed behind, and every later run just queued itself as
+pending and exited. That broke the wallpaper picker too. The lock now holds the
+owner's PID, and a lock whose owner is dead is taken over. A lock without a PID,
+left by the older script, is taken over only after 10 minutes.
+
+### More pages and their backends
+
+| Page | Backend | Notes |
+|---|---|---|
+| Bluetooth | `Quickshell.Bluetooth` (BlueZ over D-Bus) | no script; scanning stops when you leave the page |
+| Displays | `rp-display` | applies live (`niri msg output`), saves `~/.config/niri/displays.kdl` (included last, same output names as `config.kdl` so the blocks override) **and** the matching kanshi profile, since kanshi reapplies modes/positions on every hotplug. `on` isn't valid KDL for outputs, so enabling = leaving out `off` |
+| Shortcuts | `rp-keys` (Python) | edits the bind line in `config.kdl` in place (an include can add a bind but not remove one, so a remap would leave the old key working), `niri validate` + rollback; disabling uses KDL slashdash `/-`; the same edit goes to `~/dotfiles` when the line is identical there. While waiting for a key, `ShortcutInhibitor` pauses niri's binds so taken combos reach the window |
+| Applications | `rp-apps` (Python) | defaults via `xdg-mime` (mimeapps.list); autostart = `~/.config/autostart` overrides of `/etc/xdg/autostart` (systemd's xdg-autostart generator starts them); hiding = a `NoDisplay` copy in `~/.local/share/applications` |
+| History | `rp-history` (Python) | mako's `ListHistory` over D-Bus (has body/icon, unlike `makoctl history`), cliphist with image thumbnails, zsh `EXTENDED_HISTORY` (metafied bytes decoded) |
+| Night light | `rp-settings` `nightlight.*` | wlsunset over wlr-gamma-control (niri has none of its own); the page offers to install it |
+| Storage, Time & language, Account, Privacy, Gaming, Printers, Backup | `rp-sys` | cleanups double-confirm; timezone/locale/NTP go through polkit via timedatectl/localectl; missing locales are generated first; passwd/chfn/chsh open in kitty (interactive); snapper needs root even to list, so listing is a polkit job; the waybar clock format is edited in its config and waybar restarted |
+
+`rp-settings` got the niri style options that were off or implicit: border
+(its colors come from `theme-colors.kdl`, written by `30-niri.sh`, so they follow
+the wallpaper), tab indicator, insert hint, struts, shadow offset,
+`prefer-no-csd` and the startup cheat sheet (both flags, so they moved out of
+`config.kdl` like the input flags), GTK text scaling. A string schema entry may
+contain `|` in its regex: `read` gives the rest of the line to the last field,
+and `validate` joins it back.
+
+### Polkit agent
+
+`PolkitDialog.qml` is the session's polkit agent (`Quickshell.Services.Polkit`),
+replacing polkit-gnome. It is a full-screen `rp-overlay` layer with a blurred
+backdrop and a centred card animated by `PopAnim`: action message, the identity,
+a password field, PAM's error on a wrong password (the request stays open and
+the field clears), Cancel / Authenticate, Enter/Esc. Only one agent can be
+registered, so polkit-gnome must not run (nothing starts it any more). Cancelling
+counts as a failed attempt for `pam_faillock`, the same as a wrong password.
 
 ## Power modes
 

@@ -146,13 +146,14 @@ Rectangle {
         color: Qt.alpha(Colors.outlineVariant, 0.6)
     }
 
+    SWheel { flick: logView }
     ListView {
         id: logView
         anchors { left: parent.left; right: parent.right; top: header.bottom; bottom: parent.bottom; margins: 14; topMargin: 10 }
         clip: true
         model: lines
         boundsBehavior: Flickable.StopAtBounds
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: SScrollBar {}
         delegate: SMono {
             required property string line
             width: logView.width - 12

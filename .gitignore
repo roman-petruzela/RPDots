@@ -28,6 +28,7 @@ __pycache__/
 
 # Generované skriptem rp-settings (hodnoty v ~/.config/niri-rice/settings.json)
 .config/niri/settings.kdl
+.config/niri/displays.kdl
 
 # Osobní / lokální
 .config/niri/theme-colors.kdl

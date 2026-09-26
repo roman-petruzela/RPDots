@@ -94,13 +94,14 @@ Item {
         }
     }
 
+    SWheel { flick: flick }
     Flickable {
         id: flick
         anchors.fill: parent
         contentHeight: col.implicitHeight + 32
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: SScrollBar {}
 
         Column {
             id: col

@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""rp-keys — klávesové zkratky niri pro okno Settings (stránka Shortcuts).
+
+  rp-keys list                     všechny bindy z config.kdl (JSON)
+  rp-keys remap <klávesa> <nová>   přemapuje bind na jinou klávesu
+  rp-keys disable <klávesa>        vypne bind (KDL slashdash /-, jde vrátit)
+  rp-keys enable <klávesa>         zapne vypnutý bind
+  rp-keys add <klávesa> <akce…>    přidá bind: `spawn kitty`, `close-window`, …
+  rp-keys remove <klávesa>         smaže bind přidaný z okna
+
+Bindy žijí v bloku `binds { }` v ~/.config/niri/config.kdl, jeden na řádek.
+Na rozdíl od ostatních nastavení se neukládají do generovaného include:
+bind z include jde přidat, ale ne odebrat, takže přemapování by starou
+klávesu nechalo pořád aktivní. Upravuje se proto přímo řádek v config.kdl.
+Každá změna projde `niri validate`, při chybě se soubor vrátí.
+
+~/dotfiles je kopie, ne symlink. Když má řádek v repu stejný obsah jako
+v živém configu, upraví se i tam, ať se změna dá commitnout.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+LIVE = os.path.expanduser("~/.config/niri/config.kdl")
+REPO = os.path.expanduser("~/dotfiles/.config/niri/config.kdl")
+ADDED_MARK = "// rp-keys"   # komentář za bindy přidanými z okna
+
+# Klávesa: modifikátory + jedna klávesa (XKB název, Mouse*, Wheel*, Touchpad*)
+KEY_RE = re.compile(r"^(?:(?:Mod|Super|Ctrl|Control|Alt|Shift|ISO_Level3_Shift|ISO_Level5_Shift|Win)\+)*[A-Za-z0-9_]+$")
+LINE_RE = re.compile(r"^(?P<indent>\s*)(?P<off>/-)?(?P<key>[A-Za-z0-9_+]+)(?P<props>(?:\s+[a-z-]+=(?:\"[^\"]*\"|\S+))*)\s*\{\s*(?P<body>.*?)\s*\}\s*(?P<tail>//.*)?$")
+
+
+def die(msg):
+    print(f"rp-keys: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def binds_range(lines):
+    start = next((i for i, l in enumerate(lines) if re.match(r"^binds\s*\{", l)), None)
+    if start is None:
+        die("no binds block in config.kdl")
+    depth = 0
+    for i in range(start, len(lines)):
+        depth += lines[i].count("{") - lines[i].count("}")
+        if depth == 0:
+            return start, i
+    die("unterminated binds block")
+
+
+def parse(lines):
+    start, end = binds_range(lines)
+    out, comment = [], []
+    for i in range(start + 1, end):
+        raw = lines[i]
+        s = raw.strip()
+        if s.startswith("//"):
+            comment.append(s.lstrip("/ ").strip())
+            continue
+        m = LINE_RE.match(raw)
+        if not m:
+            comment = []
+            continue
+        props = dict(re.findall(r"([a-z-]+)=(\"[^\"]*\"|\S+)", m["props"] or ""))
+        body = m["body"].rstrip(";").strip()
+        action = body.split()[0] if body else ""
+        args = body[len(action):].strip()
+        # hotkey-overlay-title=null jen schová bind z přehledu niri, není to popisek
+        title = props.get("hotkey-overlay-title", "").strip('"')
+        if title == "null":
+            title = ""
+        out.append({
+            "line": i,
+            "key": m["key"],
+            "enabled": not m["off"],
+            "action": action,
+            "args": args,
+            "title": title,
+            "comment": " ".join(comment[-2:]),
+            "added": ADDED_MARK in (m["tail"] or ""),
+            "repeat": props.get("repeat") != "false",
+            "locked": props.get("allow-when-locked") == "true",
+        })
+        comment = []
+    return out
+
+
+def read(path):
+    with open(path) as f:
+        return f.read().split("\n")
+
+
+def validate():
+    return subprocess.run(["niri", "validate"], capture_output=True).returncode == 0
+
+
+def write_checked(new_lines, old_lines):
+    """Zapíše živý config; když ho niri odmítne, vrátí původní."""
+    backup = tempfile.mktemp()
+    shutil.copy(LIVE, backup)
+    with open(LIVE, "w") as f:
+        f.write("\n".join(new_lines))
+    if not validate():
+        shutil.copy(backup, LIVE)
+        os.unlink(backup)
+        die("niri rejected the change (conflicting or invalid key?), config restored")
+    os.unlink(backup)
+
+
+def mirror(old_line, new_line, insert_after=None):
+    """Stejnou změnu do repa, pokud tam je stejný řádek."""
+    if not os.path.exists(REPO) or os.path.realpath(REPO) == os.path.realpath(LIVE):
+        return
+    lines = read(REPO)
+    if insert_after is not None:
+        if insert_after in lines:
+            idx = len(lines) - 1 - lines[::-1].index(insert_after)
+            lines.insert(idx + 1, new_line)
+        else:
+            return
+    elif old_line in lines:
+        lines[lines.index(old_line)] = new_line
+        if new_line is None:
+            lines.remove(None)
+    else:
+        return
+    with open(REPO, "w") as f:
+        f.write("\n".join(l for l in lines if l is not None))
+
+
+def find(binds, key):
+    b = next((b for b in binds if b["key"] == key), None)
+    if not b:
+        die(f"no bind for {key}")
+    return b
+
+
+def check_key(key, binds, ignore=None):
+    if not KEY_RE.match(key):
+        die(f"invalid key: {key} (use e.g. Mod+Shift+K)")
+    clash = next((b for b in binds if b["key"].lower() == key.lower() and b["key"] != ignore and b["enabled"]), None)
+    if clash:
+        die(f"{key} is already bound to {clash['action']} {clash['args']}".strip())
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "list"
+    lines = read(LIVE)
+    binds = parse(lines)
+
+    if cmd == "list":
+        print(json.dumps(binds, ensure_ascii=False))
+        return
+
+    if cmd == "remap" and len(args) == 3:
+        old, new = args[1], args[2]
+        b = find(binds, old)
+        check_key(new, binds, ignore=old)
+        line = lines[b["line"]]
+        idx = line.index(old)
+        lines[b["line"]] = line[:idx] + new + line[idx + len(old):]
+        write_checked(lines, None)
+        mirror(line, lines[b["line"]])
+    elif cmd in ("disable", "enable") and len(args) == 2:
+        b = find(binds, args[1])
+        line = lines[b["line"]]
+        stripped = line.lstrip()
+        indent = line[:len(line) - len(stripped)]
+        if cmd == "disable" and b["enabled"]:
+            lines[b["line"]] = indent + "/-" + stripped
+        elif cmd == "enable" and not b["enabled"]:
+            check_key(b["key"], binds, ignore=b["key"])
+            lines[b["line"]] = indent + stripped[2:]
+        else:
+            return
+        write_checked(lines, None)
+        mirror(line, lines[b["line"]])
+    elif cmd == "add" and len(args) >= 3:
+        key, action, rest = args[1], args[2], args[3:]
+        check_key(key, binds)
+        if not re.match(r"^[a-z][a-z0-9-]*$", action):
+            die(f"invalid action: {action}")
+        # Argumenty: čísla nechat, zbytek jako KDL řetězce
+        kdl_args = " ".join(a if re.match(r"^-?\d+(\.\d+)?$", a) else json.dumps(a) for a in rest)
+        body = f"{action} {kdl_args}".strip()
+        _, end = binds_range(lines)
+        new_line = f"    {key} {{ {body}; }} {ADDED_MARK}"
+        prev = lines[end - 1]
+        lines.insert(end, new_line)
+        write_checked(lines, None)
+        mirror(None, new_line, insert_after=prev)
+    elif cmd == "remove" and len(args) == 2:
+        b = find(binds, args[1])
+        if not b["added"]:
+            die("only binds added from Settings can be removed; disable the others")
+        line = lines.pop(b["line"])
+        write_checked(lines, None)
+        mirror(line, None)
+    else:
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

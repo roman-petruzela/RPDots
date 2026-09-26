@@ -202,6 +202,9 @@ ShellRoot {
 
     Settings { id: settingsWindow }
 
+    // Polkit agent (dialog na heslo pro pkexec, systemctl, firewalld…) — místo polkit-gnome
+    PolkitDialog {}
+
     NiriState { id: niri }
 
     WorkspaceSwitcher {
