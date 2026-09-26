@@ -10,6 +10,13 @@ CONFIG_HASH_FILE="$STATE_DIR/waybar-config.sha"
 
 mkdir -p "$STATE_DIR"
 
+# Panelem je quickshell (rp-bar use quickshell) — waybar nespouštět, a kdyby
+# běžel, zastavit ho
+if [[ "$(cat "$HOME/.config/niri-rice/bar" 2>/dev/null)" == quickshell ]]; then
+  systemctl --user stop waybar.service 2>/dev/null || true
+  exit 0
+fi
+
 if [[ -f "$SESSION_ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090

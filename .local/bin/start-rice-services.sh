@@ -91,7 +91,8 @@ if ! "$HOME/.local/bin/apply-wallpaper-theme.sh" --no-daemon-restart; then
 fi
 
 write_session_env
-start_waybar_with_retry || true
+# Panelem může být místo waybaru quickshell (rp-bar) — pak waybar vůbec nezkoušet
+[[ "$(cat "$HOME/.config/niri-rice/bar" 2>/dev/null)" == quickshell ]] || start_waybar_with_retry || true
 
 start_user_unit niri-rice-playerctld.service >/dev/null 2>&1 || true
 start_user_unit niri-rice-wallpaper-healthcheck.service >/dev/null 2>&1 || true

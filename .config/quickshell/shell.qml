@@ -6,13 +6,29 @@ import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import "."
+import "bar"
 
 ShellRoot {
     id: root
 
-    // Barem je waybar — quickshell tu jede jen kvůli OSD, dashboardu
-    // a přepínači zvuku. Přepni na true, pokud chceš zpátky qs bar.
-    property bool useBar: false
+    // Horní panel: waybar, nebo bar/TopBar.qml. Volbu drží ~/.config/niri-rice/bar
+    // (přepíná `rp-bar`): "waybar" (výchozí), "quickshell" = na všech monitorech,
+    // "test:<výstup>" = qs panel jen na jednom monitoru vedle waybaru, na zkoušení.
+    FileView {
+        id: barFlag
+        path: Quickshell.env("HOME") + "/.config/niri-rice/bar"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+    }
+    readonly property string barMode: (barFlag.text() || "waybar").trim()
+    readonly property var barScreens: barMode === "quickshell" ? Quickshell.screens
+        : barMode.startsWith("test:") ? Quickshell.screens.filter(s => s.name === barMode.slice(5))
+        : []
+
+    BarData { id: barSource; active: root.barScreens.length > 0 }
+    // Pod jiným jménem: v delegátu by `niri: niri` ukazovalo samo na sebe
+    readonly property var niriRef: niri
 
     IpcHandler {
         target: "dashboard"
@@ -170,8 +186,8 @@ ShellRoot {
 
     // Bar on every connected screen
     Variants {
-        model: root.useBar ? Quickshell.screens : []
-        delegate: Bar {}
+        model: root.barScreens
+        delegate: TopBar { barData: barSource; niri: root.niriRef }
     }
 
     Dashboard {

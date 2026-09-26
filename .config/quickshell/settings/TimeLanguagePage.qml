@@ -48,15 +48,16 @@ Item {
         }
     }
 
-    // Formáty hodin ve waybaru (strftime ve {:…}); ikona hodin zůstává
+    // Formáty hodin ve waybaru (strftime ve {:…}); začínají ikonou hodin (U+F017),
+    // bez ní by výběr formátu ikonu z waybaru smazal
     readonly property var clockFormats: [
-        { f: "  {:%d.%m. %H:%M}", label: "26.09. 14:30" },
-        { f: "  {:%H:%M}", label: "14:30" },
-        { f: "  {:%H:%M:%S}", label: "14:30:05" },
-        { f: "  {:%a %d.%m. %H:%M}", label: "Sat 26.09. 14:30" },
-        { f: "  {:%A %d. %B %H:%M}", label: "Saturday 26. September 14:30" },
-        { f: "  {:%I:%M %p}", label: "02:30 PM" },
-        { f: "  {:%Y-%m-%d %H:%M}", label: "2026-09-26 14:30" },
+        { f: "  {:%d.%m. %H:%M}", label: "26.09. 14:30" },
+        { f: "  {:%H:%M}", label: "14:30" },
+        { f: "  {:%H:%M:%S}", label: "14:30:05" },
+        { f: "  {:%a %d.%m. %H:%M}", label: "Sat 26.09. 14:30" },
+        { f: "  {:%A %d. %B %H:%M}", label: "Saturday 26. September 14:30" },
+        { f: "  {:%I:%M %p}", label: "02:30 PM" },
+        { f: "  {:%Y-%m-%d %H:%M}", label: "2026-09-26 14:30" },
     ]
 
     readonly property var localeChoices: {

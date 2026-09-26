@@ -441,6 +441,38 @@ inline confirmation first (clicking the button again cancels); lock fires
 straight away, since it costs nothing to undo. Shut down is `systemctl poweroff`
 — it used to be `niri msg action quit`, which only ended the session.
 
+## Top bar (quickshell)
+
+`bar/TopBar.qml` (one per monitor) with shared `bar/BarData.qml` is a
+replacement for waybar that behaves the same and looks like the rest of the
+quickshell windows.
+
+- **Left:** the workspaces of that monitor (empty ones hidden, like
+  `hide-empty`), the window focused on that monitor, cava.
+- **Centre:** the clock. It is anchored to the centre; the left and right sides
+  have their width capped at the clock's edges and get clipped, so the clock
+  never moves.
+- **Right:** network ↓↑ and VPN, CPU, GPU, memory and temperature, volume,
+  battery and brightness, tray, power (dashboard).
+
+The data comes from the same sources as waybar: the `waybar-*.sh` scripts,
+`/proc`, `thermal_zone0`, PipeWire, UPower and brightnessctl. Clicks, the
+wheel and tooltips work like waybar's.
+
+`rp-bar use waybar|quickshell` switches between the two, and
+`rp-bar test <output>` shows the qs bar on one monitor under waybar for trying
+it out. The choice lives in `~/.config/niri-rice/bar`; `shell.qml` watches the
+file, and `waybar-watchdog.sh` / `start-rice-services.sh` leave waybar stopped
+when it says `quickshell`. The Nerd Font icons are `\u` escapes in QML: typed as
+literal characters they got lost when edited, which is also how the waybar clock
+lost its icon.
+
+A `Variants` delegate must not bind a property to an id with the same name
+(`niri: niri`): inside the delegate the name resolves to the delegate's own
+property, which stays undefined. Hence `root.niriRef`. And no property may be
+called `data`, because that is the default property that holds an item's
+children.
+
 ## Settings window
 
 `Mod+S` (`rp-shell settings toggle`) opens `Settings.qml` on **About**;
@@ -607,7 +639,7 @@ left by the older script, is taken over only after 10 minutes.
 | Page | Backend | Notes |
 |---|---|---|
 | Bluetooth | `Quickshell.Bluetooth` (BlueZ over D-Bus) | no script; scanning stops when you leave the page |
-| Displays | `rp-display` | applies live (`niri msg output`), saves `~/.config/niri/displays.kdl` (included last, same output names as `config.kdl` so the blocks override) **and** the matching kanshi profile, since kanshi reapplies modes/positions on every hotplug. `on` isn't valid KDL for outputs, so enabling = leaving out `off` |
+| Displays | `rp-display` | dragging snaps live to other monitors' edges (sides, top/bottom, start/end/centre alignment) and the top-left corner to 0,0, never overlapping; changes go straight to `rp-display`, not through the job panel (a running update would silently block them); applies live (`niri msg output`), saves `~/.config/niri/displays.kdl` (included last, same output names as `config.kdl` so the blocks override) **and** the matching kanshi profile, since kanshi reapplies modes/positions on every hotplug. `on` isn't valid KDL for outputs, so enabling = leaving out `off` |
 | Shortcuts | `rp-keys` (Python) | edits the bind line in `config.kdl` in place (an include can add a bind but not remove one, so a remap would leave the old key working), `niri validate` + rollback; disabling uses KDL slashdash `/-`; the same edit goes to `~/dotfiles` when the line is identical there. While waiting for a key, `ShortcutInhibitor` pauses niri's binds so taken combos reach the window |
 | Applications | `rp-apps` (Python) | defaults via `xdg-mime` (mimeapps.list); autostart = `~/.config/autostart` overrides of `/etc/xdg/autostart` (systemd's xdg-autostart generator starts them); hiding = a `NoDisplay` copy in `~/.local/share/applications` |
 | History | `rp-history` (Python) | mako's `ListHistory` over D-Bus (has body/icon, unlike `makoctl history`), cliphist with image thumbnails, zsh `EXTENDED_HISTORY` (metafied bytes decoded) |

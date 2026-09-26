@@ -12,8 +12,8 @@ import "../Colors.js" as Colors
 //               ["kitty", "--hold", "-e", "sudo", "pacman", "-Syu"], code => reload())
 //
 // Za běhu nejde zavřít ani zrušit: přerušený pacman uprostřed transakce by
-// nechal systém napůl aktualizovaný. Terminálová varianta spustí totéž
-// v kitty, kde jde odpovídat na dotazy pacmanu.
+// nechal systém napůl aktualizovaný. Tlačítko Terminal ukáže tutéž běžící
+// akci v kitty (její log), nespouští ji znovu.
 //
 // Akce neběží jako potomek tohohle okna: spouští je `rp-job` přes setsid
 // a panel jen čte jejich log (`tail -F`). Reload quickshellu (nová tapeta,
@@ -197,10 +197,14 @@ Rectangle {
             id: buttons
             anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
             spacing: 8
+            // Tatáž běžící akce v kitty (ne nové spuštění): výstup od začátku
+            // a dál živě, `tail --pid` skončí s akcí
             SButton {
-                visible: job.terminalCommand.length > 0 && !job.running
+                visible: job.started
                 icon: "󰆍"; text: "Terminal"
-                onClicked: Quickshell.execDetached(job.terminalCommand)
+                onClicked: Quickshell.execDetached(["kitty", "--title", "RPSettings: " + job.title, "-e", "bash", "-c",
+                    'd="$XDG_RUNTIME_DIR/rp-job"; tail -n +1 -F --pid="$(cat "$d/pid")" "$d/log" 2>/dev/null; '
+                    + 'echo; read -rsn1 -p "Press any key to close…"'])
             }
             SButton {
                 icon: "󰆏"; text: ""

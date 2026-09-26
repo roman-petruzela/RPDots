@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# rp-bar — který horní panel běží: waybar, nebo quickshell (bar/TopBar.qml).
+#
+#   rp-bar                      aktuální volba
+#   rp-bar use waybar           waybar (výchozí)
+#   rp-bar use quickshell       qs panel na všech monitorech, waybar se zastaví
+#   rp-bar test <výstup>        qs panel jen na jednom monitoru vedle waybaru
+#
+# Volbu drží ~/.config/niri-rice/bar; shell.qml ho sleduje (FileView) a
+# waybar-watchdog.sh podle něj waybar nespouští, když je panelem quickshell.
+set -euo pipefail
+FLAG="$HOME/.config/niri-rice/bar"
+mkdir -p "$(dirname "$FLAG")"
+
+case "${1:-}" in
+    "") cat "$FLAG" 2>/dev/null || echo waybar ;;
+    use)
+        case "${2:-}" in
+            waybar)
+                echo waybar > "$FLAG"
+                systemctl --user start waybar.service ;;
+            quickshell)
+                echo quickshell > "$FLAG"
+                systemctl --user stop waybar.service ;;
+            *) echo "usage: rp-bar use waybar|quickshell" >&2; exit 1 ;;
+        esac ;;
+    test)
+        [[ -n "${2:-}" ]] || { echo "usage: rp-bar test <output>" >&2; exit 1; }
+        echo "test:$2" > "$FLAG" ;;
+    *) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1 ;;
+esac

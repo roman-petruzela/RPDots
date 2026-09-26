@@ -22,10 +22,21 @@ Item {
         listProc.running = true
     }
 
-    function set(key, value) {
-        host.job.start("Display " + sel.name + ": " + key + " → " + value,
-                       ["rp-display", "set", sel.name, key, String(value)], [],
-                       code => { page.reload(); if (code === 0) page.host.job.open = false })
+    // Napřímo, ne přes sdílený panel akcí: ten běžící aktualizace blokuje
+    // a změna displeje by se pak potichu neprovedla
+    function set(key, value, output) {
+        setProc.running = false
+        setProc.command = [Quickshell.env("HOME") + "/.local/bin/rp-display", "set",
+                           output ?? sel.name, key, String(value)]
+        setProc.running = true
+    }
+
+    Process {
+        id: setProc
+        stderr: StdioCollector {
+            onStreamFinished: if (text.trim() !== "") page.host.showError(text.trim().replace(/^rp-display: /, ""))
+        }
+        onExited: page.reload()
     }
 
     Component.onCompleted: reload()
@@ -44,8 +55,17 @@ Item {
         }
     }
 
+    // Tažení: jméno taženého monitoru, jeho logická pozice po přichycení a
+    // rozměry náhledu zmrazené na začátku tažení (jinak by se náhled pod
+    // myší přeměřoval)
+    property string dragName: ""
+    property real dragX: 0
+    property real dragY: 0
+    property var frozen: null
+
     // Rozměry náhledu: všechny zapnuté monitory se vejdou do plochy
-    readonly property var bounds: {
+    readonly property var bounds: frozen ?? liveBounds
+    readonly property var liveBounds: {
         const on = outputs.filter(o => o.enabled)
         if (on.length === 0) return { x: 0, y: 0, w: 1, h: 1 }
         const x0 = Math.min(...on.map(o => o.x)), y0 = Math.min(...on.map(o => o.y))
@@ -53,24 +73,35 @@ Item {
         return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
     }
 
-    // Po puštění: přichytit k nejbližší hraně jiného monitoru (vedle / nad / pod)
+    // Přichycení za tažení: každá osa zvlášť k nejbližší hraně jiného monitoru
+    // (vedle, nad, pod, zarovnané na začátek, konec i střed) a k 0 — levý horní
+    // roh se tak zasekne v 0,0. Když by se monitory překrývaly, přiskočí na
+    // nejbližší místo těsně vedle.
     function snap(o, nx, ny) {
-        let best = null
-        for (const t of outputs.filter(p => p.enabled && p.name !== o.name)) {
-            const cands = [
-                { x: t.x - o.width, y: t.y },          // vlevo, zarovnat nahoru
-                { x: t.x + t.width, y: t.y },          // vpravo
-                { x: t.x, y: t.y - o.height },         // nad
-                { x: t.x, y: t.y + t.height },         // pod
-                { x: t.x - o.width, y: t.y + t.height - o.height },   // vlevo, zarovnat dolů
-                { x: t.x + t.width, y: t.y + t.height - o.height },   // vpravo, zarovnat dolů
-            ]
-            for (const c of cands) {
-                const d = Math.hypot(c.x - nx, c.y - ny)
-                if (!best || d < best.d) best = { x: c.x, y: c.y, d }
-            }
+        const T = 140      // dosah přichycení v logických pixelech
+        const others = outputs.filter(p => p.enabled && p.name !== o.name)
+        let xs = [0], ys = [0]
+        for (const t of others) {
+            xs.push(t.x - o.width, t.x + t.width, t.x, t.x + t.width - o.width, t.x + (t.width - o.width) / 2)
+            ys.push(t.y - o.height, t.y + t.height, t.y, t.y + t.height - o.height, t.y + (t.height - o.height) / 2)
         }
-        return best ?? { x: nx, y: ny }
+        const near = (v, list) => list.reduce((b, c) => Math.abs(c - v) < Math.abs(b - v) ? c : b, list[0])
+        let x = Math.abs(near(nx, xs) - nx) <= T ? near(nx, xs) : nx
+        let y = Math.abs(near(ny, ys) - ny) <= T ? near(ny, ys) : ny
+        const overlaps = (ax, ay) => others.some(t => ax < t.x + t.width && ax + o.width > t.x
+                                                   && ay < t.y + t.height && ay + o.height > t.y)
+        if (overlaps(x, y)) {
+            let best = null
+            for (const t of others)
+                for (const c of [{ x: t.x - o.width, y: y }, { x: t.x + t.width, y: y },
+                                 { x: x, y: t.y - o.height }, { x: x, y: t.y + t.height }])
+                    if (!overlaps(c.x, c.y)) {
+                        const d = Math.hypot(c.x - nx, c.y - ny)
+                        if (!best || d < best.d) best = { x: c.x, y: c.y, d }
+                    }
+            if (best) { x = best.x; y = best.y }
+        }
+        return { x: Math.round(x), y: Math.round(y) }
     }
 
     readonly property var scales: [0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3]
@@ -108,15 +139,16 @@ Item {
                         id: mon
                         required property var modelData
                         readonly property bool isSel: modelData.name === page.sel?.name
-                        x: preview.ox + (modelData.x - page.bounds.x) * preview.k
-                        y: preview.oy + (modelData.y - page.bounds.y) * preview.k
+                        readonly property bool dragged: page.dragName === modelData.name
+                        x: preview.ox + ((dragged ? page.dragX : modelData.x) - page.bounds.x) * preview.k
+                        y: preview.oy + ((dragged ? page.dragY : modelData.y) - page.bounds.y) * preview.k
                         width: modelData.width * preview.k
                         height: modelData.height * preview.k
                         radius: 8
                         color: isSel ? Qt.alpha(Colors.primary, 0.28) : Qt.alpha(Colors.surfaceContainerHighest, 0.9)
                         border.width: isSel ? 2 : 1
                         border.color: isSel ? Colors.primary : Colors.outlineVariant
-                        z: drag.active ? 2 : 1
+                        z: dragged ? 2 : 1
 
                         Column {
                             anchors.centerIn: parent
@@ -133,21 +165,33 @@ Item {
                             }
                         }
 
+                        // target: null — obdélník se nehýbe sám (tím by si rozbil vazbu
+                        // na skutečnou pozici), pozici za tažení počítá snap()
                         DragHandler {
                             id: drag
+                            target: null
                             enabled: page.outputs.filter(o => o.enabled).length > 1
                             onActiveChanged: {
-                                if (active) { page.selected = mon.modelData.name; return }
-                                // Zpět na logické souřadnice a přichytit
-                                const nx = Math.round((mon.x - preview.ox) / preview.k + page.bounds.x)
-                                const ny = Math.round((mon.y - preview.oy) / preview.k + page.bounds.y)
-                                const p = page.snap(mon.modelData, nx, ny)
-                                if (p.x !== mon.modelData.x || p.y !== mon.modelData.y) {
-                                    page.selected = mon.modelData.name
-                                    page.set("position", p.x + "," + p.y)
-                                } else {
-                                    page.reload()   // vrátit obdélník na místo
+                                const o = mon.modelData
+                                if (active) {
+                                    page.selected = o.name
+                                    page.frozen = page.liveBounds
+                                    page.dragX = o.x
+                                    page.dragY = o.y
+                                    page.dragName = o.name
+                                    return
                                 }
+                                const x = page.dragX, y = page.dragY
+                                page.dragName = ""
+                                page.frozen = null
+                                if (x !== o.x || y !== o.y) page.set("position", x + "," + y, o.name)
+                            }
+                            onTranslationChanged: {
+                                if (!active) return
+                                const o = mon.modelData
+                                const p = page.snap(o, o.x + translation.x / preview.k, o.y + translation.y / preview.k)
+                                page.dragX = p.x
+                                page.dragY = p.y
                             }
                         }
                         TapHandler { onTapped: page.selected = mon.modelData.name }
