@@ -103,11 +103,16 @@ repo_updates() {
     local db="${TMPDIR:-/tmp}/rp-sys-db-$UID"
     local sysdb; sysdb=$(pacman-conf DBPath 2>/dev/null || echo /var/lib/pacman/)
     mkdir -p "$db"
+    # Dvě kontroly naráz (stránka otevřená dvakrát rychle po sobě) by si sáhly
+    # na stejný db.lck a druhá by skončila chybou — seřadit je za sebe
+    exec 8>"$db.flock"
+    flock -w 60 8 || return 1
     ln -sfn "${sysdb%/}/local" "$db/local"
     # --disable-sandbox: pacman 7 jinak stahuje pod uživatelem alpm, na což
     # fakeroot nestačí (stejně to dělá checkupdates)
     fakeroot -- pacman -Sy --disable-sandbox --dbpath "$db" --logfile /dev/null >/dev/null 2>&1 || return 1
-    pacman -Qu --dbpath "$db" 2>/dev/null | grep -v '\[ignored\]'
+    # grep bez shody (žádné aktualizace) vrací 1 — to není chyba synchronizace
+    pacman -Qu --dbpath "$db" 2>/dev/null | grep -v '\[ignored\]' || true
 }
 
 updates() {

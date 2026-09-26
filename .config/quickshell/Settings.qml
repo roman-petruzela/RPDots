@@ -899,7 +899,7 @@ Scope {
                     Flickable {
                         id: flick
                         visible: root.query !== "" || !root.page.view
-                        anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom }
+                        anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: jobPanel.occupied }
                         contentHeight: pageCol.implicitHeight + 32
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
@@ -939,7 +939,7 @@ Scope {
 
                     // Systémové stránky (vlastní rozložení)
                     Loader {
-                        anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: 12 }
+                        anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: 12 + jobPanel.occupied }
                         active: root.query === "" && !!root.page.view
                         sourceComponent: ({ about: aboutC, updates: updatesC, packages: packagesC, firewall: firewallC,
                                             network: networkC, sound: soundC, bluetooth: bluetoothC,
@@ -969,12 +969,15 @@ Scope {
                     Component { id: printersC; PrintersPage { host: root } }
                     Component { id: gamingC; GamingPage { host: root } }
 
-                    // Log akcí (aktualizace, instalace, firewall) — vyjede zespodu
+                    // Log akcí (aktualizace, instalace, firewall) — vyjede zespodu; stránky
+                    // nad ním končí podle jeho horní hrany (jobPanel.occupied), nic nepřekryje
+                    // Přes celou šířku mezi postranním panelem a okrajem okna (contentArea
+                    // má odsazení 24 vlevo a 12 vpravo), spodní hrana na spodku okna
                     SJob {
                         id: jobPanel
-                        x: 0
-                        width: parent.width - 12
-                        height: Math.min(parent.height * 0.6, 420)
+                        x: -24
+                        width: parent.width + 24 + 12
+                        fullHeight: Math.min(parent.height * 0.6, 420)
                     }
                 }
 

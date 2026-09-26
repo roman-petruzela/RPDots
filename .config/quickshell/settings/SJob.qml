@@ -14,42 +14,112 @@ import "../Colors.js" as Colors
 // Za běhu nejde zavřít ani zrušit: přerušený pacman uprostřed transakce by
 // nechal systém napůl aktualizovaný. Terminálová varianta spustí totéž
 // v kitty, kde jde odpovídat na dotazy pacmanu.
+//
+// Akce neběží jako potomek tohohle okna: spouští je `rp-job` přes setsid
+// a panel jen čte jejich log (`tail -F`). Reload quickshellu (nová tapeta,
+// téma, nasazení QML) okno i s potomky zabije — dřív tím umřel i rozběhnutý
+// pacman/paru. Po reloadu se panel k běžící akci znovu připojí (rp-job status);
+// jen callback onDone z původní stránky se ztratí.
 Rectangle {
     id: job
 
     property string title: ""
     property var terminalCommand: []
     property bool open: false
+    // Sbalený na hlavičku: běží dál, jen nezabírá půl okna. Nová akce ho rozbalí.
+    property bool minimized: false
+    property real fullHeight: 420
     property int exitCode: -1
-    readonly property bool running: proc.running
+    property bool started: false
+    readonly property bool running: started && exitCode < 0
     property var onDone: null
+    readonly property string rpJob: Quickshell.env("HOME") + "/.local/bin/rp-job"
 
     signal finished(int code)
 
     color: Qt.alpha(Colors.surfaceContainer, 0.97)
-    radius: 16
-    border.width: 1
-    border.color: Colors.outlineVariant
+    // Přidokovaný ke spodní hraně okna: zaoblené jen horní rohy, bez rámečku
+    // (spodní hrana splývá s oknem); nahoře jen tenká linka
+    topLeftRadius: 16
+    topRightRadius: 16
+    bottomLeftRadius: 0
+    bottomRightRadius: 0
     clip: true
 
-    visible: y < parent.height
-    y: open ? parent.height - height - 12 : parent.height
-    Behavior on y { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+    // Spodní hrana stojí, pohybuje se jen horní: výška se animuje sama a y z ní
+    // jen počítá. `slide` (0–1) je vysunutí zespodu. Dřív se animovalo y i výška
+    // zvlášť a sbalení se cukalo.
+    property real slide: open ? 1 : 0
+    Behavior on slide { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+    height: minimized ? header.height : fullHeight
+    Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+    y: parent.height - height * slide
+    visible: slide > 0
+    // Kolik místa zespodu panel právě zabírá (obsah stránky podle toho končí)
+    readonly property real occupied: height * slide
+
+    Rectangle {
+        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 16; rightMargin: 16 }
+        height: 1
+        color: Qt.alpha(Colors.outlineVariant, 0.8)
+    }
 
     function start(title, command, terminalCommand, onDone) {
-        if (proc.running) return false
+        if (running) return false
         job.title = title
         job.terminalCommand = terminalCommand ?? []
         job.onDone = onDone ?? null
         job.exitCode = -1
+        job.minimized = false
         lines.clear()
         // Příkazy z ~/.local/bin (rp-sys) nemusí být v PATH quickshellu
         const cmd = command.slice()
         if (!cmd[0].startsWith("/")) cmd[0] = Quickshell.env("HOME") + "/.local/bin/" + cmd[0]
-        proc.command = cmd
-        proc.running = true
+        startProc.command = [rpJob, "start", title, JSON.stringify(job.terminalCommand), "--"].concat(cmd)
+        startProc.running = true
+        job.started = true
         job.open = true
         return true
+    }
+
+    // Po zavření panelu dokončenou akci zapomenout (jinak by se po reloadu ukázala znovu)
+    onOpenChanged: if (!open && started && !running) {
+        Quickshell.execDetached([rpJob, "dismiss"])
+        started = false
+    }
+
+    function follow() {
+        tailProc.running = false
+        tailProc.command = ["tail", "-n", "+1", "-F", Quickshell.env("XDG_RUNTIME_DIR") + "/rp-job/log"]
+        tailProc.running = true
+    }
+
+    // Po (re)loadu: běží, nebo nedávno doběhla akce? Připojit se k jejímu logu.
+    Component.onCompleted: statusProc.running = true
+    Process {
+        id: statusProc
+        command: [job.rpJob, "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let st = {}
+                try { st = JSON.parse(text) } catch (e) { return }
+                if (!st.title) return
+                job.title = st.title
+                job.terminalCommand = st.terminal ?? []
+                job.exitCode = -1
+                job.started = true
+                job.open = true
+                lines.clear()
+                job.follow()
+            }
+        }
+    }
+    Process {
+        id: startProc
+        stderr: StdioCollector {
+            onStreamFinished: if (text.trim() !== "") { job.append(text.trim()); job.exitCode = 1 }
+        }
+        onExited: code => { if (code === 0) job.follow() }
     }
 
     function append(line) {
@@ -71,15 +141,21 @@ Rectangle {
 
     ListModel { id: lines }
 
+    // `tail -F` na log; řádek `── exit N ──` od rp-job znamená konec
     Process {
-        id: proc
-        stdout: SplitParser { onRead: line => job.append(line) }
-        stderr: SplitParser { onRead: line => job.append(line) }
-        onExited: code => {
-            job.exitCode = code
-            job.append(code === 0 ? "── done ──" : "── exit code " + code + " ──")
-            if (typeof job.onDone === "function") job.onDone(code)
-            job.finished(code)
+        id: tailProc
+        stdout: SplitParser {
+            onRead: line => {
+                const m = line.match(/^── exit (\d+) ──$/)
+                if (!m) { job.append(line); return }
+                const code = Number(m[1])
+                job.exitCode = code
+                job.append(code === 0 ? "── done ──" : "── exit code " + code + " ──")
+                tailProc.running = false
+                if (typeof job.onDone === "function") job.onDone(code)
+                job.onDone = null
+                job.finished(code)
+            }
         }
     }
 
@@ -90,6 +166,10 @@ Rectangle {
         id: header
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: 54
+
+        // Klik na sbalenou hlavičku ji zase rozbalí
+        TapHandler { enabled: job.minimized; onTapped: job.minimized = false }
+        HoverHandler { enabled: job.minimized; cursorShape: Qt.PointingHandCursor }
 
         SSpinner {
             id: spin
@@ -132,6 +212,11 @@ Rectangle {
                 }
             }
             SButton {
+                icon: job.minimized ? "󰅃" : "󰅀"; text: ""
+                flat: true
+                onClicked: job.minimized = !job.minimized
+            }
+            SButton {
                 icon: "󰅖"; text: ""
                 flat: true
                 busy: job.running
@@ -141,6 +226,7 @@ Rectangle {
     }
 
     Rectangle {
+        visible: !job.minimized
         anchors { left: parent.left; right: parent.right; top: header.bottom }
         height: 1
         color: Qt.alpha(Colors.outlineVariant, 0.6)

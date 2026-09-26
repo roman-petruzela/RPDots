@@ -489,11 +489,25 @@ same thing interactively in kitty. A running job can't be closed or cancelled,
 because pacman killed mid-transaction leaves a half-updated system. AUR goes
 through `paru --sudo pkexec`: it builds as you and installs through polkit.
 
+Actions don't run as children of the window. `rp-job` starts them with `setsid`,
+writes their output to `$XDG_RUNTIME_DIR/rp-job/log` and appends `── exit N ──`
+at the end, and the panel follows the log with `tail -F`. Any quickshell reload
+(a new wallpaper or theme, or deploying QML) kills the window with all its
+children, and it once killed a running `paru -Sua` mid-build. `pacman -Syu`
+mid-transaction would be far worse. After a reload the panel asks
+`rp-job status` and reattaches; only the page's `onDone` callback is lost.
+Closing a finished job's panel dismisses it. The panel is docked edge to edge
+at the bottom of the content area. The pages above it end at its top edge
+(`jobPanel.occupied`), and it can collapse to its header.
+
 The update check never touches the system database. Like `checkupdates`, it
 syncs a copy into a temporary `--dbpath` under fakeroot, because a partial
 `pacman -Sy` would break the next install. It passes `--disable-sandbox`:
 pacman 7 otherwise downloads as the `alpm` user, which fakeroot can't do. The
-check takes ~15 s, so the window keeps the result while you switch pages.
+check takes ~15 s, so the window keeps the result while you switch pages. Two
+checks at once (the page opened twice in a row) are serialised with `flock` on
+the temporary database. Zero repo updates is not an error: `grep -v` with
+nothing to print exits 1, which used to show up as "sync failed".
 The Firewall page never reads through `firewall-cmd`. That tool asks polkit for
 everything up front (`authorizeAll`), and with firewalld's `server` policy (the
 default `org.fedoraproject.FirewallD1.policy` symlink on Arch) even `--state`
