@@ -446,6 +446,14 @@ off) IS_MONO=0 ;;
 *) if is_mono_wallpaper "$wal_input"; then IS_MONO=1; else IS_MONO=0; fi ;;
 esac
 
+# Typ schématu a kontrast z okna Settings (rp-settings); mono má přednost
+_rs="$HOME/.local/bin/rp-settings"
+_contrast="$("$_rs" get theme.contrast 2>/dev/null || echo 0.00)"
+[[ "$_contrast" != "0.00" ]] && MATUGEN_ARGS+=(--contrast "$_contrast")
+if [[ "$IS_MONO" != "1" ]]; then
+    MATUGEN_ARGS+=(-t "scheme-$("$_rs" get theme.scheme 2>/dev/null || echo tonal-spot)")
+fi
+
 if [[ "$IS_MONO" == "1" ]]; then
     MATUGEN_ARGS+=(-t scheme-monochrome)
     # scheme-monochrome hands back true greys, but the templates pin saturation

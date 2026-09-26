@@ -43,14 +43,16 @@ apply_wallpaper_transition() {
         local help trans angle step fps wave pos args
         help="$(awww img --help 2>/dev/null || true)"
         
-        trans="${AWWW_TRANSITION_TYPE:-${WALL_TRANSITION_TYPE:-wave}}"
+        # Výchozí typ a rychlost z okna Settings (rp-settings); proměnné prostředí mají přednost
+        local rs="$HOME/.local/bin/rp-settings"
+        trans="${AWWW_TRANSITION_TYPE:-${WALL_TRANSITION_TYPE:-$("$rs" get wallpaper.transition 2>/dev/null || echo wave)}}"
         angle="${AWWW_TRANSITION_ANGLE:-${WALL_TRANSITION_ANGLE:-45}}"
 
         if [[ "$FAST_MODE" == "yes" ]]; then
             step="${AWWW_TRANSITION_STEP_FAST:-20}"
             fps="${AWWW_TRANSITION_FPS_FAST:-120}"
         else
-            step="${AWWW_TRANSITION_STEP:-10}"
+            step="${AWWW_TRANSITION_STEP:-$("$rs" get wallpaper.transition_step 2>/dev/null || echo 10)}"
             fps="${AWWW_TRANSITION_FPS:-120}"
         fi
         [[ "$trans" == "none" ]] && step=255

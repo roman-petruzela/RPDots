@@ -444,33 +444,66 @@ straight away, since it costs nothing to undo. Shut down is `systemctl poweroff`
 ## Settings window
 
 `Mod+S` (`rp-shell settings toggle`, or `rp-shell settings <page>` to open a
-page directly) opens `Settings.qml`: a normal floating toplevel rather than a
-layer, so it can be moved and niri animates it (window-rule on the title
-`RPRice Settings`). Pages: Appearance (gaps, new column width, centering, focus
-ring, corner radius, shadows), Input (focus-follows-mouse, touchpad tap and
-natural scroll, pointer speed), Theme (wallpaper, monochrome mode, regenerate,
-per-app theme modules from `modules.conf`), Power (`rp-power` modes) and Tools
-(launchers for pavucontrol, blueman, nm-connection-editor, wdisplays, nwg-look,
-qt6ct, btop, whichever are installed).
+page directly: `appearance`, `windows`, `keyboard`, `mouse`, `theme`,
+`notifications`, `power`, `tools`) opens `Settings.qml`. It is also in the
+launcher as **Settings** (`.local/share/applications/rp-settings.desktop`). It is
+a normal floating toplevel rather than a layer, so it can be moved and niri
+animates it (window-rule on the title `RPRice Settings`).
+
+About 65 options across the pages: gaps, corner radius, focus ring, inactive
+opacity, shadows, blur, animation speed; column width and display, centering,
+overview zoom, hot corner, focus behaviour; keyboard layouts, switch key, Caps
+Lock, compose, repeat; touchpad and mouse (tap, drag, speed, profile, scroll,
+click method, left-handed); cursor theme and size, hiding; matugen scheme and
+contrast, monochrome, wallpaper transition, terminal opacity and font, Spotify
+opacity, theme modules; notifications (do not disturb, position, timeout),
+idle lock and screen off; power modes; system tools. `Ctrl+F` searches all of
+them. A dot next to a label marks a changed value, and clicking it resets it.
 
 The window only draws. **`rp-settings`** owns the data: the schema (type,
-default, range) is in the script, `dump` hands it all to QML as JSON, and `set`
-validates and applies. Only values that differ from the default are stored, in
-`~/.config/niri-rice/settings.json`. The niri part is generated into
-`~/.config/niri/settings.kdl` (gitignored), included at the very end of
-`config.kdl` so it overrides the layout there, and every write goes through
-`niri validate` with a rollback, the same pattern as `power-mode.kdl`.
+default, range or options) is one table in the script, `dump` hands it all to
+QML as JSON in one `jq` pass, and `set` validates and applies. In `Settings.qml`
+the `pages` list just places keys on pages with a label; the control is picked
+from the type (bool → switch, number → slider, enum → segments or a dropdown,
+string → text field). A new option is a schema line (plus its output) in
+`rp-settings` and one line in `pages`. Only values that differ from the default
+are stored, in `~/.config/niri-rice/settings.json`. Outputs:
 
-`settings.kdl` always contains every managed key, not just the changed ones.
-An include can switch a flag on but not off: niri rejects `natural-scroll false`
-(and `tap false`, `focus-follows-mouse false`). So those flags were moved out of
-`config.kdl` and `settings.kdl` is their only source; `start-rice-services.sh`
-generates it when it is missing. `theme.mono_mode` is read by
-`apply-wallpaper-theme.sh` when `THEME_MONO_MODE` is not set in the environment.
+| Keys | Output | Applied by |
+|---|---|---|
+| `niri.*`, `input.*`, `cursor.*`, Spotify opacity | `~/.config/niri/settings.kdl` | niri live reload, after `niri validate` (rollback on failure) |
+| `cursor.*` | also gsettings, GTK `settings.ini`, `icons/default/index.theme` | new apps |
+| `theme.terminal_*` | `~/.config/kitty/rp-settings.conf` (included last in `kitty.conf`) | `kitty @ set-background-opacity/set-font-size` on running terminals |
+| `notify.*` | `~/.config/mako/rp-settings` (`include=` in the mako template) | `makoctl reload`, `makoctl mode` for do not disturb |
+| `idle.*` | swayidle command line | `rp-settings idle` restarts swayidle (`start-rice-services.sh` starts it the same way) |
+| `theme.scheme`, `theme.contrast`, `theme.mono_mode` | read by `apply-wallpaper-theme.sh` | next theme regenerate |
+| `wallpaper.*` | read by `theme-modules/01-wallpaper-transition.sh` | next wallpaper change |
 
-Changing the theme rewrites `Colors.js`, and quickshell reloads the whole shell.
-The window's open state and page live in `PersistentProperties`, so it comes
-back where it was.
+`settings.kdl` is included at the very end of `config.kdl`, so it overrides the
+layout, blur, overview and cursor there, and the animation speed and on/off from
+`power-mode.kdl` (`rp-power` keeps only the curves). It always contains every
+managed key, not just the changed ones: an include can switch a flag on but not
+off (niri rejects `natural-scroll false`, `tap false`, `numlock false`), so those
+flags were moved out of `config.kdl` and `settings.kdl` is their only source.
+
+mako refuses its whole config when an `include=` file is missing, so
+`start-rice-services.sh` runs `rp-settings apply` before the theme, and
+`theme-modules/40-mako.sh` creates the file if it is gone. Backgrounded
+swayidle is started with `9>&-`; otherwise it inherits the `flock` descriptor
+and every later `rp-settings` call hangs.
+
+**Regenerate theme** passes the current wallpaper path to
+`apply-wallpaper-theme.sh`. Run without an argument, the script sees the same
+wallpaper signature and exits without regenerating anything.
+
+The window is created fresh on every open (`LazyLoader`) and dropped on close.
+When niri closes it (`Mod+Q`), quickshell destroys the toplevel and emits
+`closed`, but the object keeps `visible: true`, so setting `visible = true`
+again never reopened it. Changing the theme rewrites `Colors.js`, and quickshell
+reloads the whole shell. The open state and page live in `PersistentProperties`
+(the wrapping `Scope` needs a `reloadableId` for that), so the window comes back
+where it was. `qs ipc call shell reload` is a *hard* reload and drops that state
+on purpose.
 
 ## Power modes
 

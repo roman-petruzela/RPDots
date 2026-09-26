@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+GenericName=RPRice Settings
+Comment=Gaps, focus ring, touchpad, theme, power modes
+Keywords=settings;preferences;config;rice;niri;theme;touchpad;power;rp-settings;
+Icon=preferences-system
+# ~/.local/bin je v PATH session (niri → systemd --user), odkud běží i quickshell
+Exec=rp-shell settings open
+Terminal=false
+Categories=Settings;

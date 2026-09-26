@@ -5,14 +5,21 @@
 #   rp-settings get <klíč>         jedna hodnota (výchozí, když není nastavená)
 #   rp-settings set <klíč> <hod>   ověří, uloží a hned aplikuje
 #   rp-settings reset [<klíč>]     vrátí klíč (bez klíče všechny) na výchozí
-#   rp-settings apply              přegeneruje ~/.config/niri/settings.kdl
+#   rp-settings apply              přegeneruje všechny výstupy (niri, kitty, mako, idle)
+#   rp-settings idle               (re)startuje swayidle s aktuálními časy
 #   rp-settings modules            theme moduly z modules.conf jako JSON
 #   rp-settings module <jméno> on|off
 #
 # Uložené hodnoty jsou v ~/.config/niri-rice/settings.json — jen ty, které se
-# liší od výchozích. Niri část se generuje do settings.kdl (gitignored, stejný
-# vzor jako power-mode.kdl u rp-power): každý zápis projde `niri validate`
-# a při chybě se vrátí předchozí verze, takže okno nemůže shodit desktop.
+# liší od výchozích. Z nich se generuje:
+#
+#   ~/.config/niri/settings.kdl    niri (include na konci config.kdl), vždy přes
+#                                  `niri validate` s návratem při chybě
+#   ~/.config/kitty/rp-settings.conf   průhlednost a písmo terminálu
+#   ~/.config/mako/rp-settings     pozice a timeout notifikací (include v šabloně)
+#
+# Ostatní klíče čtou skripty samy přes `rp-settings get` (theme.* bere
+# apply-wallpaper-theme.sh, wallpaper.* modul 01-wallpaper-transition.sh).
 #
 # settings.kdl vždycky obsahuje *všechny* spravované niri klíče, ne jen změněné.
 # Flagy jako `tap` nebo `natural-scroll` totiž include v niri umí jen zapnout,
@@ -26,33 +33,108 @@ CFG_DIR="$HOME/.config/niri-rice"
 STORE="$CFG_DIR/settings.json"
 MODULES="$CFG_DIR/modules.conf"
 NIRI_KDL="$HOME/.config/niri/settings.kdl"
+KITTY_CONF="$HOME/.config/kitty/rp-settings.conf"
+MAKO_CONF="$HOME/.config/mako/rp-settings"
+PID_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/pids"
 LOCK="${XDG_RUNTIME_DIR:-/tmp}/rp-settings.lock"
 
 # ---------------------------------------------------------------- schéma
-# klíč → "typ|výchozí|min|max" (int, float, bool) nebo "enum|výchozí|a,b,c"
-# Výchozí hodnoty odpovídají tomu, co bylo v config.kdl před zavedením okna.
-declare -A SCHEMA=(
-    [niri.gaps]="int|16|0|48"
-    [niri.focus_ring_width]="int|4|0|12"
-    [niri.shadow]="bool|true"
-    [niri.corner_radius]="int|0|0|24"
-    [niri.center_column]="enum|never|never,always,on-overflow"
-    [niri.default_width]="enum|0.5|0.33333,0.5,0.66667"
-    [input.focus_follows_mouse]="bool|true"
-    [input.touchpad_tap]="bool|true"
-    [input.natural_scroll]="bool|true"
-    [input.mouse_accel]="float|0.00|-1|1"
-    [theme.mono_mode]="enum|auto|auto,on,off"
-)
-# Pořadí pro dump (asociativní pole v bashi pořadí nedrží)
-KEYS=(niri.gaps niri.focus_ring_width niri.shadow niri.corner_radius
-      niri.center_column niri.default_width
-      input.focus_follows_mouse input.touchpad_tap input.natural_scroll input.mouse_accel
-      theme.mono_mode)
+# klíč|typ|výchozí|a|b
+#   int, float: a = min, b = max
+#   enum:       a = volby oddělené čárkou (@cursors = nainstalovaná témata kurzoru)
+#   string:     a = regex, kterým hodnota musí projít
+#   bool:       nic
+# Výchozí hodnoty odpovídají stavu před zavedením okna (config.kdl, kitty.conf,
+# šablona mako, swayidle ve start-rice-services.sh), takže prázdný
+# settings.json nic nemění.
+SCHEMA='
+niri.gaps|int|16|0|48
+niri.corner_radius|int|0|0|24
+niri.focus_ring_width|int|4|0|12
+niri.shadow|bool|true
+niri.shadow_softness|int|30|0|100
+niri.shadow_spread|int|5|0|50
+niri.inactive_opacity|float|1.00|0.30|1
+niri.animations|bool|true
+niri.anim_slowdown|float|1.50|0.25|4
+niri.blur_passes|int|2|1|6
+niri.blur_offset|float|3.00|0|10
+niri.blur_noise|float|0.02|0|0.2
+niri.blur_saturation|float|1.50|0|3
+niri.default_width|enum|0.5|0.33333,0.5,0.66667,1.0
+niri.default_display|enum|normal|normal,tabbed
+niri.center_column|enum|never|never,always,on-overflow
+niri.center_single|bool|false
+niri.empty_ws_first|bool|false
+niri.overview_zoom|float|0.35|0.10|0.75
+niri.hot_corner|enum|top-left|off,top-left,top-right,bottom-left,bottom-right
+input.kb_layouts|string|cz,us|^[a-z]{2,3}(,[a-z]{2,3}){0,3}$
+input.kb_switch|enum|alt_shift_toggle|alt_shift_toggle,ctrl_shift_toggle,caps_toggle,none
+input.caps_lock|enum|default|default,escape,ctrl,swapescape,none
+input.compose|enum|none|none,ralt,rctrl,menu
+input.track_layout|enum|global|global,window
+input.repeat_delay|int|600|150|1000
+input.repeat_rate|int|25|5|80
+input.numlock|bool|true
+input.touchpad_tap|bool|true
+input.touchpad_drag|bool|true
+input.touchpad_drag_lock|bool|false
+input.touchpad_dwt|bool|false
+input.touchpad_external_off|bool|false
+input.natural_scroll|bool|true
+input.touchpad_accel|float|0.00|-1|1
+input.touchpad_profile|enum|adaptive|adaptive,flat
+input.touchpad_scroll|float|1.00|0.10|5
+input.touchpad_click|enum|default|default,button-areas,clickfinger
+input.touchpad_tap_map|enum|left-right-middle|left-right-middle,left-middle-right
+input.mouse_accel|float|0.00|-1|1
+input.mouse_profile|enum|adaptive|adaptive,flat
+input.mouse_natural|bool|false
+input.mouse_scroll|float|1.00|0.10|5
+input.mouse_left_handed|bool|false
+input.focus_follows_mouse|bool|true
+input.warp_mouse|bool|false
+input.ws_back_forth|bool|false
+cursor.theme|enum|Bibata-Modern-Ice|@cursors
+cursor.size|int|24|16|64
+cursor.hide_typing|bool|false
+cursor.hide_after|int|0|0|60
+theme.scheme|enum|tonal-spot|tonal-spot,content,expressive,fidelity,fruit-salad,rainbow,neutral
+theme.contrast|float|0.00|-1|1
+theme.mono_mode|enum|auto|auto,on,off
+theme.terminal_opacity|float|0.45|0.10|1
+theme.terminal_font|float|11.50|7|24
+theme.spotify_opacity|float|0.75|0.30|1
+wallpaper.transition|enum|wave|none,simple,fade,wipe,wave,grow,center,outer,left,right,top,bottom,any,random
+wallpaper.transition_step|int|10|1|90
+notify.position|enum|top-right|top-left,top-center,top-right,bottom-left,bottom-center,bottom-right
+notify.timeout|int|6|0|60
+notify.max_visible|int|5|1|20
+notify.dnd|bool|false
+idle.lock_min|int|5|0|120
+idle.screen_off_min|int|10|0|180
+idle.lock_on_sleep|bool|true
+'
+
+declare -A TYPE DEF A B
+KEYS=()
+while IFS='|' read -r k t d a b; do
+    [[ -n "$k" ]] || continue
+    KEYS+=("$k"); TYPE[$k]=$t; DEF[$k]=$d; A[$k]=${a:-}; B[$k]=${b:-}
+done <<<"$SCHEMA"
 
 die() { echo "rp-settings: $*" >&2; exit 1; }
 
-field() { cut -d'|' -f"$2" <<<"${SCHEMA[$1]}"; }
+cursor_themes() {
+    local d
+    for d in /usr/share/icons/*/cursors "$HOME"/.local/share/icons/*/cursors "$HOME"/.icons/*/cursors; do
+        [[ -d "$d" ]] && basename "$(dirname "$d")"
+    done | sort -u | paste -sd, -
+}
+
+options() {
+    [[ "${A[$1]}" == "@cursors" ]] && cursor_themes || echo "${A[$1]}"
+}
 
 store_json() {
     if [[ -s "$STORE" ]] && jq -e 'type == "object"' "$STORE" >/dev/null 2>&1; then
@@ -62,38 +144,40 @@ store_json() {
     fi
 }
 
-get() {
-    local key=$1
-    [[ -n "${SCHEMA[$key]:-}" ]] || die "neznámý klíč: $key"
-    local v
-    # ne `.[$k] // empty` — to by uložené false považovalo za chybějící
-    v=$(store_json | jq -r --arg k "$key" 'if has($k) then .[$k] | tostring else empty end')
-    [[ -n "$v" ]] && echo "$v" || field "$key" 2
+# Efektivní hodnoty všech klíčů do pole V (jedno volání jq místo desítek)
+declare -A V
+load() {
+    local k
+    for k in "${KEYS[@]}"; do V[$k]=${DEF[$k]}; done
+    while IFS=$'\t' read -r k v; do
+        [[ -n "${TYPE[$k]:-}" ]] && V[$k]=$v
+    done < <(store_json | jq -r 'to_entries[] | "\(.key)\t\(.value | tostring)"')
 }
 
 # Ověří hodnotu podle schématu a vypíše ji v normalizovaném tvaru
 validate() {
-    local key=$1 val=$2 type
-    type=$(field "$key" 1)
-    case "$type" in
+    local key=$1 val=$2
+    case "${TYPE[$key]}" in
         int)
-            [[ "$val" =~ ^-?[0-9]+$ ]] || die "$key: čekám celé číslo, dostal jsem '$val'"
-            (( val >= $(field "$key" 3) && val <= $(field "$key" 4) )) \
-                || die "$key: mimo rozsah $(field "$key" 3)–$(field "$key" 4)"
+            [[ "$val" =~ ^-?[0-9]+$ ]] || die "$key: expected a whole number, got '$val'"
+            (( val >= ${A[$key]} && val <= ${B[$key]} )) || die "$key: out of range ${A[$key]}–${B[$key]}"
             echo "$val" ;;
         float)
-            [[ "$val" =~ ^-?[0-9]*\.?[0-9]+$ ]] || die "$key: čekám číslo, dostal jsem '$val'"
-            awk -v v="$val" -v lo="$(field "$key" 3)" -v hi="$(field "$key" 4)" \
-                'BEGIN { exit !(v >= lo && v <= hi) }' || die "$key: mimo rozsah"
+            [[ "$val" =~ ^-?[0-9]*\.?[0-9]+$ ]] || die "$key: expected a number, got '$val'"
+            awk -v v="$val" -v lo="${A[$key]}" -v hi="${B[$key]}" \
+                'BEGIN { exit !(v >= lo && v <= hi) }' || die "$key: out of range ${A[$key]}–${B[$key]}"
             printf '%.2f\n' "$val" ;;
         bool)
             case "$val" in
                 true|on|1)   echo true ;;
                 false|off|0) echo false ;;
-                *) die "$key: čekám true/false" ;;
+                *) die "$key: expected true/false" ;;
             esac ;;
         enum)
-            [[ ",$(field "$key" 3)," == *",$val,"* ]] || die "$key: povolené jsou $(field "$key" 3)"
+            [[ ",$(options "$key")," == *",$val,"* ]] || die "$key: allowed values are $(options "$key")"
+            echo "$val" ;;
+        string)
+            [[ "$val" =~ ${A[$key]} ]] || die "$key: invalid value '$val'"
             echo "$val" ;;
     esac
 }
@@ -104,47 +188,130 @@ write_store() {
     cat > "$tmp" && mv "$tmp" "$STORE"
 }
 
+on() { [[ "${V[$1]}" == true ]]; }
+
 # --------------------------------------------------------------- niri KDL
 render_kdl() {
-    local ring shadow radius
-    ring=$(get niri.focus_ring_width)
-    shadow=$(get niri.shadow)
-    radius=$(get niri.corner_radius)
+    local opts=() ms
+    [[ ${V[input.kb_switch]} != none ]] && opts+=("grp:${V[input.kb_switch]}")
+    case ${V[input.caps_lock]} in
+        escape)     opts+=("caps:escape") ;;
+        ctrl)       opts+=("ctrl:nocaps") ;;
+        swapescape) opts+=("caps:swapescape") ;;
+        none)       opts+=("caps:none") ;;
+    esac
+    [[ ${V[input.compose]} != none ]] && opts+=("compose:${V[input.compose]}")
 
     echo "// Generováno skriptem rp-settings (okno Settings) — needitovat ručně."
     echo "// Kanonické hodnoty: ~/.config/niri-rice/settings.json + schéma v rp-settings."
     echo "input {"
+    echo "    keyboard {"
+    echo "        xkb {"
+    echo "            layout \"${V[input.kb_layouts]}\""
+    echo "            options \"$(IFS=,; echo "${opts[*]}")\""
+    echo "        }"
+    echo "        repeat-delay ${V[input.repeat_delay]}"
+    echo "        repeat-rate ${V[input.repeat_rate]}"
+    echo "        track-layout \"${V[input.track_layout]}\""
+    on input.numlock && echo "        numlock"
+    echo "    }"
     echo "    touchpad {"
-    [[ $(get input.touchpad_tap) == true ]] && echo "        tap"
-    [[ $(get input.natural_scroll) == true ]] && echo "        natural-scroll"
+    on input.touchpad_tap && echo "        tap"
+    echo "        drag ${V[input.touchpad_drag]}"
+    on input.touchpad_drag_lock && echo "        drag-lock"
+    on input.touchpad_dwt && echo "        dwt"
+    on input.touchpad_external_off && echo "        disabled-on-external-mouse"
+    on input.natural_scroll && echo "        natural-scroll"
+    echo "        accel-speed ${V[input.touchpad_accel]}"
+    echo "        accel-profile \"${V[input.touchpad_profile]}\""
+    echo "        scroll-factor ${V[input.touchpad_scroll]}"
+    echo "        tap-button-map \"${V[input.touchpad_tap_map]}\""
+    [[ ${V[input.touchpad_click]} != default ]] && echo "        click-method \"${V[input.touchpad_click]}\""
     echo "    }"
     echo "    mouse {"
-    echo "        accel-speed $(get input.mouse_accel)"
+    on input.mouse_natural && echo "        natural-scroll"
+    echo "        accel-speed ${V[input.mouse_accel]}"
+    echo "        accel-profile \"${V[input.mouse_profile]}\""
+    echo "        scroll-factor ${V[input.mouse_scroll]}"
+    on input.mouse_left_handed && echo "        left-handed"
     echo "    }"
-    [[ $(get input.focus_follows_mouse) == true ]] && echo '    focus-follows-mouse max-scroll-amount="0%"'
+    on input.focus_follows_mouse && echo '    focus-follows-mouse max-scroll-amount="0%"'
+    on input.warp_mouse && echo "    warp-mouse-to-focus"
+    on input.ws_back_forth && echo "    workspace-auto-back-and-forth"
     echo "}"
+
     echo "layout {"
-    echo "    gaps $(get niri.gaps)"
-    echo "    center-focused-column \"$(get niri.center_column)\""
-    echo "    default-column-width { proportion $(get niri.default_width); }"
-    if (( ring == 0 )); then
+    echo "    gaps ${V[niri.gaps]}"
+    echo "    center-focused-column \"${V[niri.center_column]}\""
+    on niri.center_single && echo "    always-center-single-column"
+    on niri.empty_ws_first && echo "    empty-workspace-above-first"
+    echo "    default-column-width { proportion ${V[niri.default_width]}; }"
+    echo "    default-column-display \"${V[niri.default_display]}\""
+    if (( ${V[niri.focus_ring_width]} == 0 )); then
         echo "    focus-ring { off; }"
     else
-        echo "    focus-ring { on; width $ring; }"
+        echo "    focus-ring { on; width ${V[niri.focus_ring_width]}; }"
     fi
-    [[ $shadow == true ]] && echo "    shadow { on; }" || echo "    shadow { off; }"
+    echo "    shadow {"
+    on niri.shadow && echo "        on" || echo "        off"
+    echo "        softness ${V[niri.shadow_softness]}"
+    echo "        spread ${V[niri.shadow_spread]}"
+    echo "    }"
     echo "}"
-    if (( radius > 0 )); then
+
+    echo "blur {"
+    echo "    passes ${V[niri.blur_passes]}"
+    echo "    offset ${V[niri.blur_offset]}"
+    echo "    noise ${V[niri.blur_noise]}"
+    echo "    saturation ${V[niri.blur_saturation]}"
+    echo "}"
+
+    # Po power-mode.kdl (rp-power), takže rychlost a vypnutí animací platí vždy
+    echo "animations {"
+    on niri.animations && echo "    on" || echo "    off"
+    echo "    slowdown ${V[niri.anim_slowdown]}"
+    echo "}"
+
+    echo "overview {"
+    echo "    zoom ${V[niri.overview_zoom]}"
+    echo "}"
+
+    echo "gestures {"
+    echo "    hot-corners {"
+    if [[ ${V[niri.hot_corner]} == off ]]; then echo "        off"; else echo "        ${V[niri.hot_corner]}"; fi
+    echo "    }"
+    echo "}"
+
+    echo "cursor {"
+    echo "    xcursor-theme \"${V[cursor.theme]}\""
+    echo "    xcursor-size ${V[cursor.size]}"
+    on cursor.hide_typing && echo "    hide-when-typing"
+    (( ${V[cursor.hide_after]} > 0 )) && echo "    hide-after-inactive-ms $(( ${V[cursor.hide_after]} * 1000 ))"
+    echo "}"
+
+    if (( ${V[niri.corner_radius]} > 0 )); then
         echo "window-rule {"
-        echo "    geometry-corner-radius $radius"
+        echo "    geometry-corner-radius ${V[niri.corner_radius]}"
         echo "    clip-to-geometry true"
         echo "}"
     fi
+    if [[ ${V[niri.inactive_opacity]} != 1.00 ]]; then
+        echo "window-rule {"
+        echo "    match is-focused=false"
+        echo "    opacity ${V[niri.inactive_opacity]}"
+        echo "}"
+    fi
+    # Až za pravidlem neaktivních oken — pozdější pravidlo vyhrává a Spotify si
+    # má držet svou průhlednost i nezaostřené (viz komentář v config.kdl)
+    echo "window-rule {"
+    echo "    match app-id=\"(?i)^spotify\$\""
+    echo "    opacity ${V[theme.spotify_opacity]}"
+    echo "}"
 }
 
 # Zapíše settings.kdl jen tehdy, když s ním niri config projde validací
 apply_kdl() {
-    local tmp backup had=0
+    local tmp backup had=0 err
     tmp=$(mktemp); backup=$(mktemp)
     render_kdl > "$tmp"
     if [[ -f "$NIRI_KDL" ]]; then
@@ -152,12 +319,110 @@ apply_kdl() {
         cp "$NIRI_KDL" "$backup"; had=1
     fi
     cp "$tmp" "$NIRI_KDL"
-    if ! niri validate >/dev/null 2>&1; then
+    if ! err=$(niri validate 2>&1); then
         if (( had )); then cp "$backup" "$NIRI_KDL"; else rm -f "$NIRI_KDL"; fi
         rm -f "$tmp" "$backup"
-        die "niri config by byl neplatný, settings.kdl vrácen"
+        echo "$err" | grep -v -e DEBUG -e '^\s*$' | tail -5 >&2
+        die "niri rejected the change, settings.kdl restored"
     fi
     rm -f "$tmp" "$backup"
+}
+
+# ------------------------------------------------------- ostatní výstupy
+write_if_changed() {
+    local dst=$1 tmp; tmp=$(mktemp)
+    cat > "$tmp"
+    mkdir -p "$(dirname "$dst")"
+    if cmp -s "$tmp" "$dst"; then rm -f "$tmp"; return 1; fi
+    mv "$tmp" "$dst"
+}
+
+apply_kitty() {
+    write_if_changed "$KITTY_CONF" <<EOF || true
+# Generováno skriptem rp-settings (okno Settings) — needitovat ručně.
+background_opacity ${V[theme.terminal_opacity]}
+font_size ${V[theme.terminal_font]}
+EOF
+    # Běžící kitty: přes remote control (kitty.conf má listen_on /tmp/kitty-{pid})
+    local s
+    for s in /tmp/kitty-*; do
+        [[ -S "$s" ]] || continue
+        kitty @ --to "unix:$s" set-background-opacity --all "${V[theme.terminal_opacity]}" >/dev/null 2>&1
+        kitty @ --to "unix:$s" set-font-size --all "${V[theme.terminal_font]}" >/dev/null 2>&1
+    done
+    return 0
+}
+
+apply_mako() {
+    local ms=$(( ${V[notify.timeout]} * 1000 ))
+    write_if_changed "$MAKO_CONF" <<EOF || true
+# Generováno skriptem rp-settings (okno Settings) — needitovat ručně.
+# Načítá ho šablona .config/matugen/templates/mako.ini přes include=.
+anchor=${V[notify.position]}
+default-timeout=$ms
+max-visible=${V[notify.max_visible]}
+EOF
+    command -v makoctl >/dev/null 2>&1 || return 0
+    makoctl reload >/dev/null 2>&1
+    if on notify.dnd; then
+        makoctl mode -a do-not-disturb >/dev/null 2>&1
+    else
+        makoctl mode -r do-not-disturb >/dev/null 2>&1
+    fi
+    return 0
+}
+
+# GTK a X aplikace kurzor z niri neberou — gsettings, settings.ini a index.theme
+apply_cursor() {
+    local t=${V[cursor.theme]} s=${V[cursor.size]} f
+    if command -v gsettings >/dev/null 2>&1; then
+        gsettings set org.gnome.desktop.interface cursor-theme "$t" 2>/dev/null
+        gsettings set org.gnome.desktop.interface cursor-size "$s" 2>/dev/null
+    fi
+    for f in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
+        [[ -f "$f" ]] || continue
+        sed -i -e "s/^gtk-cursor-theme-name=.*/gtk-cursor-theme-name=$t/" \
+               -e "s/^gtk-cursor-theme-size=.*/gtk-cursor-theme-size=$s/" "$f"
+    done
+    f="$HOME/.local/share/icons/default/index.theme"
+    [[ -f "$f" ]] && sed -i "s/^Inherits=.*/Inherits=$t/" "$f"
+    return 0
+}
+
+start_idle() {
+    command -v swayidle >/dev/null 2>&1 || return 0
+    local pidfile="$PID_DIR/swayidle.pid" pid args=(-w)
+    pid=$(cat "$pidfile" 2>/dev/null)
+    [[ -n "$pid" ]] && kill "$pid" 2>/dev/null
+    pkill -x swayidle 2>/dev/null
+    (( ${V[idle.lock_min]} > 0 )) && args+=(timeout $(( ${V[idle.lock_min]} * 60 )) 'swaylock -f')
+    (( ${V[idle.screen_off_min]} > 0 )) && args+=(timeout $(( ${V[idle.screen_off_min]} * 60 )) \
+        'niri msg action power-off-monitors' \
+        resume 'niri msg action power-on-monitors; systemctl --user restart gamemoded >/dev/null 2>&1 || true')
+    on idle.lock_on_sleep && args+=(before-sleep 'swaylock -f')
+    mkdir -p "$PID_DIR"
+    # 9>&- : jinak by swayidle zdědil deskriptor zámku a další rp-settings by
+    # na flocku visel napořád
+    setsid swayidle "${args[@]}" >/dev/null 2>&1 < /dev/null 9>&- &
+    echo $! > "$pidfile"
+}
+
+# Co se má po změně klíče přegenerovat
+apply_for() {
+    case "$1" in
+        niri.*|input.*|theme.spotify_opacity) apply_kdl ;;
+        cursor.*) apply_kdl && apply_cursor ;;
+        theme.terminal_*) apply_kitty ;;
+        notify.*) apply_mako ;;
+        idle.*) start_idle ;;
+        *) return 0 ;;   # theme.*, wallpaper.* čtou skripty samy
+    esac
+}
+
+apply_all() {
+    apply_kdl || return 1
+    apply_kitty
+    apply_mako
 }
 
 # --------------------------------------------------------------- moduly
@@ -172,70 +437,81 @@ modules_json() {
 set_module() {
     local name=$1 state
     case "$2" in on|1|true) state=1 ;; off|0|false) state=0 ;; *) die "module: on|off" ;; esac
-    [[ -f "$MODULES" ]] || die "chybí $MODULES"
-    grep -q "^${name//./\\.}|" "$MODULES" || die "neznámý modul: $name"
+    [[ -f "$MODULES" ]] || die "missing $MODULES"
+    grep -q "^${name//./\\.}|" "$MODULES" || die "unknown module: $name"
     local tmp; tmp=$(mktemp "$MODULES.XXXXXX")
     awk -F'|' -v OFS='|' -v n="$name" -v s="$state" '$1 == n { $2 = s } { print }' "$MODULES" > "$tmp" \
         && mv "$tmp" "$MODULES"
 }
 
 dump() {
-    local store; store=$(store_json)
-    for key in "${KEYS[@]}"; do
-        local type def
-        type=$(field "$key" 1); def=$(field "$key" 2)
-        jq -n --arg k "$key" --arg t "$type" --arg d "$def" --arg v "$(get "$key")" \
-              --arg a "$(field "$key" 3)" --arg b "$(field "$key" 4)" \
-              --argjson set "$(jq --arg k "$key" 'has($k)' <<<"$store")" '
-            def conv: if $t == "int" or $t == "float" then tonumber
-                      elif $t == "bool" then . == "true" else . end;
-            { key: $k, type: $t, value: ($v | conv), default: ($d | conv), changed: $set }
-            + (if $t == "enum" then { options: ($a | split(",")) }
-               elif $t == "bool" then {}
-               else { min: ($a | tonumber), max: ($b | tonumber) } end)'
-    done | jq -s '{ settings: ., modules: $m }' --argjson m "$(modules_json)"
+    local k
+    for k in "${KEYS[@]}"; do
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$k" "${TYPE[$k]}" "${DEF[$k]}" "${V[$k]}" \
+            "$( [[ ${TYPE[$k]} == enum ]] && options "$k" || echo "${A[$k]}" )" "${B[$k]}"
+    done | jq -R -s --argjson store "$(store_json)" --argjson m "$(modules_json)" '
+        split("\n") | map(select(length > 0) | split("\t")) | map(
+            .[0] as $k | .[1] as $t
+            | def conv: if $t == "int" or $t == "float" then tonumber
+                        elif $t == "bool" then . == "true" else . end;
+            { key: .[0], type: $t, value: (.[3] | conv), default: (.[2] | conv),
+              changed: ($store | has($k)) }
+            + (if $t == "enum" then { options: (.[4] | split(",")) }
+               elif $t == "int" or $t == "float" then { min: (.[4] | tonumber), max: (.[5] | tonumber) }
+               else {} end))
+        | { settings: ., modules: $m }'
 }
 
 # ---------------------------------------------------------------- main
 exec 9>"$LOCK"
 flock 9
+load
 
 case "${1:-dump}" in
     dump) dump ;;
     get)
-        [[ $# -eq 2 ]] || die "použití: rp-settings get <klíč>"
-        get "$2" ;;
+        [[ $# -eq 2 ]] || die "usage: rp-settings get <key>"
+        [[ -n "${TYPE[$2]:-}" ]] || die "unknown key: $2"
+        echo "${V[$2]}" ;;
     set)
-        [[ $# -eq 3 ]] || die "použití: rp-settings set <klíč> <hodnota>"
-        [[ -n "${SCHEMA[$2]:-}" ]] || die "neznámý klíč: $2"
+        [[ $# -eq 3 ]] || die "usage: rp-settings set <key> <value>"
+        [[ -n "${TYPE[$2]:-}" ]] || die "unknown key: $2"
         val=$(validate "$2" "$3") || exit 1
         prev=$(store_json)
         # Výchozí hodnota se neukládá, ať settings.json drží jen skutečné změny
-        if [[ "$val" == "$(field "$2" 2)" ]]; then
+        if [[ "$val" == "${DEF[$2]}" ]]; then
             jq --arg k "$2" 'del(.[$k])' <<<"$prev" | write_store
         else
-            jq --arg k "$2" --arg v "$val" --arg t "$(field "$2" 1)" \
+            jq --arg k "$2" --arg v "$val" --arg t "${TYPE[$2]}" \
                '.[$k] = (if $t == "int" or $t == "float" then ($v | tonumber)
                          elif $t == "bool" then ($v == "true") else $v end)' <<<"$prev" | write_store
         fi
-        if [[ "$2" == niri.* || "$2" == input.* ]] && ! apply_kdl; then
+        V[$2]=$val
+        if ! apply_for "$2"; then
             write_store <<<"$prev"
             exit 1
         fi ;;
     reset)
         prev=$(store_json)
         if [[ $# -ge 2 ]]; then
+            [[ -n "${TYPE[$2]:-}" ]] || die "unknown key: $2"
             jq --arg k "$2" 'del(.[$k])' <<<"$prev" | write_store
+            V[$2]=${DEF[$2]}
+            apply_for "$2" || { write_store <<<"$prev"; exit 1; }
         else
             echo '{}' | write_store
-        fi
-        apply_kdl || { write_store <<<"$prev"; exit 1; } ;;
-    apply) apply_kdl ;;
+            load
+            apply_all || { write_store <<<"$prev"; exit 1; }
+            apply_cursor
+            start_idle
+        fi ;;
+    apply) apply_all ;;
+    idle) start_idle ;;
     modules) modules_json ;;
     module)
-        [[ $# -eq 3 ]] || die "použití: rp-settings module <jméno> on|off"
+        [[ $# -eq 3 ]] || die "usage: rp-settings module <name> on|off"
         set_module "$2" "$3" ;;
     *)
-        sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' >&2
+        sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' >&2
         exit 1 ;;
 esac

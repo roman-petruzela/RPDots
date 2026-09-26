@@ -81,14 +81,13 @@ start_waybar_with_retry() {
   return 1
 }
 
+# Výstupy okna Settings: settings.kdl drží i tap/natural-scroll/numlock (config.kdl
+# je nemá, viz rp-settings) a šablona mako includuje ~/.config/mako/rp-settings,
+# bez kterého mako config odmítne — proto před tématem. Beze změn nic nepřepíše.
+"$HOME/.local/bin/rp-settings" apply || log "rp-settings apply failed"
+
 if ! "$HOME/.local/bin/apply-wallpaper-theme.sh" --no-daemon-restart; then
   log "apply-wallpaper-theme failed, continuing startup with existing theme"
-fi
-
-# settings.kdl drží i tap/natural-scroll (config.kdl je nemá, viz rp-settings) —
-# na čisté instalaci ho vygenerovat, jinak by touchpad jel bez nich.
-if [[ ! -f "$HOME/.config/niri/settings.kdl" ]]; then
-  "$HOME/.local/bin/rp-settings" apply || log "rp-settings apply failed"
 fi
 
 write_session_env
@@ -136,10 +135,7 @@ fi
 # QuickShell běží jako systemd unit (viz start_user_unit výše).
 # Bar je v shell.qml vypnutý přepínačem useBar — barem je waybar.
 
-ensure_pidfile_running \
-  "$PID_DIR/swayidle.pid" swayidle \
-  swayidle -w \
-  timeout 300 'swaylock -f' \
-  timeout 600 'niri msg action power-off-monitors' \
-  resume 'niri msg action power-on-monitors; systemctl --user restart gamemoded >/dev/null 2>&1 || true' \
-  before-sleep 'swaylock -f'
+# swayidle startuje rp-settings — časy zamknutí/vypnutí obrazovky jsou v okně Settings
+if ! pgrep -x swayidle >/dev/null 2>&1; then
+  "$HOME/.local/bin/rp-settings" idle || log "rp-settings idle failed"
+fi

@@ -81,7 +81,7 @@ ShellRoot {
         target: "settings"
         function toggle(): void { settingsWindow.toggle() }
         function open(): void   { settingsWindow.open() }
-        function hide(): void   { settingsWindow.visible = false }
+        function hide(): void   { settingsWindow.hide() }
     }
 
     IpcHandler {
@@ -151,7 +151,7 @@ ShellRoot {
         if (target === "settings") {
             if (fn === "toggle") settingsWindow.toggle()
             else if (fn === "open") settingsWindow.open()
-            else if (fn === "hide") settingsWindow.visible = false
+            else if (fn === "hide") settingsWindow.hide()
             else if (!settingsWindow.openPage(fn)) console.warn("rp-shell: unknown settings page:", fn)
             return
         }

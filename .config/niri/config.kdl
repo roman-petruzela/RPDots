@@ -4,7 +4,7 @@ input {
             layout "cz,us"
             options "grp:alt_shift_toggle"
         }
-        numlock
+        // numlock: v settings.kdl (rp-settings) — flag by include nevypnul
     }
     // tap, natural-scroll, accel-speed a focus-follows-mouse jsou v settings.kdl
     // (okno Settings / rp-settings). Flag zapnutý tady by include nevypnul —
@@ -77,7 +77,8 @@ hotkey-overlay {
 }
 prefer-no-csd
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
-// Animace žijí v power-mode.kdl, přepíná je rp-power (režim gaming je vypíná).
+// Křivky animací žijí v power-mode.kdl (rp-power); rychlost a vypnutí přebíjí
+// settings.kdl z okna Settings, includovaný na konci.
 include optional=true "~/.config/niri/power-mode.kdl"
 // Pozn.: dřív tu bylo namespace="^wallpaper$", což nesedělo na nic — awww-daemon
 // registruje vrstvu pod svým vlastním jménem, takže se backdrop neuplatňoval.
