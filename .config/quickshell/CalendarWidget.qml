@@ -5,6 +5,8 @@ Item {
     implicitWidth: 340
     implicitHeight: headerRow.height + 10 + dayNamesRow.height + 6 + calGrid.height
 
+    // Velikost buňky dne (dashboard 26, kalendář pod hodinami v panelu menší)
+    property int cell: 26
     property int viewYear:  (new Date()).getFullYear()
     property int viewMonth: (new Date()).getMonth()
     readonly property var today: new Date()
@@ -118,19 +120,19 @@ Item {
             model: calModel
             Item {
                 width: calGrid.width / 7
-                height: 30
+                height: cell + 4
 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 26; height: 26
-                    radius: 13
+                    width: cell; height: cell
+                    radius: cell / 2
                     color: model.now ? Colors.primary : "transparent"
                 }
 
                 Text {
                     anchors.centerIn: parent
                     text: model.d
-                    font.pixelSize: 12
+                    font.pixelSize: cell >= 26 ? 12 : 11
                     font.weight: model.now ? Font.Medium : Font.Normal
                     color: model.now  ? Colors.onPrimary
                          : model.cur ? Colors.onSurface
