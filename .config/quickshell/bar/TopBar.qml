@@ -39,6 +39,20 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "rp-bar"
 
+    // Podklad přes celou šířku jako okno Settings: tmavý, poloprůhledný,
+    // s rozmazanou tapetou pod sebou a tenkou linkou dole
+    BackgroundEffect.blurRegion: Region { item: barBg }
+    Rectangle {
+        id: barBg
+        anchors.fill: parent
+        color: Qt.alpha(Colors.surface, 0.72)
+        Rectangle {
+            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+            height: 1
+            color: Qt.alpha(Colors.outlineVariant, 0.6)
+        }
+    }
+
     function sh(cmd) { Quickshell.execDetached(["bash", "-c", cmd]) }
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
 
@@ -67,8 +81,8 @@ PanelWindow {
         id: pill
         default property alias content: row.data
         // Stejný podklad jako karty/okna Settings; tint jen pro zvýraznění (napájení)
-        property color tint: Colors.surfaceContainer
-        property real tintAlpha: 0.86
+        property color tint: Colors.surfaceContainerHigh
+        property real tintAlpha: 0.9
         property int pad: 10
         property bool clickable: false
         readonly property bool hovered: pillArea.containsMouse
@@ -135,6 +149,7 @@ PanelWindow {
     }
 
     TrayMenu { id: trayMenu }
+    ClockPopup { target: center; targetHovered: clockHover.hovered }
 
     // ═══ Levá strana ═════════════════════════════════════════════════════
     Row {
@@ -241,6 +256,7 @@ PanelWindow {
     Pill {
         id: center
         anchors.centerIn: parent
+        HoverHandler { id: clockHover }
         pad: 14
         Text {
             anchors.verticalCenter: parent.verticalCenter
@@ -425,8 +441,8 @@ PanelWindow {
 
         // Napájení → dashboard
         Pill {
-            tint: hovered ? Colors.errorColor : Colors.surfaceContainer
-            tintAlpha: hovered ? 0.3 : 0.86
+            tint: hovered ? Colors.errorColor : Colors.surfaceContainerHigh
+            tintAlpha: hovered ? 0.3 : 0.9
             pad: 9
             border.color: hovered ? Qt.alpha(Colors.errorColor, 0.7) : Qt.alpha(Colors.outlineVariant, 0.7)
             Behavior on color { ColorAnimation { duration: 150 } }
