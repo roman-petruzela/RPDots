@@ -246,11 +246,12 @@ Scope {
     // Pořadí v postranním panelu: skupiny jdou za sebou a každá jen jednou, bez
     // ohledu na to, kde je stránka v pageList (a jakou skupinu tam má napsanou)
     readonly property var groups: [
-        { name: "SYSTEM", ids: ["about", "displays", "network", "sound", "bluetooth", "power", "storage", "updates",
-                                "packages", "timelang", "account", "privacy", "backup", "printers", "firewall", "tools"] },
+        { name: "SYSTEM", ids: ["about", "updates", "packages", "storage", "power", "backup", "tools"] },
+        { name: "DEVICES", ids: ["displays", "sound", "bluetooth", "keyboard", "mouse", "printers"] },
+        { name: "NETWORK", ids: ["network", "firewall"] },
         { name: "APPS", ids: ["apps", "shortcuts", "history", "gaming"] },
-        { name: "PERSONALIZATION", ids: ["appearance", "windows", "theme", "keyboard", "mouse", "notifications",
-                                         "nightlight", "accessibility"] },
+        { name: "PERSONALIZATION", ids: ["appearance", "windows", "theme", "nightlight", "notifications"] },
+        { name: "ACCOUNT", ids: ["account", "privacy", "timelang", "accessibility"] },
     ]
     readonly property var pages: {
         // QML seznam není JS pole (chybí mu flatMap) — nejdřív převést
