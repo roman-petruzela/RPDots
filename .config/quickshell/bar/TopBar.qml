@@ -66,8 +66,9 @@ PanelWindow {
     component Pill: Rectangle {
         id: pill
         default property alias content: row.data
+        // Stejný podklad jako karty/okna Settings; tint jen pro zvýraznění (napájení)
         property color tint: Colors.surfaceContainer
-        property real tintAlpha: 0.72
+        property real tintAlpha: 0.86
         property int pad: 10
         property bool clickable: false
         readonly property bool hovered: pillArea.containsMouse
@@ -79,7 +80,7 @@ PanelWindow {
         radius: height / 2
         color: Qt.alpha(tint, tintAlpha)
         border.width: 1
-        border.color: Qt.alpha(Colors.outlineVariant, 0.55)
+        border.color: Qt.alpha(Colors.outlineVariant, 0.7)
         MouseArea {
             id: pillArea
             anchors.fill: parent
@@ -100,7 +101,12 @@ PanelWindow {
     component Item_: Text {
         id: it
         property string tip: ""
+        property string icon: ""               // ikona v barvě iconColor, text = value
+        property string value: ""
+        property color iconColor: Colors.primary
         property color baseColor: Colors.onSurface
+        textFormat: icon !== "" ? Text.StyledText : Text.PlainText
+        text: icon !== "" ? "<font color=\"" + iconColor + "\">" + icon + "</font>&nbsp;" + value : value
         property bool clickable: false
         signal leftClicked()
         signal rightClicked()
@@ -156,7 +162,7 @@ PanelWindow {
                     visible: wsPill.activeIndex >= 0
                     width: wsPill.cell; height: wsPill.cell
                     radius: wsPill.cell / 2
-                    color: Qt.alpha(Colors.primaryContainer, 0.95)
+                    color: Qt.alpha(Colors.primary, 0.22)
                     x: Math.max(0, wsPill.activeIndex) * (wsPill.cell + wsRow.spacing)
                     Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.OutBack; easing.overshoot: 1.1 } }
                 }
@@ -182,7 +188,7 @@ PanelWindow {
                                 width: parent.active ? 8 : 6
                                 height: width
                                 radius: width / 2
-                                color: parent.active ? Colors.onPrimaryContainer
+                                color: parent.active ? Colors.primary
                                     : wsHover.containsMouse ? Colors.primary : Qt.alpha(Colors.onSurfaceVariant, 0.5)
                                 Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
                                 Behavior on color { ColorAnimation { duration: 150 } }
@@ -223,6 +229,8 @@ PanelWindow {
             font.family: bar.fontFamily
             font.pixelSize: 12
             color: Colors.primary
+            layer.enabled: true
+            layer.effect: MultiEffect { shadowEnabled: true; shadowColor: "#000000"; shadowOpacity: 0.85; shadowBlur: 0.5; shadowVerticalOffset: 1 }
         }
     }
 
@@ -233,18 +241,15 @@ PanelWindow {
     Pill {
         id: center
         anchors.centerIn: parent
-        tint: Colors.primaryContainer
-        tintAlpha: 0.65
         pad: 14
-        border.color: Qt.alpha(Colors.primary, 0.45)
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: "\uf017 " + Qt.formatDateTime(bar.now, "dd.MM. HH:mm")
+            textFormat: Text.StyledText
+            text: "<font color=\"" + Colors.primary + "\">\uf017</font>&nbsp;" + Qt.formatDateTime(bar.now, "dd.MM. HH:mm")
             font.family: bar.fontFamily
             font.pixelSize: 13
-            font.weight: Font.Bold
-            font.letterSpacing: 0.5
-            color: Colors.onPrimaryContainer
+            font.weight: Font.DemiBold
+            color: Colors.onSurface
         }
     }
 
@@ -257,14 +262,10 @@ PanelWindow {
         width: Math.min(implicitWidth, bar.width - (center.x + center.width) - bar.gap - bar.edge)
         clip: true
 
-        // Síť + VPN — bez podkladu, jen text (jako cava)
-        Row {
-            anchors.verticalCenter: parent.verticalCenter
-            height: bar.pillHeight
-            spacing: 10
-            rightPadding: 4
+        // Síť + VPN — v pilulce: bez podkladu byl text na světlé tapetě nečitelný
+        Pill {
             Item_ {
-                text: bar.barData.network.text ?? ""
+                value: bar.barData.network.text ?? ""
                 tip: bar.barData.network.tooltip ?? ""
                 baseColor: Colors.tertiary
                 font.pixelSize: 12
@@ -273,7 +274,7 @@ PanelWindow {
             }
             Item_ {
                 visible: (bar.barData.vpn.text ?? "") !== ""
-                text: bar.barData.vpn.text ?? ""
+                value: bar.barData.vpn.text ?? ""
                 tip: bar.barData.vpn.tooltip ?? ""
                 baseColor: (bar.barData.vpn.class ?? []).includes("active") ? Colors.tertiary : Qt.alpha(Colors.tertiary, 0.4)
                 font.pixelSize: 12
@@ -285,8 +286,7 @@ PanelWindow {
         // Hardware
         Pill {
             Item_ {
-                text: "\uf4bc " + bar.barData.cpu + "%"
-                baseColor: Colors.secondary
+                icon: "\uf4bc"; value: bar.barData.cpu + "%"; iconColor: Colors.secondary
                 tip: {
                     const c = bar.barData.cores
                     let lines = ["CPU " + bar.barData.cpu + " %   ·   load " + bar.barData.load, ""]
@@ -300,20 +300,29 @@ PanelWindow {
                     return lines.join("\n")
                 }
             }
-            Item_ { text: bar.barData.gpu.text ?? ""; tip: bar.barData.gpu.tooltip ?? ""; baseColor: Colors.secondary }
-            Item_ { text: "\uefc5 " + bar.barData.mem + "%"; baseColor: Colors.secondary }
+            // waybar-gpu.sh vrací "ikona hodnota" — rozdělit, ať má ikona akcent
             Item_ {
-                text: "\uf2c9 " + bar.barData.temp + "°C"
-                baseColor: bar.barData.temp >= 85 ? Colors.errorColor : Colors.tertiary   // critical-threshold 85
+                readonly property string raw: bar.barData.gpu.text ?? ""
+                icon: raw.split(" ")[0]; value: raw.split(" ").slice(1).join(" ")
+                iconColor: Colors.secondary
+                tip: bar.barData.gpu.tooltip ?? ""
+            }
+            Item_ { icon: "\uefc5"; value: bar.barData.mem + "%"; iconColor: Colors.secondary }
+            Item_ {
+                // critical-threshold 85 jako waybar
+                icon: "\uf2c9"; value: bar.barData.temp + "°C"
+                iconColor: bar.barData.temp >= 85 ? Colors.errorColor : Colors.tertiary
+                baseColor: bar.barData.temp >= 85 ? Colors.errorColor : Colors.onSurface
             }
         }
 
         // Zvuk, baterie, jas
         Pill {
             Item_ {
-                text: bar.barData.muted ? "\ueee8 " : (bar.barData.volume < 34 ? "\uf026" : bar.barData.volume < 67 ? "\uf027" : "\uf028") + " " + bar.barData.volume + "%"
+                icon: bar.barData.muted ? "\ueee8" : (bar.barData.volume < 34 ? "\uf026" : bar.barData.volume < 67 ? "\uf027" : "\uf028")
+                value: bar.barData.muted ? "" : bar.barData.volume + "%"
+                iconColor: bar.barData.muted ? Qt.alpha(Colors.onSurfaceVariant, 0.5) : Colors.onSurfaceVariant
                 tip: bar.barData.sinkName + "\n" + bar.barData.volume + " %"
-                baseColor: bar.barData.muted ? Qt.alpha(Colors.onSurfaceVariant, 0.35) : Colors.onSurfaceVariant
                 clickable: true
                 onLeftClicked: bar.sh(bar.bin + "rp-shell audio toggle")
                 onRightClicked: bar.sh(bar.bin + "rp-shell settings sound")
@@ -325,9 +334,11 @@ PanelWindow {
                 visible: bar.barData.hasBattery
                 readonly property int pct: bar.barData.batteryPct
                 readonly property bool low: !bar.barData.charging && pct <= 30
-                text: (bar.barData.charging ? "\uf0e7" : ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"][Math.min(4, Math.floor(pct / 20))]) + " " + pct + "%"
+                icon: bar.barData.charging ? "\uf0e7" : ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"][Math.min(4, Math.floor(pct / 20))]
+                value: pct + "%"
+                iconColor: low ? Colors.errorColor : Colors.tertiary
                 tip: pct + " %" + (bar.barData.charging ? " · charging" : "") + "\nClick to switch power mode"
-                baseColor: low ? Colors.errorColor : Colors.tertiary
+                baseColor: low ? Colors.errorColor : Colors.onSurface
                 clickable: true
                 onLeftClicked: bar.sh(bar.bin + "rp-shell power toggle")
                 // warning 30 % bliká pomaleji, critical 15 % rychleji (jako waybar)
@@ -340,8 +351,7 @@ PanelWindow {
                 }
             }
             Item_ {
-                text: "󰃟 " + bar.barData.brightness + "%"
-                baseColor: Colors.onSurfaceVariant
+                icon: String.fromCodePoint(0xf00df); value: bar.barData.brightness + "%"; iconColor: Colors.onSurfaceVariant
                 onWheel: dir => { bar.sh(bar.bin + "brightness-osd.sh " + (dir > 0 ? "up" : "down")); bar.barData.refreshBrightness() }
             }
         }
@@ -415,11 +425,11 @@ PanelWindow {
 
         // Napájení → dashboard
         Pill {
-            tint: Colors.errorColor
-            tintAlpha: hovered ? 0.4 : 0.26
+            tint: hovered ? Colors.errorColor : Colors.surfaceContainer
+            tintAlpha: hovered ? 0.3 : 0.86
             pad: 9
-            border.color: Qt.alpha(Colors.errorColor, hovered ? 0.65 : 0.35)
-            Behavior on tintAlpha { NumberAnimation { duration: 150 } }
+            border.color: hovered ? Qt.alpha(Colors.errorColor, 0.7) : Qt.alpha(Colors.outlineVariant, 0.7)
+            Behavior on color { ColorAnimation { duration: 150 } }
             clickable: true
             onClicked: bar.sh(bar.bin + "rp-shell dashboard toggle")
             Text {
