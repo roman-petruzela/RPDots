@@ -128,6 +128,8 @@ PanelWindow {
         BarTooltip { target: it; text: it.tip; show: area.containsMouse && it.tip !== "" }
     }
 
+    TrayMenu { id: trayMenu }
+
     // ═══ Levá strana ═════════════════════════════════════════════════════
     Row {
         id: left
@@ -401,10 +403,8 @@ PanelWindow {
                         onClicked: e => {
                             if (e.button === Qt.LeftButton && !ti.modelData.onlyMenu) ti.modelData.activate()
                             else if (e.button === Qt.MiddleButton) ti.modelData.secondaryActivate()
-                            else if (ti.modelData.hasMenu) {
-                                const p = ti.mapToItem(null, 0, ti.height)
-                                ti.modelData.display(bar, p.x, p.y + 6)
-                            }
+                            // vlastní QML menu (display() by chtělo QApplication režim)
+                            else if (ti.modelData.hasMenu) trayMenu.openAt(ti, ti.modelData.menu)
                         }
                         onWheel: e => ti.modelData.scroll(e.angleDelta.y, false)
                     }

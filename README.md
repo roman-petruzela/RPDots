@@ -467,6 +467,14 @@ when it says `quickshell`. The Nerd Font icons are `\u` escapes in QML: typed as
 literal characters they got lost when edited, which is also how the waybar clock
 lost its icon.
 
+Tray menus are drawn in QML (`bar/TrayMenu.qml`: `QsMenuOpener` over DBusMenu,
+`entry.triggered()` on click, submenus open in place with a Back row, a click
+outside closes it via `grabFocus`). `SystemTrayItem.display()` would need
+quickshell in QApplication mode (a pragma plus a restart) and draws a foreign
+Qt Widgets menu; without it the clicks did nothing and the log said so.
+Symbolic tray icons (Easy Effects) are recolored with `MultiEffect`, since
+unlike GTK nothing else recolors them.
+
 A `Variants` delegate must not bind a property to an id with the same name
 (`niri: niri`): inside the delegate the name resolves to the delegate's own
 property, which stays undefined. Hence `root.niriRef`. And no property may be
