@@ -6,6 +6,15 @@
 #   rp-net connect <ssid>  připojí uloženou nebo otevřenou síť
 #   rp-net disconnect      odpojí wifi
 #   rp-net rescan          vynutí sken okolních sítí
+#   rp-net details         všechna rozhraní (IP, brána, DNS, MAC, Wi-Fi link),
+#                          uložená připojení, VPN, rfkill — pro Settings
+#   rp-net up|down <jméno>  zapne/vypne uložené připojení (VPN, ethernet, Wi-Fi)
+#   rp-net forget <jméno>  smaže uložené připojení
+#   rp-net autoconnect <jméno> yes|no
+#   rp-net airplane on|off režim letadlo (rfkill: Wi-Fi, Bluetooth, WWAN)
+#   rp-net publicip        veřejná IP a lokace (Cloudflare trace) — jen na požádání
+#   rp-net speedtest       latence, download, upload proti speed.cloudflare.com;
+#                          průběžně vypisuje JSON řádky {phase, …}
 #
 # Parsování drží stranou od QML — okno jen konzumuje JSON.
 set -uo pipefail
@@ -107,11 +116,118 @@ cmd_connect() {
     fi
 }
 
+# Jedno rozhraní z `nmcli device show` (klíč:hodnota) + sysfs/iw doplňky
+device_json() {
+    local dev=$1 info
+    info=$(nmcli -t -f GENERAL.DEVICE,GENERAL.TYPE,GENERAL.STATE,GENERAL.CONNECTION,GENERAL.HWADDR,IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,IP6.ADDRESS,IP6.GATEWAY \
+           device show "$dev" 2>/dev/null)
+    local speed="" link="{}"
+    [[ -r "/sys/class/net/$dev/speed" ]] && speed=$(cat "/sys/class/net/$dev/speed" 2>/dev/null)
+    if [[ -d "/sys/class/net/$dev/wireless" ]] && command -v iw >/dev/null 2>&1; then
+        link=$(iw dev "$dev" link 2>/dev/null | awk '
+            /SSID:/ { sub(/^[ \t]*SSID: /, ""); ssid = $0 }
+            /freq:/ { freq = $2 }
+            /signal:/ { sig = $2 }
+            /tx bitrate:/ { tx = $3 }
+            /rx bitrate:/ { rx = $3 }
+            END { printf "{\"ssid\":%s,\"freq\":%s,\"dbm\":%s,\"tx\":%s,\"rx\":%s}",
+                  (ssid == "" ? "null" : "\"" ssid "\""), (freq == "" ? "null" : freq),
+                  (sig == "" ? "null" : sig), (tx == "" ? "null" : tx), (rx == "" ? "null" : rx) }')
+    fi
+    jq -n --arg info "$info" --arg speed "$speed" --argjson link "${link:-{\}}" '
+        ($info | split("\n") | map(select(length > 0) | capture("^(?<k>[^:\\[]+)(\\[[0-9]+\\])?:(?<v>.*)$"))) as $kv
+        | def all($k): [$kv[] | select(.k == $k) | .v | select(length > 0)];
+          def one($k): (all($k) | first) // "";
+        { device: one("GENERAL.DEVICE"), type: one("GENERAL.TYPE"),
+          state: (one("GENERAL.STATE") | sub("^[0-9]+ \\("; "") | sub("\\)$"; "")),
+          connection: one("GENERAL.CONNECTION"), mac: (one("GENERAL.HWADDR") | gsub("\\\\"; "")),
+          ipv4: all("IP4.ADDRESS"), gateway: one("IP4.GATEWAY"), dns: all("IP4.DNS"),
+          ipv6: all("IP6.ADDRESS"), gateway6: one("IP6.GATEWAY"),
+          speed: (($speed | tonumber?) // null | if . != null and . > 0 then . else null end),
+          wifi: (if $link.ssid then $link + { band: (if $link.freq >= 5900 then "6 GHz"
+                                                     elif $link.freq >= 4900 then "5 GHz" else "2.4 GHz" end) }
+                 else null end) }'
+}
+
+cmd_details() {
+    local devs=() d
+    # Jen skutečná rozhraní; loopback, docker a leak-protection dummy ne
+    while IFS=: read -r d t; do
+        case "$t" in ethernet|wifi|wireguard|tun|vpn|gsm|bt) devs+=("$d") ;; esac
+    done < <(nmcli -t -f DEVICE,TYPE device status 2>/dev/null)
+
+    local ifaces="[]"
+    if (( ${#devs[@]} )); then
+        ifaces=$(for d in "${devs[@]}"; do device_json "$d"; done | jq -s .)
+    fi
+
+    local conns
+    conns=$(nmcli -t -f NAME,TYPE,DEVICE,AUTOCONNECT,ACTIVE connection show 2>/dev/null | detabify |
+        awk -F: -v OFS='\t' '{ print $1, $2, $3, $4, $5 }' | retabify |
+        jq -R -s 'split("\n") | map(select(length > 0) | split("\t")
+            | { name: .[0], type: .[1], device: .[2], autoconnect: (.[3] == "yes"), active: (.[4] == "yes") })
+            | map(select(.type as $t | ["loopback", "bridge", "dummy"] | index($t) | not))')
+
+    local rf
+    rf=$(rfkill -J 2>/dev/null | jq -c '.rfkilldevices // [] | map({ type, soft, hard })' || echo '[]')
+
+    jq -n --argjson ifaces "$ifaces" --argjson conns "$conns" --argjson rf "$rf" \
+          --arg host "$(cat /etc/hostname 2>/dev/null || uname -n)" \
+          --arg radio "$(nmcli radio wifi 2>/dev/null)" \
+          --arg route "$(ip route show default 2>/dev/null | awk '{ print $5; exit }')" '
+        { hostname: $host, routeDevice: $route, wifiEnabled: ($radio == "enabled"),
+          interfaces: $ifaces,
+          connections: ($conns | map(select(.type != "wireguard" and .type != "vpn"))),
+          vpn: ($conns | map(select(.type == "wireguard" or .type == "vpn"))),
+          rfkill: $rf,
+          airplane: (($rf | length) > 0 and ($rf | all(.soft == "blocked" or .hard == "blocked"))) }'
+}
+
+cmd_publicip() {
+    local t
+    t=$(curl -s --max-time 6 https://1.1.1.1/cdn-cgi/trace) || { echo '{"error":"offline"}'; return; }
+    jq -n --arg t "$t" '$t | split("\n") | map(select(contains("=")) | split("=") | { (.[0]): .[1] }) | add
+        | { ip, country: .loc, datacenter: .colo, warp }'
+}
+
+# Měření proti Cloudflare (jako speed.cloudflare.com): latence = medián TTFB
+# prázdných požadavků, download 25 MB, upload 10 MB. Mbit/s z bajtů za sekundu.
+cmd_speedtest() {
+    local base="https://speed.cloudflare.com" i t lat=() mbps
+    for i in 1 2 3 4 5; do
+        t=$(curl -s -o /dev/null --max-time 5 -w '%{time_starttransfer} %{time_pretransfer}' "$base/__down?bytes=0") || continue
+        lat+=("$(awk '{ printf "%.1f", ($1 - $2) * 1000 }' <<<"$t")")
+    done
+    if (( ${#lat[@]} == 0 )); then echo '{"phase":"error","message":"no connection to speed.cloudflare.com"}'; return 1; fi
+    printf '%s\n' "${lat[@]}" | sort -n | awk '{ a[NR] = $1 } END { printf "{\"phase\":\"latency\",\"ms\":%s}\n", a[int((NR + 1) / 2)] }'
+
+    echo '{"phase":"download","running":true}'
+    mbps=$(curl -s -o /dev/null --max-time 30 -w '%{speed_download}' "$base/__down?bytes=25000000" |
+           awk '{ printf "%.1f", $1 * 8 / 1e6 }')
+    echo "{\"phase\":\"download\",\"mbps\":${mbps:-0}}"
+
+    echo '{"phase":"upload","running":true}'
+    mbps=$(head -c 10000000 /dev/zero | curl -s -o /dev/null --max-time 30 -w '%{speed_upload}' \
+           --data-binary @- "$base/__up" | awk '{ printf "%.1f", $1 * 8 / 1e6 }')
+    echo "{\"phase\":\"upload\",\"mbps\":${mbps:-0}}"
+    echo '{"phase":"done"}'
+}
+
+conn_name() { [[ -n "${1:-}" ]] || { echo "rp-net: missing connection name" >&2; exit 1; }; }
+
 case "${1:-status}" in
     status)     cmd_status ;;
     wifi)       nmcli radio wifi "${2:-on}" >/dev/null 2>&1 ;;
     connect)    shift; cmd_connect "$*" ;;
     disconnect) nmcli device disconnect "$(wifi_dev)" >/dev/null 2>&1 ;;
     rescan)     nmcli device wifi rescan >/dev/null 2>&1 ;;
-    *)          echo "použití: rp-net {status|wifi on|off|connect <ssid>|disconnect|rescan}" >&2; exit 1 ;;
+    details)    cmd_details ;;
+    up)         conn_name "${2:-}"; nmcli connection up id "$2" 2>&1 ;;
+    down)       conn_name "${2:-}"; nmcli connection down id "$2" 2>&1 ;;
+    forget)     conn_name "${2:-}"; nmcli connection delete id "$2" 2>&1 ;;
+    autoconnect) conn_name "${2:-}"; nmcli connection modify id "$2" connection.autoconnect "${3:-yes}" 2>&1 ;;
+    airplane)   if [[ "${2:-on}" == on ]]; then rfkill block all; else rfkill unblock all; fi ;;
+    publicip)   cmd_publicip ;;
+    speedtest)  cmd_speedtest ;;
+    *)          echo "použití: rp-net {status|details|wifi on|off|connect <ssid>|disconnect|rescan|up|down|forget <jméno>|autoconnect <jméno> yes|no|airplane on|off|publicip|speedtest}" >&2; exit 1 ;;
 esac

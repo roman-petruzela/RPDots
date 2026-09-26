@@ -39,6 +39,10 @@ Scope {
     //          percent (0–1 jako %), zero (popisek pro 0, např. "Off") }
     // nebo zvláštní druh: { kind: "button" | "modules" | "power" | "tools" | "note" }
     readonly property var pages: [
+        { id: "network", group: "CONNECTIONS", icon: "󰛳", label: "Network", view: "network",
+          keywords: "wifi wi-fi ethernet ip address dns vpn proton airplane speed test public" },
+        { id: "sound", group: "CONNECTIONS", icon: "󰕾", label: "Sound", view: "sound",
+          keywords: "audio volume output input microphone speakers headphones apps profile" },
         { id: "appearance", group: "PERSONALIZATION", icon: "󰏘", label: "Appearance", sections: [
             { title: "WINDOWS", rows: [
                 { key: "niri.gaps", label: "Gaps", hint: "Space between windows and around the screen edge.", suffix: " px" },
@@ -679,74 +683,85 @@ Scope {
                             onEdited: v => root.query = v
                         }
 
-                        Repeater {
-                            model: root.pages
-                            Column {
-                                required property var modelData
-                                required property int index
-                                readonly property bool sel: root.query === "" && persist.page === index
-                                readonly property bool firstInGroup: index === 0 || root.pages[index - 1].group !== modelData.group
-                                width: nav.width
+                    }
 
-                                // Nadpis skupiny (Personalization / System)
-                                Item {
-                                    visible: firstInGroup
-                                    width: parent.width
-                                    height: 34
-                                    SHeading {
-                                        anchors.bottom: parent.bottom
-                                        leftPadding: 12; topPadding: 0; bottomPadding: 6
-                                        text: modelData.group
-                                        color: Colors.outline
-                                        font.pixelSize: 10
-                                    }
-                                }
+                    // Stránky — posuvné, ať se vejdou i na nižší okno
+                    Flickable {
+                        id: navFlick
+                        anchors { left: parent.left; right: parent.right; top: nav.bottom; bottom: parent.bottom; leftMargin: 14; rightMargin: 14; bottomMargin: 14 }
+                        contentHeight: navCol.implicitHeight
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-                                // Položka: ikona i text svisle na středu (Row by je zarovnal nahoru)
-                                Rectangle {
-                                    width: parent.width
-                                    height: 36
-                                    radius: 10
-                                    color: sel ? Qt.alpha(Colors.primary, 0.18)
-                                        : navHover.hovered ? Qt.alpha(Colors.onSurface, 0.05) : "transparent"
-                                    Behavior on color { ColorAnimation { duration: 120 } }
-                                    HoverHandler { id: navHover }
+                        Column {
+                            id: navCol
+                            width: navFlick.width
+                            spacing: 2
 
-                                    Text {
-                                        id: navIcon
-                                        anchors { left: parent.left; leftMargin: 12; verticalCenter: parent.verticalCenter }
-                                        width: 20
-                                        horizontalAlignment: Text.AlignHCenter
-                                        text: modelData.icon
-                                        font.family: root.fontFamily
-                                        font.pixelSize: 16
-                                        color: sel ? Colors.primary : Colors.onSurfaceVariant
+                            Repeater {
+                                model: root.pages
+                                Column {
+                                    required property var modelData
+                                    required property int index
+                                    readonly property bool sel: root.query === "" && persist.page === index
+                                    readonly property bool firstInGroup: index === 0 || root.pages[index - 1].group !== modelData.group
+                                    width: navCol.width
+
+                                    // Nadpis skupiny (Personalization / System)
+                                    Item {
+                                        visible: firstInGroup
+                                        width: parent.width
+                                        height: 34
+                                        SHeading {
+                                            anchors.bottom: parent.bottom
+                                            leftPadding: 12; topPadding: 0; bottomPadding: 6
+                                            text: modelData.group
+                                            color: Colors.outline
+                                            font.pixelSize: 10
+                                        }
                                     }
-                                    Text {
-                                        anchors { left: navIcon.right; leftMargin: 12; right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
-                                        text: modelData.label
-                                        elide: Text.ElideRight
-                                        font.family: root.fontFamily
-                                        font.pixelSize: 13
-                                        font.weight: sel ? Font.Medium : Font.Normal
-                                        color: sel ? Colors.onSurface : Colors.onSurfaceVariant
-                                    }
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: root.goTo(modelData.id)
+
+                                    // Položka: ikona i text svisle na středu (Row by je zarovnal nahoru)
+                                    Rectangle {
+                                        width: parent.width
+                                        height: 36
+                                        radius: 10
+                                        color: sel ? Qt.alpha(Colors.primary, 0.18)
+                                            : navHover.hovered ? Qt.alpha(Colors.onSurface, 0.05) : "transparent"
+                                        Behavior on color { ColorAnimation { duration: 120 } }
+                                        HoverHandler { id: navHover }
+
+                                        Text {
+                                            id: navIcon
+                                            anchors { left: parent.left; leftMargin: 12; verticalCenter: parent.verticalCenter }
+                                            width: 20
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: modelData.icon
+                                            font.family: root.fontFamily
+                                            font.pixelSize: 16
+                                            color: sel ? Colors.primary : Colors.onSurfaceVariant
+                                        }
+                                        Text {
+                                            anchors { left: navIcon.right; leftMargin: 12; right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
+                                            text: modelData.label
+                                            elide: Text.ElideRight
+                                            font.family: root.fontFamily
+                                            font.pixelSize: 13
+                                            font.weight: sel ? Font.Medium : Font.Normal
+                                            color: sel ? Colors.onSurface : Colors.onSurfaceVariant
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: root.goTo(modelData.id)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    SHint {
-                        anchors { left: parent.left; bottom: parent.bottom; leftMargin: 26; bottomMargin: 18 }
-                        text: "Esc to close"
-                        font.pixelSize: 10
-                        color: Colors.outline
-                    }
                 }
 
                 // ── Obsah
@@ -819,12 +834,15 @@ Scope {
                     Loader {
                         anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: 12 }
                         active: root.query === "" && !!root.page.view
-                        sourceComponent: ({ about: aboutC, updates: updatesC, packages: packagesC, firewall: firewallC })[root.page.view] ?? null
+                        sourceComponent: ({ about: aboutC, updates: updatesC, packages: packagesC, firewall: firewallC,
+                                            network: networkC, sound: soundC })[root.page.view] ?? null
                     }
                     Component { id: aboutC; AboutPage { host: root } }
                     Component { id: updatesC; UpdatesPage { host: root } }
                     Component { id: packagesC; PackagesPage { host: root } }
                     Component { id: firewallC; FirewallPage { host: root } }
+                    Component { id: networkC; NetworkPage { host: root } }
+                    Component { id: soundC; SoundPage { host: root } }
 
                     // Log akcí (aktualizace, instalace, firewall) — vyjede zespodu
                     SJob {

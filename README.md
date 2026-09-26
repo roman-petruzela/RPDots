@@ -444,8 +444,9 @@ straight away, since it costs nothing to undo. Shut down is `systemctl poweroff`
 ## Settings window
 
 `Mod+S` (`rp-shell settings toggle`, or `rp-shell settings <page>` to open a
-page directly: `appearance`, `windows`, `theme`, `keyboard`, `mouse`,
-`notifications`, `about`, `updates`, `packages`, `firewall`, `power`, `tools`)
+page directly: `network`, `sound`, `appearance`, `windows`, `theme`, `keyboard`,
+`mouse`, `notifications`, `about`, `updates`, `packages`, `firewall`, `power`,
+`tools`)
 opens `Settings.qml`. It is also in the
 launcher as **Settings** (`.local/share/applications/rp-settings.desktop`). It is
 a normal floating toplevel rather than a layer, so it can be moved and niri
@@ -492,6 +493,24 @@ action (allowed without a password) and the services and ports from the
 world-readable zone XML. Writes run as one `pkexec sh -c` covering runtime and
 permanent, with no timeout: one dialog per change, and it stays open while you
 type.
+
+The **Connections** pages are built the same way. **Network** (`rp-net details`)
+shows the connection and IP, an airplane-mode switch (`rfkill`, no root needed),
+the public IP and a speed test, Wi-Fi with joining (the password goes to
+`rp-net connect` over stdin, as in the flyout), NetworkManager VPNs (Proton's
+WireGuard included), saved connections with autoconnect/forget, and a card per
+interface (IPv4/IPv6, gateway, DNS, MAC, link speed, Wi-Fi band/signal/bitrate).
+The public IP and the speed test only contact Cloudflare when you click:
+`1.1.1.1/cdn-cgi/trace`, and `speed.cloudflare.com` with 25 MB down, 10 MB up
+and latency as the median TTFB of empty requests. It goes through the VPN if one
+is up. `nmcli monitor` triggers a refresh on changes.
+
+**Sound** (`rp-audio status`, one `pactl -f json` pass) has the master volume
+(still mirrored to every output, like the volume keys), outputs and inputs,
+the port of the current output, input volume and mute, a volume and output
+choice per app, which app uses which microphone, card profiles and the
+blacklist. Recording streams that read an output's monitor (cava) are left out.
+`pactl subscribe` keeps it live.
 
 The shared controls (`SRow`, `SToggle`, `SSlider`, `SDropdown`, `SButton`, …)
 live in `settings/` too. In `Row`, children sit at the top, so a 13 px label

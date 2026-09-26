@@ -10,6 +10,7 @@ Rectangle {
     property string icon: ""
     // false: jen Enter (pole, kde by odchod kliknutím nechtěně spustil akci)
     property bool commitOnBlur: true
+    property bool password: false
     property alias text: input.text
     property alias inputItem: input
     signal committed(string value)
@@ -41,6 +42,7 @@ Rectangle {
             verticalCenter: parent.verticalCenter
         }
         text: tb.value
+        echoMode: tb.password ? TextInput.Password : TextInput.Normal
         font.family: "JetBrainsMono Nerd Font"
         font.pixelSize: 12
         color: Colors.onSurface

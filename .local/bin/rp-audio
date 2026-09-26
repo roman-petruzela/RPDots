@@ -10,6 +10,19 @@
 #   rp-audio list            list outputs (JSON)
 #   rp-audio daemon          watch volume and new streams (systemd unit)
 #
+# For the Settings window (Sound page):
+#   rp-audio status                    outputs, inputs, app streams, cards (JSON)
+#   rp-audio input <source>            default input
+#   rp-audio source-volume <source> <0-150>
+#   rp-audio source-mute <source> [toggle|on|off]
+#   rp-audio stream-volume <id> <0-150>   one app's playback stream
+#   rp-audio stream-mute <id> [toggle|on|off]
+#   rp-audio stream-move <id> <sink>      pin an app to another output
+#   rp-audio rec-move <id> <source>       move a recording stream to another input
+#   rp-audio profile <card> <profile>     card profile (e.g. headset mic on/off)
+#   rp-audio port <sink|source> <port>    speakers vs. headphones etc.
+#   rp-audio blacklist [a,b,…]            print or replace the blacklist
+#
 # Volume is always set on ALL outputs at once, so switching between them
 # isn't heard as a jump. Streams from the blacklist (~/.config/rp-audio/blacklist.conf)
 # stay wherever the app itself routed them.
@@ -183,6 +196,72 @@ cmd_list() {
         ]'
 }
 
+# ── Settings page ──────────────────────────────────────────────────────
+
+# Everything the Sound page shows, in one JSON (volume = first channel, in %)
+cmd_status() {
+    local sinks sources inputs outputs cards
+    sinks=$(pactl -f json list sinks 2>/dev/null || echo '[]')
+    sources=$(pactl -f json list sources 2>/dev/null || echo '[]')
+    inputs=$(pactl -f json list sink-inputs 2>/dev/null || echo '[]')
+    outputs=$(pactl -f json list source-outputs 2>/dev/null || echo '[]')
+    cards=$(pactl -f json list cards 2>/dev/null || echo '[]')
+    jq -n --argjson sinks "$sinks" --argjson sources "$sources" --argjson inputs "$inputs" \
+          --argjson outputs "$outputs" --argjson cards "$cards" \
+          --arg defSink "$(pactl get-default-sink 2>/dev/null)" \
+          --arg defSource "$(pactl get-default-source 2>/dev/null)" \
+          --arg vol "$(pct_of_raw "$(global_vol)")" --arg mute "$(global_mute)" \
+          --argjson bl "$(read_blacklist | jq -R . | jq -s .)" '
+        def pct: [.volume[]?.value_percent | rtrimstr("%") | tonumber] | (first // 0);
+        def ports: [.ports[]? | { name, description, available: (.availability != "not available") }];
+        def app: .properties as $p | {
+            app: ($p."application.name" // $p."application.process.binary" // $p."node.name" // "Unknown"),
+            icon: ($p."application.icon_name" // $p."application.process.binary" // ""),
+            media: ($p."media.name" // "") };
+        [$sources[] | select(.monitor_source != "" and .monitor_source != null) | .index] as $monitors
+        | {
+            volume: ($vol | tonumber), muted: ($mute == "yes"), blacklist: $bl,
+            outputs: [$sinks[] | { id: .index, name, description, volume: pct, muted: .mute,
+                                   default: (.name == $defSink), ports: ports, port: (.active_port // ""),
+                                   virtual: ((.properties."device.api" // "") == "") }],
+            inputs: [$sources[] | select(.monitor_source == "" or .monitor_source == null)
+                     | { id: .index, name, description, volume: pct, muted: .mute,
+                         default: (.name == $defSource), ports: ports, port: (.active_port // ""),
+                         virtual: ((.properties."device.api" // "") == "") }],
+            streams: [$inputs[] | select((.properties."application.id" // "") != "org.PulseAudio.pavucontrol")
+                      | app + { id: .index, sink: .sink, volume: pct, muted: .mute,
+                                corked: .corked }],
+            recording: [$outputs[] | select((.properties."application.id" // "") != "org.PulseAudio.pavucontrol")
+                        # cava a spol. čtou monitor výstupu — to není nahrávání mikrofonu
+                        | select(.source as $s | $monitors | index($s) | not)
+                        | app + { id: .index, source: .source }],
+            cards: [$cards[] | { id: .index, name, description: (.properties."device.description" // .name),
+                                 profile: .active_profile,
+                                 profiles: [.profiles | to_entries[] | select(.value.available != false)
+                                            | { name: .key, description: .value.description, priority: .value.priority }]
+                                           | sort_by(-.priority) }]
+          }'
+}
+
+check_pct() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]] && (( $1 <= 150 )) || { echo "rp-audio: volume must be 0-150" >&2; exit 1; }
+}
+
+mute_flag() {
+    case "${1:-toggle}" in on) echo 1 ;; off) echo 0 ;; toggle) echo toggle ;;
+        *) echo "rp-audio: expected toggle|on|off" >&2; exit 1 ;; esac
+}
+
+cmd_blacklist() {
+    if [[ $# -eq 0 ]]; then read_blacklist; return; fi
+    mkdir -p "$CONF_DIR"
+    {
+        echo "# Apps that keep their own output (substring of binary / app name / node name)."
+        echo "# Edited from the Settings window; one entry per line."
+        tr ',' '\n' <<<"$1" | tr -d ' \t' | tr '[:upper:]' '[:lower:]' | grep -v '^$'
+    } > "$BLACKLIST_FILE"
+}
+
 # ── daemon ───────────────────────────────────────────────────────────────
 
 # A freshly added device generates `change` events for a moment while it
@@ -271,5 +350,18 @@ case "${1:-}" in
     sync)   cmd_sync ;;
     list)   cmd_list ;;
     daemon) cmd_daemon ;;
+    status) cmd_status ;;
+    input)  [[ -n "${2:-}" ]] || exit 1; pactl set-default-source "$2" ;;
+    source-volume) check_pct "${3:-}"; pactl set-source-volume "$2" "$3%" ;;
+    source-mute)   pactl set-source-mute "$2" "$(mute_flag "${3:-}")" ;;
+    stream-volume) check_pct "${3:-}"; pactl set-sink-input-volume "$2" "$3%" ;;
+    stream-mute)   pactl set-sink-input-mute "$2" "$(mute_flag "${3:-}")" ;;
+    stream-move)   pactl move-sink-input "$2" "$3" ;;
+    rec-move)      pactl move-source-output "$2" "$3" ;;
+    profile)       pactl set-card-profile "$2" "$3" ;;
+    port)
+        # Port patří buď výstupu, nebo vstupu — zkusit obojí
+        pactl set-sink-port "$2" "$3" 2>/dev/null || pactl set-source-port "$2" "$3" ;;
+    blacklist) shift; cmd_blacklist "$@" ;;
     *)      sed -n '2,20p' "$0" | sed 's/^# \?//'; exit 1 ;;
 esac
