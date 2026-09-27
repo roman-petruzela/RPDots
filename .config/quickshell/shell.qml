@@ -157,6 +157,7 @@ ShellRoot {
             return
         }
         if (line === "lock lock") { lockScreen.lock(); return }
+        if (line === "identify run") { identify.run(); return }
         if (line === "osd-volume trigger") osd.triggerVolume()
         else if (line === "osd-brightness trigger") osd.triggerBrightness()
         else if (line === "osd-keyboard-layout trigger") osd.triggerKeyboardLayout()
@@ -211,6 +212,7 @@ ShellRoot {
     PolkitDialog {}
 
     LockScreen { id: lockScreen }
+    IdentifyOverlay { id: identify }
 
     IpcHandler {
         target: "lock"

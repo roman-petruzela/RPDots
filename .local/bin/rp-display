@@ -156,6 +156,7 @@ set_value() {
 }
 
 identify() {
+    "$HOME/.local/bin/rp-shell" identify run 2>/dev/null && return 0
     local o
     for o in $(niri msg --json outputs | jq -r 'to_entries[] | select(.value.logical) | .key'); do
         niri msg action focus-monitor "$o" >/dev/null 2>&1
