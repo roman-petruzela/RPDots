@@ -50,6 +50,10 @@ PKGS=(
     git
 
     zsh
+    zsh-theme-powerlevel10k
+    zsh-autosuggestions
+    zsh-syntax-highlighting
+    fzf
     eza
     zoxide
     cava
@@ -145,7 +149,20 @@ install_packages() {
     fi
     [[ ${#repo[@]} -eq 0 && ${#aur[@]} -eq 0 ]] && echo "Everything is installed."
     install_cursor
+    install_zsh
     return 0
+}
+
+install_zsh() {
+    local custom="$HOME/.oh-my-zsh/custom/plugins" p
+    [[ -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]] \
+        || git clone -q --depth 1 https://github.com/ohmyzsh/ohmyzsh "$HOME/.oh-my-zsh" \
+        || echo "!! Cloning oh-my-zsh failed" >&2
+    for p in zsh-autosuggestions zsh-syntax-highlighting; do
+        [[ -d "$custom/$p" ]] || git clone -q --depth 1 "https://github.com/zsh-users/$p" "$custom/$p" \
+            || echo "!! Cloning $p failed" >&2
+    done
+    [[ "$(getent passwd "$USER" | cut -d: -f7)" == */zsh ]] || sudo chsh -s /usr/bin/zsh "$USER"
 }
 
 install_cursor() {

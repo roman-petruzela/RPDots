@@ -19,7 +19,7 @@ archlinux
 zsh-syntax-highlighting
 )
 
-source $ZSH/oh-my-zsh.sh
+[[ -f $ZSH/oh-my-zsh.sh ]] && source $ZSH/oh-my-zsh.sh
 
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='vim'
@@ -41,7 +41,8 @@ typeset -g POWERLEVEL9K_PROMPT_CHAR_ERROR_VIINS_CONTENT_EXPANSION='❯'
 [[ -f "${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/p10k-colors.zsh" ]] \
   && source "${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/p10k-colors.zsh"
 
-source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
+[[ -f /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme ]] \
+  && source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
 
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
