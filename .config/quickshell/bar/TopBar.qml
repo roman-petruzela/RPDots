@@ -477,7 +477,8 @@ PanelWindow {
                         }
                         onWheel: e => ti.modelData.scroll(e.angleDelta.y, false)
                     }
-                    BarTooltip { target: ti; text: ti.modelData.tooltipTitle || ti.modelData.title; wanted: tiArea.containsMouse }
+                    // Když je menu té ikony otevřené, tooltip by ho zakrýval
+                    BarTooltip { target: ti; text: ti.modelData.tooltipTitle || ti.modelData.title; wanted: tiArea.containsMouse && !(trayMenu.visible && trayMenu.owner === ti) }
                 }
             }
         }
