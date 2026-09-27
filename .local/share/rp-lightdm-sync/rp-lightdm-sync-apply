@@ -2,11 +2,12 @@
 # rp-lightdm-sync-apply — privilegovaná část synchronizace login screenu.
 # Volá se přes sudo z theme-modules/84-lightdm.sh při každé změně tapety.
 # lightdm-gtk-greeter běží pod vlastním uživatelem a nedostane se do
-# /home/roman (chmod 700), takže mu GTK3 téma a current wallpaper kopírujeme
+# domovské složky uživatele (chmod 700), takže mu GTK3 téma a current wallpaper kopírujeme
 # do systémových cest, které přečte kdokoli.
 set -euo pipefail
 
-USER_HOME="/home/${SUDO_USER:-roman}"
+USER_HOME="$(getent passwd "${SUDO_USER:?run through sudo}" | cut -d: -f6)"
+[[ -d "$USER_HOME" ]] || { echo "rp-lightdm-sync-apply: no home for $SUDO_USER" >&2; exit 1; }
 SRC_THEME="$USER_HOME/.local/share/themes/RPRice"
 SRC_WALLPAPER="$USER_HOME/.local/share/wallpapers/current"
 DST_THEME="/usr/share/themes/RPRice"

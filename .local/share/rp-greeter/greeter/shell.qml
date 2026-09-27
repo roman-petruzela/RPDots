@@ -19,7 +19,7 @@ import "Colors.js" as Colors
 ShellRoot {
     id: root
 
-    readonly property string user: Quickshell.env("RP_GREETER_USER") || "roman"
+    readonly property string user: Quickshell.env("RP_GREETER_USER") || ""
     readonly property bool testMode: Quickshell.env("RP_GREETER_TEST") === "1"
     readonly property string onlyScreen: Quickshell.env("RP_GREETER_SCREEN") || ""
     readonly property string wallpaper: Quickshell.env("RP_GREETER_WALLPAPER")

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # LightDM greeter (login screen) zrcadlí RPRice GTK3 téma + current wallpaper.
-# Greeter běží pod vlastním uživatelem a nedostane se do /home/roman (chmod
+# Greeter běží pod vlastním uživatelem a nedostane se do domovské složky (chmod
 # 700), takže kopírování do systémových cest dělá privilegovaný helper — viz
 # .local/share/rp-lightdm-sync/install.sh. Dokud není nainstalovaný, requires=
 # v modules.conf tenhle modul potichu přeskočí.

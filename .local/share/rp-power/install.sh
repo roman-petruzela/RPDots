@@ -8,9 +8,10 @@ SRC="$(cd "$(dirname "$0")" && pwd)"
 
 install -Dm755 "$SRC/rp-power-apply" /usr/local/bin/rp-power-apply
 
-# sudoers — scoped to this one binary, nothing else
-cat > /etc/sudoers.d/rp-power <<'EOF'
-roman ALL=(root) NOPASSWD: /usr/local/bin/rp-power-apply
+# sudoers — scoped to this one binary, nothing else, for the user who ran sudo
+TARGET_USER="${SUDO_USER:?run through sudo so the target user is known}"
+cat > /etc/sudoers.d/rp-power <<EOF
+$TARGET_USER ALL=(root) NOPASSWD: /usr/local/bin/rp-power-apply
 EOF
 chmod 0440 /etc/sudoers.d/rp-power
 visudo -cf /etc/sudoers.d/rp-power

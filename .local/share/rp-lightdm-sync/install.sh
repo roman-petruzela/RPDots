@@ -16,7 +16,7 @@ SRC="$(cd "$(dirname "$0")" && pwd)"
 
 install -Dm755 "$SRC/rp-lightdm-sync-apply" /usr/local/bin/rp-lightdm-sync-apply
 
-TARGET_USER="${SUDO_USER:-roman}"
+TARGET_USER="${SUDO_USER:?run through sudo so the target user is known}"
 cat >/etc/sudoers.d/rp-lightdm-sync <<EOF
 $TARGET_USER ALL=(root) NOPASSWD: /usr/local/bin/rp-lightdm-sync-apply
 EOF
