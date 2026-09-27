@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $EUID -eq 0 ]]; then
-    echo "Run install.sh as your normal user, not with sudo — it asks for the password once at the start." >&2
+    echo "error: run as a regular user; the installer calls sudo itself" >&2
     exit 1
 fi
 
@@ -97,8 +97,8 @@ NOT_DEPLOYED=(.gitignore .stow-local-ignore README.md install.sh CLAUDE.md .gitc
 
 need_sudo() {
     [[ -n "${SUDO_KEEPALIVE:-}" ]] && return 0
-    echo "Some steps need root — enter your password once, it's kept for the whole run."
-    sudo -v || { echo "sudo failed." >&2; exit 1; }
+    echo ":: Root access is required"
+    sudo -v || { echo "error: sudo authentication failed" >&2; exit 1; }
     while kill -0 $$ 2>/dev/null; do sudo -n -v 2>/dev/null || true; sleep 50; done &
     SUDO_KEEPALIVE=$!
     trap 'kill "$SUDO_KEEPALIVE" 2>/dev/null' EXIT
@@ -116,14 +116,14 @@ in_session() {
 
 WANT_EXTRAS=0
 choose_extras() {
-    echo "Optional extras (the rice works without them, ~350 MB):"
+    echo ":: Optional packages (~350 MB):"
     printf '  %s\n' "${EXTRAS[@]}"
-    ask "Install the extras too?" && WANT_EXTRAS=1
+    ask "Install optional packages?" && WANT_EXTRAS=1
     return 0
 }
 
 install_packages() {
-    echo "== Packages"
+    echo ":: Installing packages"
     local list=("${PKGS[@]}")
     [[ $WANT_EXTRAS == 1 ]] && list+=("${EXTRAS[@]}")
     sudo pacman -Sy
@@ -134,20 +134,19 @@ install_packages() {
     done
 
     if [[ ${#repo[@]} -gt 0 ]]; then
-        echo "From the repositories: ${repo[*]}"
-        echo "(this also upgrades the rest of the system — Arch doesn't support partial upgrades)"
+        echo " -> Repositories (with full system upgrade): ${repo[*]}"
         sudo pacman -Su --needed --noconfirm "${repo[@]}"
     fi
     if [[ ${#aur[@]} -gt 0 ]]; then
         command -v paru &>/dev/null || install_paru
         if command -v paru &>/dev/null; then
-            echo "From the AUR: ${aur[*]}"
+            echo " -> AUR: ${aur[*]}"
             paru -S --needed --noconfirm --skipreview "${aur[@]}"
         else
-            echo "Not in the repositories and no paru to get them from the AUR: ${aur[*]}" >&2
+            echo "warning: paru unavailable, skipping AUR packages: ${aur[*]}" >&2
         fi
     fi
-    [[ ${#repo[@]} -eq 0 && ${#aur[@]} -eq 0 ]] && echo "Everything is installed."
+    [[ ${#repo[@]} -eq 0 && ${#aur[@]} -eq 0 ]] && echo " -> All packages already installed"
     install_cursor
     install_zsh
     return 0
@@ -157,10 +156,10 @@ install_zsh() {
     local custom="$HOME/.oh-my-zsh/custom/plugins" p
     [[ -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]] \
         || git clone -q --depth 1 https://github.com/ohmyzsh/ohmyzsh "$HOME/.oh-my-zsh" \
-        || echo "!! Cloning oh-my-zsh failed" >&2
+        || echo "warning: failed to clone oh-my-zsh" >&2
     for p in zsh-autosuggestions zsh-syntax-highlighting; do
         [[ -d "$custom/$p" ]] || git clone -q --depth 1 "https://github.com/zsh-users/$p" "$custom/$p" \
-            || echo "!! Cloning $p failed" >&2
+            || echo "warning: failed to clone $p" >&2
     done
     [[ "$(getent passwd "$USER" | cut -d: -f7)" == */zsh ]] || sudo chsh -s /usr/bin/zsh "$USER"
 }
@@ -170,22 +169,19 @@ install_cursor() {
     for d in /usr/share/icons "$HOME/.local/share/icons" "$HOME/.icons"; do
         [[ -d "$d/$CURSOR_THEME/cursors" ]] && return 0
     done
-    echo "Cursor theme $CURSOR_THEME → ~/.local/share/icons"
+    echo " -> Installing cursor theme $CURSOR_THEME"
     mkdir -p "$HOME/.local/share/icons"
     curl -fsSL "$CURSOR_URL" | tar -xJ -C "$HOME/.local/share/icons" \
-        || echo "!! Downloading the cursor theme failed — $CURSOR_URL" >&2
+        || echo "warning: failed to download $CURSOR_URL" >&2
 }
 
 install_paru() {
-    echo "Some packages are only in the AUR — installing paru (the AUR helper) first."
+    echo " -> Installing paru"
     sudo pacman -S --needed --noconfirm base-devel git
     local tmp; tmp="$(mktemp -d)"
-    if git clone --depth 1 https://aur.archlinux.org/paru-bin.git "$tmp/paru-bin" \
-        && (cd "$tmp/paru-bin" && makepkg -si --noconfirm); then
-        echo "paru installed."
-    else
-        echo "!! Installing paru failed — AUR packages are skipped." >&2
-    fi
+    git clone -q --depth 1 https://aur.archlinux.org/paru-bin.git "$tmp/paru-bin" \
+        && (cd "$tmp/paru-bin" && makepkg -si --noconfirm) \
+        || echo "warning: paru installation failed" >&2
     rm -rf "$tmp"
 }
 
@@ -206,7 +202,7 @@ repo_files() {
 copy_configs() {
     local dry="${1:-0}" f src dst backup="" changed=0 new=0
     [[ "$dry" == 1 ]] || backup="$STATE_DIR/deploy-backup/$(date +%Y%m%d-%H%M%S)"
-    echo "== Configs → $HOME${backup:+ (changed files backed up to $backup)}"
+    echo ":: Deploying configs to $HOME"
 
     while IFS= read -r f; do
         src="$DOTFILES/$f"
@@ -216,10 +212,10 @@ copy_configs() {
         elif [[ -f "$dst" ]]; then
             cmp -s "$src" "$dst" && continue
             changed=$((changed + 1))
-            echo "  changed  $f"
+            [[ "$dry" == 1 ]] && echo "  changed  $f"
         else
             new=$((new + 1))
-            echo "  new      $f"
+            [[ "$dry" == 1 ]] && echo "  new      $f"
         fi
         [[ "$dry" == 1 ]] && continue
 
@@ -232,43 +228,34 @@ copy_configs() {
         cp -p "$src" "$dst"
     done < <(repo_files)
 
-    echo "$new new, $changed changed."
+    echo " -> $new new, $changed updated"
+    [[ "$dry" != 1 && $changed -gt 0 ]] && echo " -> Replaced files backed up to $backup"
     if [[ "$dry" != 1 && $changed -eq 0 && -n "$backup" ]]; then rmdir -p "$backup" 2>/dev/null || true; fi
     if [[ "$dry" != 1 ]] && command -v niri >/dev/null; then
         niri validate -c "$HOME/.config/niri/config.kdl" >/dev/null 2>&1 \
-            || echo "!! niri validate failed for ~/.config/niri/config.kdl" >&2
+            || echo "warning: niri config validation failed" >&2
     fi
 }
 
 stow_configs() {
-    echo "== Symlinking configs with stow"
+    echo ":: Linking configs with stow"
     stow --dir="$DOTFILES" --target="$HOME" --restow .
 }
 
 post_deploy() {
-    echo "== Session setup"
+    echo ":: Configuring session"
     systemctl --user daemon-reload
 
     command -v ya >/dev/null && ya pkg install >/dev/null 2>&1 || true
 
     if ! in_session; then
-        echo "Not inside a running niri session — log into niri, then run"
-        echo "  ~/.local/bin/apply-wallpaper-theme.sh ~/Pictures/Wallpapers/<some wallpaper>"
-        echo "to generate the colours (quickshell won't start without Colors.js)."
+        echo " -> The theme is generated on the first login to niri"
         return 0
     fi
 
     if [[ ! -f "$HOME/.config/quickshell/Colors.js" ]]; then
-        local wall
-        wall="$(find "$HOME/Pictures/Wallpapers" "$HOME/Pictures" -maxdepth 1 -type f \
-            \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
-            -print -quit 2>/dev/null || true)"
-        if [[ -n "$wall" ]]; then
-            echo "Generating the theme from $wall"
-            "$HOME/.local/bin/apply-wallpaper-theme.sh" "$wall" || true
-        else
-            echo "No wallpaper found — put one in ~/Pictures/Wallpapers and press Mod+Shift+W."
-        fi
+        echo " -> Generating theme"
+        "$HOME/.local/bin/apply-wallpaper-theme.sh" >/dev/null 2>&1 || echo "warning: theme generation failed" >&2
     fi
 
     systemctl --user try-restart niri-rice-quickshell.service niri-rice-audio-sync.service \
@@ -276,43 +263,41 @@ post_deploy() {
     systemctl --user start niri-rice-cliphist.service 2>/dev/null || true
     pkill -USR2 -x waybar 2>/dev/null || true
     command -v makoctl >/dev/null && makoctl reload 2>/dev/null || true
-    echo "Done."
+    echo ":: Done"
 }
 
 system_setup() {
-    echo "== System integration"
+    echo ":: System integration"
     local share="$HOME/.local/share"
 
-    if ask "Power modes (rp-power: sudoers rule, udev rule on AC, systemd units)?"; then
+    if ask "Install power profiles (rp-power)?"; then
         sudo "$share/rp-power/install.sh"
     fi
-    if pacman -Qi lightdm &>/dev/null && ask "Mirror the theme and wallpaper to the LightDM login screen (rp-lightdm-sync)?"; then
+    if pacman -Qi lightdm &>/dev/null && ask "Apply the theme to the LightDM greeter?"; then
         sudo "$share/rp-lightdm-sync/install.sh"
     fi
-    echo
-    echo "The quickshell login screen replaces the current display manager with greetd (back with --revert)."
-    echo "Preview it first: $share/rp-greeter/preview.sh"
-    if ask "Switch the login screen to rp-greeter now?"; then
+    echo " -> The RPRice login screen replaces the current display manager with greetd"
+    echo " -> Preview: $share/rp-greeter/preview.sh, revert: $share/rp-greeter/install.sh --revert"
+    if ask "Install the RPRice login screen?"; then
         sudo "$share/rp-greeter/install.sh"
     fi
 }
 
-echo "=== niri rice install ==="
-echo "Dotfiles: $DOTFILES"
+echo "RPRice installer ($DOTFILES)"
 echo
 
-PS3="Choose: "
+PS3="> "
 select action in \
-    "Everything (packages, configs, session setup)" \
-    "Install packages" \
-    "Copy configs to \$HOME" \
-    "Show what copying would change" \
-    "Symlink configs with stow instead of copying" \
-    "System integration (sudo helpers, login screen)" \
-    "Cancel"; do
+    "Full install" \
+    "Packages only" \
+    "Configs only" \
+    "Preview config changes" \
+    "Configs as stow symlinks" \
+    "System integration" \
+    "Quit"; do
     case "$REPLY" in
         1) choose_extras; need_sudo; install_packages; copy_configs; post_deploy
-           echo; ask "Also run the system integration steps?" && system_setup
+           echo; ask "Run system integration?" && system_setup
            break ;;
         2) choose_extras; need_sudo; install_packages; break ;;
         3) copy_configs; post_deploy; break ;;
@@ -320,6 +305,6 @@ select action in \
         5) stow_configs; post_deploy; break ;;
         6) need_sudo; system_setup; break ;;
         7) exit 0 ;;
-        *) echo "Pick a number from the list." ;;
+        *) echo "Invalid choice" ;;
     esac
 done
