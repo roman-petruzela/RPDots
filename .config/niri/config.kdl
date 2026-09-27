@@ -128,6 +128,7 @@ window-rule {
 window-rule {
     match app-id=r#"^dev\.zed\.Zed$"#
     match app-id=r#"^vesktop$"#
+    match app-id=r#"^app\.zen_browser\.zen$"#
     draw-border-with-background false
     background-effect {
         blur true
