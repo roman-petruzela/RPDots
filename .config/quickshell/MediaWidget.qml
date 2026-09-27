@@ -1,12 +1,13 @@
 import Quickshell.Services.Mpris
 import QtQuick
+import QtQuick.Effects
 import "Colors.js" as Colors
 
 Item {
     id: root
 
     implicitWidth: 340
-    implicitHeight: visible ? (hasArt ? 190 : 104) : 0
+    implicitHeight: visible ? body.implicitHeight + 24 : 0
     visible: !!activePlayer
 
     readonly property var players: Mpris.players.values.filter(
@@ -66,98 +67,78 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 14
-        color: Qt.rgba(Qt.color(Colors.surfaceContainerHigh).r,
-                       Qt.color(Colors.surfaceContainerHigh).g,
-                       Qt.color(Colors.surfaceContainerHigh).b, 0.95)
-        border.color: Qt.rgba(Qt.color(Colors.outlineVariant).r,
-                              Qt.color(Colors.outlineVariant).g,
-                              Qt.color(Colors.outlineVariant).b, 0.6)
-        border.width: 1
+        color: Colors.surfaceContainerHigh
         clip: true
 
-        Rectangle {
-            id: artBanner
-            visible: root.hasArt
-            anchors { left: parent.left; right: parent.right; top: parent.top }
-            height: visible ? 120 : 0
-            color: Colors.surfaceContainer
-
-            Image {
-                anchors.fill: parent
-                source: root.artUrl
-                fillMode: Image.PreserveAspectCrop
-                smooth: true
-                asynchronous: true
-            }
-
-            Rectangle {
-                anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-                height: 96
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop {
-                        position: 0.45
-                        color: Qt.rgba(Qt.color(Colors.surfaceContainer).r,
-                                       Qt.color(Colors.surfaceContainer).g,
-                                       Qt.color(Colors.surfaceContainer).b, 0.75)
-                    }
-                    GradientStop {
-                        position: 1.0
-                        color: Qt.rgba(Qt.color(Colors.surfaceContainer).r,
-                                       Qt.color(Colors.surfaceContainer).g,
-                                       Qt.color(Colors.surfaceContainer).b, 0.98)
-                    }
-                }
-            }
-
-            Column {
-                anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-                anchors.leftMargin: 14; anchors.rightMargin: 14; anchors.bottomMargin: 10
-                spacing: 1
-
-                Text {
-                    width: parent.width
-                    text: root.activePlayer ? (root.activePlayer.trackTitle || "Unknown") : ""
-                    font.pixelSize: 14; font.weight: Font.DemiBold
-                    font.family: "JetBrainsMono Nerd Font"
-                    color: Colors.onSurface; elide: Text.ElideRight
-                }
-                Text {
-                    width: parent.width
-                    text: root.activePlayer
-                        ? (root.activePlayer.trackArtist || root.activePlayer.identity || "") : ""
-                    font.pixelSize: 12; font.family: "JetBrainsMono Nerd Font"
-                    color: Colors.onSurfaceVariant; elide: Text.ElideRight
-                }
-            }
-        }
-
         Column {
-            anchors {
-                left: parent.left; right: parent.right
-                top: artBanner.bottom
-                leftMargin: 14; rightMargin: 14; topMargin: 10
-            }
-            spacing: 8
+            id: body
+            x: 12; y: 12
+            width: parent.width - 24
+            spacing: 10
 
-            Column {
-                visible: !root.hasArt
+            Row {
                 width: parent.width
-                spacing: 2
+                spacing: 12
 
-                Text {
-                    width: parent.width
-                    text: root.activePlayer ? (root.activePlayer.trackTitle || "Unknown") : ""
-                    font.pixelSize: 14; font.weight: Font.Medium
-                    font.family: "JetBrainsMono Nerd Font"
-                    color: Colors.onSurface; elide: Text.ElideRight
+                Item {
+                    id: art
+                    width: 56; height: 56
+                    Rectangle {
+                        id: artMask
+                        anchors.fill: parent
+                        radius: 10
+                        visible: false
+                        layer.enabled: true
+                    }
+                    Image {
+                        id: artImg
+                        anchors.fill: parent
+                        source: root.artUrl
+                        fillMode: Image.PreserveAspectCrop
+                        sourceSize: Qt.size(112, 112)
+                        asynchronous: true
+                        visible: false
+                    }
+                    MultiEffect {
+                        anchors.fill: parent
+                        source: artImg
+                        visible: root.hasArt && artImg.status === Image.Ready
+                        maskEnabled: true
+                        maskSource: artMask
+                    }
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 10
+                        visible: !root.hasArt || artImg.status !== Image.Ready
+                        color: Qt.alpha(Colors.primary, 0.16)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "\u{f075a}"
+                            font.family: "JetBrainsMono Nerd Font"
+                            font.pixelSize: 22
+                            color: Colors.primary
+                        }
+                    }
                 }
-                Text {
-                    width: parent.width
-                    text: root.activePlayer
-                        ? (root.activePlayer.trackArtist || root.activePlayer.identity || "") : ""
-                    font.pixelSize: 12; font.family: "JetBrainsMono Nerd Font"
-                    color: Colors.onSurfaceVariant; elide: Text.ElideRight
+
+                Column {
+                    width: parent.width - art.width - parent.spacing
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 2
+                    Text {
+                        width: parent.width
+                        text: root.activePlayer ? (root.activePlayer.trackTitle || "Unknown") : ""
+                        font.pixelSize: 13; font.weight: Font.DemiBold
+                        font.family: "JetBrainsMono Nerd Font"
+                        color: Colors.onSurface; elide: Text.ElideRight
+                    }
+                    Text {
+                        width: parent.width
+                        text: root.activePlayer
+                            ? (root.activePlayer.trackArtist || root.activePlayer.identity || "") : ""
+                        font.pixelSize: 11; font.family: "JetBrainsMono Nerd Font"
+                        color: Colors.onSurfaceVariant; elide: Text.ElideRight
+                    }
                 }
             }
 
@@ -166,12 +147,9 @@ Item {
                 spacing: 4
 
                 Rectangle {
-                    id: progressBar
                     width: parent.width; height: 4; radius: 2
                     opacity: root.hasLength ? 1.0 : 0.45
-                    color: Qt.rgba(Qt.color(Colors.outlineVariant).r,
-                                   Qt.color(Colors.outlineVariant).g,
-                                   Qt.color(Colors.outlineVariant).b, 0.5)
+                    color: Colors.surfaceContainerHighest
 
                     Rectangle {
                         width: parent.width * root.trackProgress
@@ -193,49 +171,41 @@ Item {
                     }
                 }
 
-                Row {
+                Item {
                     width: parent.width
-
+                    height: posLbl.implicitHeight
                     Text {
                         id: posLbl
                         text: root.fmtTime(root.trackPos)
                         font.pixelSize: 10; font.family: "JetBrainsMono Nerd Font"
-                        color: Qt.rgba(Qt.color(Colors.onSurface).r,
-                                       Qt.color(Colors.onSurface).g,
-                                       Qt.color(Colors.onSurface).b, 0.55)
-                    }
-                    Item {
-                        width: parent.width - posLbl.implicitWidth - durLbl.implicitWidth
-                        height: 1
+                        color: Colors.onSurfaceVariant
                     }
                     Text {
-                        id: durLbl
+                        anchors.right: parent.right
                         text: root.hasLength ? root.fmtTime(root.effectiveLen) : "live"
                         font.pixelSize: 10; font.family: "JetBrainsMono Nerd Font"
-                        color: Qt.rgba(Qt.color(Colors.onSurface).r,
-                                       Qt.color(Colors.onSurface).g,
-                                       Qt.color(Colors.onSurface).b, 0.35)
+                        color: Colors.onSurfaceVariant
                     }
                 }
             }
 
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 4
+                spacing: 14
 
                 CtrlBtn {
-                    icon: "\uf048"
+                    icon: "\u{f04ae}"
                     enabled: !!root.activePlayer && root.activePlayer.canGoPrevious
                     onClicked: root.activePlayer.previous()
                 }
                 CtrlBtn {
-                    icon: root.playing ? "\uf04c" : "\uf04b"
-                    size: 36
+                    icon: root.playing ? "\u{f03e4}" : "\u{f040a}"
+                    main: true
                     enabled: !!root.activePlayer && root.activePlayer.canTogglePlaying
                     onClicked: root.activePlayer.togglePlaying()
                 }
                 CtrlBtn {
-                    icon: "\uf051"
+                    icon: "\u{f04ad}"
                     enabled: !!root.activePlayer && root.activePlayer.canGoNext
                     onClicked: root.activePlayer.next()
                 }
@@ -246,29 +216,23 @@ Item {
     component CtrlBtn: Rectangle {
         id: btn
         property string icon: ""
-        property int size: 30
+        property bool main: false
         property bool enabled: true
         signal clicked()
 
-        width: size; height: size; radius: 8
+        width: main ? 44 : 36; height: width; radius: width / 2
+        anchors.verticalCenter: parent ? parent.verticalCenter : undefined
         opacity: enabled ? 1.0 : 0.4
-        color: (ma.containsMouse && enabled)
-            ? Qt.rgba(Qt.color(Colors.primary).r, Qt.color(Colors.primary).g, Qt.color(Colors.primary).b, 0.15)
-            : Qt.rgba(Qt.color(Colors.surfaceContainerHighest).r,
-                      Qt.color(Colors.surfaceContainerHighest).g,
-                      Qt.color(Colors.surfaceContainerHighest).b, 0.70)
-        border.color: Qt.rgba(Qt.color(Colors.outlineVariant).r,
-                              Qt.color(Colors.outlineVariant).g,
-                              Qt.color(Colors.outlineVariant).b, 0.4)
-        border.width: 1
+        color: main ? (ma.containsMouse ? Qt.lighter(Colors.primary, 1.08) : Colors.primary)
+             : ma.containsMouse && enabled ? Colors.surfaceContainerHighest : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         Text {
             anchors.centerIn: parent
             text: btn.icon
-            font.pixelSize: 15
+            font.pixelSize: btn.main ? 20 : 18
             font.family: "JetBrainsMono Nerd Font"
-            color: Colors.onSurface
+            color: btn.main ? Colors.onPrimary : Colors.onSurface
         }
 
         MouseArea {

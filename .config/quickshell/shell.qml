@@ -5,6 +5,8 @@ import Quickshell.Wayland
 import QtQuick
 import "."
 import "bar"
+import "notify"
+import "lock"
 
 ShellRoot {
     id: root
@@ -28,7 +30,7 @@ ShellRoot {
         target: "dashboard"
         function toggle(): void { root.openFlyout(dashboard, true) }
         function open(): void   { root.openFlyout(dashboard, false) }
-        function hide(): void   { dashboard.visible = false }
+        function hide(): void   { dashboard.hide() }
     }
 
     IpcHandler {
@@ -101,7 +103,8 @@ ShellRoot {
 
     function openFlyout(target, allowToggle) {
         for (const f of [dashboard, audioSwitcher, powerSwitcher, networkSwitcher, wallpaperPicker, launcher, sessionMenu, clipboardHistory])
-            if (f !== target) f.visible = false
+            if (f === dashboard && f !== target) f.hide()
+            else if (f !== target) f.visible = false
 
         if (allowToggle) target.toggle()
         else target.open()
@@ -153,6 +156,7 @@ ShellRoot {
             else if (!settingsWindow.openPage(fn)) console.warn("rp-shell: unknown settings page:", fn)
             return
         }
+        if (line === "lock lock") { lockScreen.lock(); return }
         if (line === "osd-volume trigger") osd.triggerVolume()
         else if (line === "osd-brightness trigger") osd.triggerBrightness()
         else if (line === "osd-keyboard-layout trigger") osd.triggerKeyboardLayout()
@@ -177,6 +181,7 @@ ShellRoot {
         id: dashboard
         barData: barSource
         caffeine: caffeine
+        notify: notifyService
     }
 
     AudioSwitcher {
@@ -204,6 +209,16 @@ ShellRoot {
     Settings { id: settingsWindow }
 
     PolkitDialog {}
+
+    LockScreen { id: lockScreen }
+
+    IpcHandler {
+        target: "lock"
+        function lock(): void { lockScreen.lock() }
+    }
+
+    NotifyService { id: notifyService }
+    NotifyPopups { service: notifyService; niri: root.niriRef; rightInset: dashboard.visible ? 380 : 0 }
 
     NiriState { id: niri }
 

@@ -14,7 +14,7 @@ PanelWindow {
 
     anchors { left: true; right: true; top: true; bottom: true }
 
-    exclusionMode: ExclusionMode.Ignore
+    exclusionMode: ExclusionMode.Normal
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: visible
@@ -26,6 +26,7 @@ PanelWindow {
     property int barHeight: 36
     property var barData
     property var caffeine
+    property var notify
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
 
     property var volPending: null
@@ -60,37 +61,53 @@ PanelWindow {
         NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
     }
 
+    property bool closing: false
+    Timer {
+        id: hideTimer
+        interval: 300
+        onTriggered: { root.closing = false; root.visible = false; scroll.contentY = 0 }
+    }
+
     onVisibleChanged: {
         if (visible) {
+            closing = false
             slideX = 0
         } else {
             slideX = 380
-            scroll.contentY = 0
         }
     }
 
     FocusedOutput { id: opener; window: root }
 
-    function open()   { opener.show() }
-    function toggle() { if (root.visible) root.visible = false; else root.open() }
+    function open() {
+        if (closing) { closing = false; hideTimer.stop(); slideX = 0; return }
+        opener.show()
+    }
+    function hide() {
+        if (!visible || closing) return
+        closing = true
+        slideX = 380
+        hideTimer.restart()
+    }
+    function toggle() { if (root.visible && !root.closing) root.hide(); else root.open() }
 
     MouseArea {
         anchors.fill: parent
-        onClicked: root.visible = false
+        onClicked: root.hide()
     }
 
     Item {
         anchors.fill: parent
         focus: root.visible
-        Keys.onEscapePressed: root.visible = false
+        Keys.onEscapePressed: root.hide()
     }
 
     Rectangle {
         id: panel
         x: parent.width - width + slideX
-        y: root.barHeight
+        y: 0
         width: 380
-        height: parent.height - root.barHeight
+        height: parent.height
 
         color: Qt.rgba(Qt.color(Colors.surfaceContainer).r,
                        Qt.color(Colors.surfaceContainer).g,
@@ -137,7 +154,7 @@ PanelWindow {
                         width: parent.width
                         caffeine: root.caffeine
                         polling: root.visible
-                        onRequestClose: root.visible = false
+                        onRequestClose: root.hide()
                     }
 
                     Column {
@@ -165,9 +182,11 @@ PanelWindow {
                         }
                     }
 
+                    SystemWidget { width: parent.width; active: root.visible }
+
                     MediaWidget { id: mediaWidget; width: parent.width }
 
-                    SystemWidget { width: parent.width; active: root.visible }
+                    DashNotifications { width: parent.width; service: root.notify }
                 }
             }
 
