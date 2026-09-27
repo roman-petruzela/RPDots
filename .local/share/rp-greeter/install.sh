@@ -1,15 +1,4 @@
 #!/usr/bin/env bash
-# rp-greeter: login screen in quickshell (greetd → niri → quickshell), replacing
-# lightdm-gtk-greeter. Run once:
-#
-#   sudo ~/.local/share/rp-greeter/install.sh            # install + switch to greetd
-#   sudo ~/.local/share/rp-greeter/install.sh --revert   # back to LightDM
-#
-# Try the look first without touching the system: ~/.local/share/rp-greeter/preview.sh
-#
-# The switch takes effect on the next boot (or after `systemctl restart
-# display-manager` from a TTY). If the greeter ever fails, log in on another
-# TTY (Ctrl+Alt+F2) and run the --revert line above.
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 DST="/usr/share/rp-greeter"
@@ -21,23 +10,31 @@ DST="/usr/share/rp-greeter"
 USER_NAME="${SUDO_USER:?run through sudo so the target user is known}"
 USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
 
+STATE="$DST/previous"
+
 if [[ "${1:-}" == "--revert" ]]; then
+    prev_dm="$(sed -n 's/^dm=//p' "$STATE" 2>/dev/null)"
+    prev_target="$(sed -n 's/^target=//p' "$STATE" 2>/dev/null)"
     systemctl disable greetd.service
-    systemctl enable lightdm.service
-    echo "LightDM is back from the next boot."
+    [[ -n "$prev_dm" ]] && systemctl enable "$prev_dm"
+    [[ -n "$prev_target" ]] && systemctl set-default "$prev_target"
+    echo "Back to ${prev_dm:-no display manager} from the next boot."
     exit 0
+fi
+
+if [[ ! -f "$USER_HOME/.config/quickshell/Colors.js" ]]; then
+    echo "No theme yet ($USER_HOME/.config/quickshell/Colors.js). Log into niri once so the" >&2
+    echo "theme gets generated, then run this again." >&2
+    exit 1
 fi
 
 pacman -S --needed --noconfirm greetd
 
-# Greeter QML + colours. Colors.js is refreshed on every theme change by
-# rp-lightdm-sync-apply (the wallpaper already was).
 install -d "$DST/greeter"
 install -m644 "$SRC"/greeter/*.qml "$DST/greeter/"
 install -m644 "$USER_HOME/.config/quickshell/Colors.js" "$DST/greeter/Colors.js"
 
-# niri config: user name + the user's own output blocks (modes, scale)
-outputs="$(awk '/^output /,/^}/' "$USER_HOME/.config/niri/config.kdl")"
+outputs="$(cat "$USER_HOME/.config/niri/config.kdl" "$USER_HOME/.config/niri/displays.kdl" 2>/dev/null | awk '/^output /,/^}/')"
 while IFS= read -r line; do
     if [[ "$line" == "// @OUTPUTS@" ]]; then
         printf '%s\n' "$outputs"
@@ -49,7 +46,6 @@ niri validate -c "$DST/niri.kdl"
 
 install -d -o greeter -g greeter /var/lib/rp-greeter /var/lib/rp-greeter/cache /var/lib/rp-greeter/state
 
-# greetd config; the packaged one is kept once as config.toml.orig
 if [[ -f /etc/greetd/config.toml && ! -f /etc/greetd/config.toml.orig ]]; then
     cp /etc/greetd/config.toml /etc/greetd/config.toml.orig
 fi
@@ -62,19 +58,21 @@ command = "niri -c $DST/niri.kdl"
 user = "greeter"
 EOF
 
-# LightDM unlocked gnome-keyring at login (/etc/pam.d/lightdm); greetd's PAM
-# stack doesn't, so browser/Discord secrets would stop unlocking on their own.
 PAM=/etc/pam.d/greetd
 grep -q pam_gnome_keyring "$PAM" || {
     sed -i '/^auth.*include/a -auth       optional    pam_gnome_keyring.so' "$PAM"
     printf '%s\n' '-session    optional    pam_gnome_keyring.so auto_start' >>"$PAM"
 }
 
-# Updated sync helper (now also copies Colors.js for the greeter)
 SUDO_USER="$USER_NAME" "$SRC/../rp-lightdm-sync/install.sh"
 
-systemctl disable lightdm.service
+cur_dm="$(basename "$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null)" 2>/dev/null)"
+[[ "$cur_dm" == greetd.service || "$cur_dm" == display-manager.service ]] && cur_dm=""
+install -d "$DST"
+[[ -f "$STATE" ]] || printf 'dm=%s\ntarget=%s\n' "$cur_dm" "$(systemctl get-default)" >"$STATE"
+[[ -n "$cur_dm" ]] && systemctl disable "$cur_dm"
 systemctl enable greetd.service
+[[ "$(systemctl get-default)" == graphical.target ]] || systemctl set-default graphical.target
 
 echo
 echo "Done. The new login screen appears on the next boot."

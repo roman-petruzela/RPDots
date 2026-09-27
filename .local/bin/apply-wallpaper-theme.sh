@@ -7,7 +7,6 @@ CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/niri-rice"
 WALL_DIR="$HOME/.local/share/wallpapers"
 CURRENT_WALL="$WALL_DIR/current"
 CURRENT_SOURCE_FILE="$STATE_DIR/current-wallpaper-source"
-# Drží cestu k video tapetě, pokud je aktivní. Neexistuje = statická tapeta.
 CURRENT_VIDEO_FILE="$STATE_DIR/current-video"
 MODULE_DIR="$HOME/.local/bin/theme-modules"
 THEME_LOG="$STATE_DIR/theme-modules.log"
@@ -32,11 +31,6 @@ waybar_css_changed=0
 waybar_config_changed=0
 
 mkdir -p "$STATE_DIR"
-# Zámek drží PID majitele. Zabitý běh (SIGKILL, nebo quickshell reload, který
-# zabil proces spuštěný z okna Settings) trap nespustí a zámek by zůstal viset
-# navždy — každý další běh by si pak jen zapsal pending a skončil, takže by
-# nešla změnit ani tapeta. Mrtvého majitele proto převzít; zámek bez PID
-# (ze starší verze skriptu) jen když je starší než 10 minut.
 lock_is_stale() {
     local owner
     owner=$(cat "$LOCK_DIR/pid" 2>/dev/null)
@@ -85,7 +79,6 @@ parse_meta() {
     enabled=""
     priority=""
     requires=""
-    # Parse module metadata in one pass (fewer forks than multiple greps).
     IFS='|' read -r enabled priority requires < <(
         awk -F': *' '
       BEGIN { e=""; p=""; r="" }
@@ -250,7 +243,6 @@ apply_wallpaper_now() {
         sleep 0.3
     fi
     
-    # Run wallpaper transition module
     if [[ -x "$HOME/.local/bin/theme-modules/01-wallpaper-transition.sh" ]]; then
         export CURRENT_WALL="$wall"
         "$HOME/.local/bin/theme-modules/01-wallpaper-transition.sh" >/dev/null 2>&1 || true
@@ -264,12 +256,6 @@ is_video_wallpaper() {
     esac
 }
 
-# Připraví $CURRENT_WALL a stav videa.
-#
-# CURRENT_WALL je *vždy* obrázek, i když je vybrané video — v tom případě do něj
-# uložíme první snímek. Matugen z něj vytáhne barvy, awww ho zobrazí jako podklad
-# a přechodový efekt tak vypadá stejně jako u obrázkových tapet. Teprve navrch
-# se pak položí mpvpaper s videem.
 install_wallpaper_source() {
     local src="$1"
 
@@ -279,12 +265,7 @@ install_wallpaper_source() {
             return 1
         fi
         local frame="$STATE_DIR/video-frame.png"
-        # Filtr thumbnail vybere z prvních 100 snímků ten nejreprezentativnější.
-        # Prostý -frames:v 1 by u videí s fade-in z černé vytáhl černý snímek —
-        # a matugen by z něj udělal generickou tmavou paletu, takže by to
-        # vypadalo, že video tapety barvy vůbec nemění.
         if ! ffmpeg -y -v error -i "$src" -vf "thumbnail=100" -frames:v 1 -f image2 "$frame" >/dev/null 2>&1; then
-            # Záloha pro velmi krátká videa, kde thumbnail nemá z čeho vybírat.
             if ! ffmpeg -y -v error -i "$src" -frames:v 1 -f image2 "$frame" >/dev/null 2>&1; then
                 echo "Nepodařilo se vytáhnout snímek z videa: $src" >&2
                 return 1
@@ -324,7 +305,6 @@ done
 
 wallpaper_sig() {
     local f="$1"
-    # Fast signature: path + mtime + size (good enough to detect changes cheaply).
     stat -c '%n|%Y|%s' "$f" 2>/dev/null || printf '%s\n' "$f"
 }
 
@@ -334,8 +314,6 @@ if [[ -n "$WALLPAPER_ARG" ]]; then
         echo "Wallpaper not found: $WALLPAPER" >&2
         exit 1
     }
-    # Musí proběhnout před prvním přechodem — awww i matugen pracují s CURRENT_WALL,
-    # a u videa ho teprve tohle naplní prvním snímkem.
     install_wallpaper_source "$WALLPAPER" || exit 1
     printf '%s\n' "$WALLPAPER" >"$CURRENT_SOURCE_FILE"
     sig="$(wallpaper_sig "$WALLPAPER")"
@@ -353,18 +331,20 @@ else
     if [[ -f "$CURRENT_WALL" ]]; then
         WALLPAPER="$CURRENT_WALL"
     else
-        # Stop as soon as we find the first matching file (much faster than piping to head).
         WALLPAPER="$(find "$HOME/Pictures" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print -quit 2>/dev/null || true)"
+        if [[ -z "$WALLPAPER" ]] && command -v magick >/dev/null 2>&1; then
+            WALLPAPER="$HOME/Pictures/Wallpapers/rprice-default.png"
+            mkdir -p "${WALLPAPER%/*}"
+            magick -size 2560x1440 radial-gradient:'#5b3f8c'-'#0d0f1a' "$WALLPAPER" 2>/dev/null || WALLPAPER=""
+        fi
         [[ -n "$WALLPAPER" ]] || exit 0
         if [[ "$(readlink -f "$WALLPAPER" 2>/dev/null || printf '%s' "$WALLPAPER")" != "$(readlink -f "$CURRENT_WALL" 2>/dev/null || printf '%s' "$CURRENT_WALL")" ]]; then
             cp -f "$WALLPAPER" "$CURRENT_WALL"
         fi
     fi
-    # Triggered by systemd path unit without a new wallpaper: skip if nothing actually changed.
     sig="$(wallpaper_sig "$WALLPAPER")"
     last_sig_file="$STATE_DIR/last-wallpaper.sig"
     if [[ -f "$last_sig_file" ]] && [[ "$(cat "$last_sig_file" 2>/dev/null || true)" == "$sig" ]]; then
-        # At fresh login the wallpaper daemon isn't running yet — restore wallpaper without re-running matugen.
         _wd="swww-daemon"; command -v awww-daemon >/dev/null 2>&1 && _wd="awww-daemon"
         if ! pgrep -x "$_wd" >/dev/null 2>&1; then
             apply_wallpaper_now "$WALLPAPER"
@@ -373,9 +353,6 @@ else
     fi
 fi
 
-# Start wallpaper transition immediately so it's visible at once.
-# Theme processing (matugen, modules) runs after — the transition daemon is
-# GPU-side so CPU work doesn't stutter the animation.
 apply_wallpaper_now "$CURRENT_WALL"
 export WALLPAPER_TRANSITION_DONE=1
 printf '%s\n' "$(wallpaper_sig "$WALLPAPER")" >"$STATE_DIR/last-wallpaper.sig" 2>/dev/null || true
@@ -388,20 +365,13 @@ if [[ -f "$CURRENT_SOURCE_FILE" ]]; then
     fi
 fi
 
-# U videa bereme barvy z už vytaženého prvního snímku v CURRENT_WALL, ne ze
-# samotného .mp4 — magick by ho musel dekódovat znovu (u 4K souboru zbytečně)
-# a spoléhal by přitom na ffmpeg delegáta, který nemusí být všude k dispozici.
 if is_video_wallpaper "$wal_source" && [[ -f "$CURRENT_WALL" ]]; then
     wal_source="$CURRENT_WALL"
 fi
 
 wal_input="$wal_source"
 if command -v magick >/dev/null 2>&1; then
-    # matugen cannot read JPEG — always convert to PNG for color extraction.
-    # Resize to 1920px max; beyond that resolution adds no color accuracy.
     matugen_png="$STATE_DIR/wal-matugen.png"
-    # Smazat předem: kdyby magick selhal, zůstal by tu snímek z předchozí tapety
-    # a matugen by tiše vygeneroval staré barvy (vypadá to jako "barvy se nemění").
     rm -f "$matugen_png"
     if [[ "$FAST_MODE" == "yes" ]]; then
         magick "${wal_source}[0]" -auto-orient -resize "960x960>" "$matugen_png" >/dev/null 2>&1 || true
@@ -411,11 +381,6 @@ if command -v magick >/dev/null 2>&1; then
     [[ -f "$matugen_png" ]] && wal_input="$matugen_png"
 fi
 
-# Black-and-white wallpapers have no hue to derive anything from, and matugen's
-# quantizer then seeds the scheme from a near-black pixel whose channels differ by
-# a unit or two of compression noise. saturn-monochrome.mp4 seeds #040206 — that is
-# hue 270 at 2.4 % value, and Material You blows it up into a full purple palette.
-# Detect the case and ask for scheme-monochrome instead of guessing a hue.
 is_mono_wallpaper() {
     local img="$1"
     command -v python3 >/dev/null 2>&1 || return 1
@@ -454,10 +419,6 @@ sys.exit(0 if pct < float(os.environ["THEME_MONO_THRESHOLD"]) else 1)
 PY
 }
 
-# Measured over the wallpaper collection, the two groups sit far apart: the
-# monochrome ones land at 0.00 %, the darkest still-colourful one (void-space-
-# black-hole) at 5.19 %, everything else well above. 2 % separates them cleanly.
-# THEME_MONO_MODE z prostředí má přednost; jinak volba z okna Settings.
 MONO_MODE="${THEME_MONO_MODE:-$("$HOME/.local/bin/rp-settings" get theme.mono_mode 2>/dev/null || echo auto)}"
 MATUGEN_ARGS=()
 case "$MONO_MODE" in
@@ -466,7 +427,6 @@ off) IS_MONO=0 ;;
 *) if is_mono_wallpaper "$wal_input"; then IS_MONO=1; else IS_MONO=0; fi ;;
 esac
 
-# Typ schématu a kontrast z okna Settings (rp-settings); mono má přednost
 _rs="$HOME/.local/bin/rp-settings"
 _contrast="$("$_rs" get theme.contrast 2>/dev/null || echo 0.00)"
 [[ "$_contrast" != "0.00" ]] && MATUGEN_ARGS+=(--contrast "$_contrast")
@@ -476,11 +436,6 @@ fi
 
 if [[ "$IS_MONO" == "1" ]]; then
     MATUGEN_ARGS+=(-t scheme-monochrome)
-    # scheme-monochrome hands back true greys, but the templates pin saturation
-    # (`set_saturation: 30`) to keep surfaces coloured — on a grey that resolves to
-    # hue 0 and repaints everything red-brown (#d4d4d4 -> #3c2020). matugen has no
-    # conditionals, so generate a grey variant of those templates and point a copy
-    # of the config at it. The templates stay the single source of truth.
     mono_cfg="$(MONO_DIR="$STATE_DIR/templates-mono" python3 - <<'PY' 2>/dev/null || true
 import os, pathlib, re, sys
 
@@ -513,8 +468,6 @@ PY
     fi
 fi
 
-# Generate color scheme with matugen: templates first (Colors.js, waybar, kitty, gtk…),
-# then extract JSON for the bash color variables used by the remaining modules.
 if command -v matugen >/dev/null 2>&1 && [[ -f "$wal_input" ]]; then
     matugen "${MATUGEN_ARGS[@]}" image "$wal_input" --source-color-index 0 2>/dev/null || true
 fi
@@ -523,9 +476,6 @@ if command -v matugen >/dev/null 2>&1; then
     _matugen_json="$(matugen "${MATUGEN_ARGS[@]}" image "$wal_input" --source-color-index 0 -j hex 2>/dev/null || true)"
 fi
 
-# Extract matugen colors into pywal-compatible shell variables
-# NOTE: pipe+heredoc for python3 is broken (pipe overrides heredoc as script src);
-# pass JSON via env var instead.
 export _MATUGEN_JSON="$_matugen_json"
 eval "$(python3 - <<'PYEOF'
 import json, os
@@ -654,9 +604,6 @@ image)
     if image_pick="$(pick_image_accent "$WALLPAPER")"; then
         first="$(echo "$image_pick" | sed -n '1p')"
         second="$(echo "$image_pick" | sed -n '2p')"
-        # The picker can legitimately come up empty (an all-dark wallpaper drops
-        # every candidate). Keep the matugen fallback then — an empty accent is
-        # written straight into theme-colors.kdl and makes the niri config invalid.
         if [[ -n "${first:-}" ]]; then
             accent="$first"
         fi
@@ -678,9 +625,6 @@ wal | *)
     ;;
 esac
 
-# Last-resort net: whatever happened above, no accent may reach the modules empty.
-# 30-niri.sh interpolates these straight into KDL, and `active-color ""` fails
-# `niri validate`, so the whole config (not just the colors) stops loading.
 : "${accent:=${color5:-#ffb68c}}"
 : "${accent_soft:=${color6:-#e5bfaa}}"
 : "${accent_blue:=${color4:-#ffb68c}}"
@@ -781,7 +725,6 @@ if [[ -d "$MODULE_DIR" ]]; then
         exit 1
     fi
 
-    # By default we do NOT wait for async heavy modules. To wait: export THEME_ASYNC_WAIT=1
     if [[ "${THEME_ASYNC_WAIT:-0}" == "1" ]] && [[ ${#async_pids[@]} -gt 0 ]]; then
         for pid in "${async_pids[@]}"; do
             wait "$pid" || true
@@ -858,8 +801,6 @@ if [[ "$NO_RESTART" != "yes" ]]; then
     ensure_pidfile_running "$PID_DIR/mako.pid" mako mako
 fi
 
-# Always reload running daemons so systemd-triggered theme applies (with --no-daemon-restart)
-# still refresh Waybar/Mako without spawning new processes.
 signal_running_processes waybar USR2
 if [[ "$waybar_css_changed" -eq 1 || "$waybar_config_changed" -eq 1 ]]; then
     restart_waybar_if_running
@@ -876,8 +817,6 @@ if [[ -f "$PENDING_FLAG" ]]; then
         mapfile -d '' -t pending_args <"$PENDING_ARGS"
     fi
     rm -f "$PENDING_ARGS"
-    # If pending has no new wallpaper (just a systemd path-unit re-trigger), skip it —
-    # we just finished applying, so sig will match and the else-branch would exit 0 anyway.
     has_wall_arg=0
     for a in "${pending_args[@]}"; do
         [[ -f "$a" ]] && has_wall_arg=1 && break

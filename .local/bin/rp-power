@@ -1,32 +1,12 @@
 #!/usr/bin/env bash
-# rp-power — přepínání power režimů RPRice.
-#
-#   rp-power battery    šetřicí: CPU powersave, dGPU omezená a nechaná spát,
-#                        video tapeta uspaná
-#   rp-power balanced   běžná práce (výchozí)
-#   rp-power gaming     plný výkon + zámek taktu dGPU + uspaná video tapeta
-#   rp-power status     co je teď nastavené
-#   rp-power sync       interní — dorovná session efekty (video tapeta) podle
-#                        aktuálně platného režimu; volá ho path unit při AC
-#                        události, není určeno k ručnímu spouštění
-#
-# Privilegovanou část (CPU, ACPI profil, nvidia-smi) dělá /usr/local/bin/rp-power-apply
-# přes sudo. Tady zůstávají jen věci ze session — hlavně animace niri a video tapeta.
 set -uo pipefail
 
 HELPER=/usr/local/bin/rp-power-apply
 NIRI_KDL="$HOME/.config/niri/power-mode.kdl"
 STATE_FILE=/var/lib/rp-power/mode
-# Skutečně aplikovaný režim — na baterce se může lišit od STATE_FILE, protože
-# odpojení AC vynutí "battery" bez ohledu na to, co má uživatel vybrané (viz
-# rp-power-apply). Zapisuje ho výhradně rp-power-apply.
 EFFECTIVE_FILE=/var/lib/rp-power/effective
 VIDEO_CTL="$HOME/.local/bin/wallpaper-video-ctl.sh"
 
-# Video tapeta se dekóduje a překresluje na iGPU — tedy na té samé, která zároveň
-# přebírá každý snímek hry z dGPU. V gaming režimu ji proto uspíme kvůli výkonu;
-# na baterce kvůli spotřebě (dekód videa stojí citelně víc než statický obrázek).
-# Statická awww vrstva zůstane, takže plocha jen zamrzne na prvním snímku.
 switch_wallpaper_video() {
     [[ -x "$VIDEO_CTL" ]] || return 0
     case "$1" in
@@ -42,9 +22,6 @@ write_animations() {
     {
         echo "// Generováno skriptem rp-power — needitovat ručně."
         echo "// Přepíná se přes: rp-power battery|balanced|gaming"
-        # Pozn.: settings.kdl (rp-settings, okno Settings) je includovaný až za
-        # tímhle souborem a přebíjí `slowdown` i zapnutí/vypnutí animací.
-        # Tady zůstávají jen křivky a délky jednotlivých animací.
         cat <<'KDL'
 animations {
     slowdown 1.5
@@ -68,8 +45,6 @@ animations {
 KDL
     } > "$tmp"
 
-    # Nikdy nenechat rozbitý config — niri ho hot-reloaduje a rozsypal by se
-    # celý desktop. Zapisovat až po validaci.
     local backup
     backup=$(mktemp)
     cp "$NIRI_KDL" "$backup" 2>/dev/null || true
@@ -87,13 +62,10 @@ KDL
 
 status() {
     local ac gov epp prof mode
-    ac=$(cat /sys/class/power_supply/ACAD/online 2>/dev/null)
+    ac=$(for d in /sys/class/power_supply/*; do [[ "$(cat "$d/type" 2>/dev/null)" == Mains ]] && cat "$d/online" && break; done 2>/dev/null)
     gov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)
     epp=$(cat /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference 2>/dev/null)
     prof=$(cat /sys/firmware/acpi/platform_profile 2>/dev/null)
-    # EFFECTIVE_FILE odráží to, co je fakticky aplikované (viz komentář výše);
-    # dokud nevznikne (první běh před instalací rp-power-apply), padáme na
-    # zvolený režim.
     mode=$(cat "$EFFECTIVE_FILE" 2>/dev/null || cat "$STATE_FILE" 2>/dev/null || echo "?")
 
     echo "režim:            $mode"
@@ -132,8 +104,6 @@ case "${1:-status}" in
         }
         ;;
     sync)
-        # Voláno path unitem při změně EFFECTIVE_FILE (AC plug/unplug) — jen
-        # dorovná session efekty, bez sudo a beze změny STATE_FILE.
         switch_wallpaper_video "$(cat "$EFFECTIVE_FILE" 2>/dev/null || cat "$STATE_FILE" 2>/dev/null || echo balanced)"
         ;;
     *)

@@ -1,21 +1,10 @@
 #!/usr/bin/env bash
-# rp-power-apply — privilegovaná část přepínání power režimů.
-# Volá se přes sudo z ~/.local/bin/rp-power, nebo jako "auto" z udev/timeru při
-# změně napájení či periodické kontroly. Animace niri a video tapetu řeší
-# uživatelský skript, sem nepatří.
-#
-# Režimy: battery | balanced | gaming | auto
 set -uo pipefail
 
 STATE_DIR=/var/lib/rp-power
 STATE_FILE="$STATE_DIR/mode"
-# Skutečně aplikovaný režim (viz "auto" níže) — čte ho uživatelský rp-power
-# (status, sync path unit), proto musí zůstat world-readable.
 EFFECTIVE_FILE="$STATE_DIR/effective"
 
-# Spodní zámek taktu dGPU v režimu gaming. Smysl je zabránit propadu na
-# 210 MHz, který rozbíjí frametime — není to overclock, napětí zůstává
-# na tovární V/F křivce.
 GPU_FLOOR_MHZ=800
 GPU_TOP_MHZ=2100
 GPU_PL_GAMING=85
@@ -23,11 +12,13 @@ GPU_PL_BALANCED=60
 GPU_PL_BATTERY=40
 
 on_ac() {
-    [[ "$(cat /sys/class/power_supply/ACAD/online 2>/dev/null || echo 0)" == "1" ]]
+    local d
+    for d in /sys/class/power_supply/*; do
+        [[ "$(cat "$d/type" 2>/dev/null)" == Mains ]] && { [[ "$(cat "$d/online" 2>/dev/null)" == 1 ]]; return; }
+    done
+    return 1
 }
 
-# dGPU je runtime-suspendovaná? Pak na ni NESAHAT — každé volání nvidia-smi
-# ji probudí a sežere baterku, což je přesně to, čemu se chceme vyhnout.
 dgpu_suspended() {
     [[ "$(cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status 2>/dev/null)" == "suspended" ]]
 }
@@ -82,18 +73,11 @@ apply() {
             ;;
         balanced)
             set_platform_profile balanced
-            # CPU se dřív záměrně nechával na TLP, ale governor/EPP je globální
-            # sysfs stav, který přežívá do dalšího módu beze změny, dokud
-            # nenastane AC událost — po battery/gaming tak "balanced" tiše
-            # zůstávalo na powersave/performance z předchozího módu místo na
-            # tom, co zrovna nastavilo TLP. Radši nastavujeme explicitně.
             set_cpu performance performance
             set_gpu balanced
             ;;
         battery)
             set_platform_profile low-power
-            # Battery je explicitní "chci teď co nejdéle vydržet" a nemá
-            # čekat na to, jestli/kdy TLP zrovna přepne svůj AC/BAT profil.
             set_cpu powersave power
             set_gpu battery
             ;;
@@ -110,10 +94,6 @@ mkdir -p "$STATE_DIR"
 
 case "${1:-auto}" in
     auto)
-        # Na baterce vždy shodit dolů, bez ohledu na uloženou volbu — volá se
-        # jak z udev při odpojení AC, tak periodicky z rp-power-gpu-guard.timer,
-        # protože nvidia-smi limity nepřežijí probuzení dGPU z runtime suspendu.
-        # Po zapojení do sítě se obnoví to, co si uživatel zvolil.
         chosen=$(cat "$STATE_FILE" 2>/dev/null || echo balanced)
         if on_ac; then
             apply "$chosen"

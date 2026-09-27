@@ -81,9 +81,18 @@ start_waybar_with_retry() {
   return 1
 }
 
-# Výstupy okna Settings: settings.kdl drží i tap/natural-scroll/numlock (config.kdl
-# je nemá, viz rp-settings) a šablona mako includuje ~/.config/mako/rp-settings,
-# bez kterého mako config odmítne — proto před tématem. Beze změn nic nepřepíše.
+if command -v systemctl >/dev/null 2>&1 && ! systemctl --user is-active -q graphical-session.target; then
+  export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-niri}" XDG_SESSION_TYPE=wayland
+  systemctl --user import-environment WAYLAND_DISPLAY DISPLAY NIRI_SOCKET XDG_CURRENT_DESKTOP XDG_SESSION_TYPE 2>/dev/null || true
+  command -v dbus-update-activation-environment >/dev/null 2>&1 \
+    && dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY NIRI_SOCKET XDG_CURRENT_DESKTOP 2>/dev/null || true
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user start niri-rice-session.target 2>/dev/null && log "started niri-rice-session.target (niri without niri-session)"
+  ( while niri msg version >/dev/null 2>&1; do sleep 5; done
+    systemctl --user stop niri-rice-session.target ) >/dev/null 2>&1 &
+  disown
+fi
+
 "$HOME/.local/bin/rp-settings" apply || log "rp-settings apply failed"
 
 if ! "$HOME/.local/bin/apply-wallpaper-theme.sh" --no-daemon-restart; then
@@ -91,17 +100,13 @@ if ! "$HOME/.local/bin/apply-wallpaper-theme.sh" --no-daemon-restart; then
 fi
 
 write_session_env
-# Panelem může být místo waybaru quickshell (rp-bar) — pak waybar vůbec nezkoušet
 [[ "$(cat "$HOME/.config/niri-rice/bar" 2>/dev/null)" == quickshell ]] || start_waybar_with_retry || true
 
 start_user_unit niri-rice-playerctld.service >/dev/null 2>&1 || true
 start_user_unit niri-rice-wallpaper-healthcheck.service >/dev/null 2>&1 || true
-# quickshell = OSD, dashboard a přepínač zvuku (barem zůstává waybar)
 start_user_unit niri-rice-quickshell.service >/dev/null 2>&1 || true
-# společná hlasitost všech výstupů
 start_user_unit niri-rice-audio-sync.service >/dev/null 2>&1 || true
 start_user_unit niri-rice-cliphist.service >/dev/null 2>&1 || true
-# niri-rice-waybar.service také zakázán
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user start niri-rice-wallpaper-healthcheck.timer >/dev/null 2>&1 || true
   systemctl --user start niri-rice-waybar.timer >/dev/null 2>&1 || true
@@ -124,23 +129,16 @@ if command -v xwayland-satellite >/dev/null 2>&1; then
   ensure_pidfile_running "$PID_DIR/xwayland-satellite.pid" xwayland-satellite xwayland-satellite
 fi
 
-# Config píše až rp-display (Settings → Displays); bez něj kanshi hned spadne
 if command -v kanshi >/dev/null 2>&1 && [[ -f "$HOME/.config/kanshi/config" ]]; then
   ensure_pidfile_running "$PID_DIR/kanshi.pid" kanshi kanshi
 fi
 
-# VNC server jen na loopbacku, vzdálený přístup je přes SSH tunel (viz ~/.config/wayvnc/config)
 if command -v wayvnc >/dev/null 2>&1; then
   ensure_pidfile_running "$PID_DIR/wayvnc.pid" wayvnc wayvnc 127.0.0.1 5900
 fi
 
-# QuickShell běží jako systemd unit (viz start_user_unit výše).
-# Bar je v shell.qml vypnutý přepínačem useBar — barem je waybar.
-
-# Noční světlo (wlsunset), když je v okně Settings zapnuté a nainstalované
 "$HOME/.local/bin/rp-settings" nightlight || log "rp-settings nightlight failed"
 
-# swayidle startuje rp-settings — časy zamknutí/vypnutí obrazovky jsou v okně Settings
 if ! pgrep -x swayidle >/dev/null 2>&1; then
   "$HOME/.local/bin/rp-settings" idle || log "rp-settings idle failed"
 fi
