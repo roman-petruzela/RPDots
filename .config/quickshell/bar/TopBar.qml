@@ -11,7 +11,7 @@ import "../Colors.js" as Colors
 // s waybarem (viz .config/waybar/config.jsonc), vzhled sjednocený s okny
 // ricu (Settings, flyouty): stejný font, barvy a zaoblení.
 //
-//   vlevo   workspacy tohohle monitoru · okno zaměřené na tomhle monitoru · cava
+//   vlevo   workspacy tohohle monitoru · okno zaměřené na tomhle monitoru · cava · přehrávač
 //   střed   hodiny a datum — vždy přesně uprostřed; levá/pravá strana se
 //           zkrátí (ořízne), nikdy hodiny neodsunou
 //   vpravo  síť (↓ ↑, VPN) · CPU GPU paměť teplota · zvuk baterie jas · tray · napájení
@@ -85,8 +85,10 @@ PanelWindow {
         property real tintAlpha: 0.9
         property int pad: 10
         property bool clickable: false
+        property int buttons: Qt.LeftButton
         readonly property bool hovered: pillArea.containsMouse
         signal clicked()
+        signal buttonClicked(int button)
         implicitWidth: row.implicitWidth + 2 * pad
         width: implicitWidth
         height: bar.pillHeight
@@ -100,8 +102,9 @@ PanelWindow {
             anchors.fill: parent
             enabled: pill.clickable
             hoverEnabled: true
+            acceptedButtons: pill.buttons
             cursorShape: Qt.PointingHandCursor
-            onClicked: pill.clicked()
+            onClicked: e => { if (e.button === Qt.LeftButton) pill.clicked(); pill.buttonClicked(e.button) }
         }
         Row {
             id: row
@@ -246,6 +249,46 @@ PanelWindow {
             color: Colors.primary
             layer.enabled: true
             layer.effect: MultiEffect { shadowEnabled: true; shadowColor: "#000000"; shadowOpacity: 0.85; shadowBlur: 0.5; shadowVerticalOffset: 1 }
+        }
+        // Přehrávač (jako custom/player ve waybaru): interpret – skladba.
+        // Klik = pauza/přehrát, prostřední = další, pravý = dashboard s celou
+        // kartou přehrávače. Bez přehrávače zmizí; při pauze zůstane ztlumený.
+        Pill {
+            id: mediaPill
+            readonly property var p: bar.barData.player
+            readonly property string track: {
+                if (!p) return ""
+                const a = p.trackArtist || "", t = p.trackTitle || p.identity || ""
+                return a !== "" && t !== "" ? a + " – " + t : a + t
+            }
+            visible: track !== ""
+            clickable: true
+            opacity: bar.barData.playing ? 1 : 0.6
+            Behavior on opacity { NumberAnimation { duration: 150 } }
+            buttons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+            onButtonClicked: b => {
+                const p = mediaPill.p
+                if (!p) return
+                if (b === Qt.RightButton) bar.sh(bar.bin + "rp-shell dashboard open")
+                else if (b === Qt.MiddleButton) { if (p.canGoNext) p.next() }
+                else if (p.canTogglePlaying) p.togglePlaying()
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: bar.barData.playing ? "\u{f03e4}" : "\u{f040a}"
+                font.family: bar.fontFamily
+                font.pixelSize: 13
+                color: Colors.primary
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, 280)
+                elide: Text.ElideRight
+                text: mediaPill.track
+                font.family: bar.fontFamily
+                font.pixelSize: 13
+                color: Colors.onSurface
+            }
         }
     }
 
@@ -430,7 +473,7 @@ PanelWindow {
                             if (e.button === Qt.LeftButton && !ti.modelData.onlyMenu) ti.modelData.activate()
                             else if (e.button === Qt.MiddleButton) ti.modelData.secondaryActivate()
                             // vlastní QML menu (display() by chtělo QApplication režim)
-                            else if (ti.modelData.hasMenu) trayMenu.toggleAt(ti, ti.modelData.menu)
+                            else if (ti.modelData.hasMenu) trayMenu.toggleAt(ti, ti.modelData.menu, ti.modelData.tooltipTitle || ti.modelData.title)
                         }
                         onWheel: e => ti.modelData.scroll(e.angleDelta.y, false)
                     }

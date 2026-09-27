@@ -410,6 +410,29 @@ installed.
 
 ## Dashboard
 
+The panel keeps its original slide-in chrome; the content is built from
+`dash/`. The one bold element is the header: a crop of the current wallpaper
+(`~/.cache/niri-rice/wal-matugen.png`, the same downscale matugen reads) fading
+into the panel colour, with the clock over it. It shows where the rice's colours
+come from. The calendar moved to the clock popup in the bar, so the dashboard
+no longer repeats it.
+
+- **Toggles** (`DashToggles`): Wi-Fi, Bluetooth, Silent (`notify.dnd`), Night
+  light, Airplane, Stay awake, power mode (opens the power flyout) and Settings.
+  State is read by one script when the dashboard opens and after each click,
+  not polled. Bluetooth is `Quickshell.Bluetooth`.
+- **Stay awake** is `Caffeine.qml`. The idle-inhibit protocol needs a mapped
+  surface, so while it is on, a 1×1 input-less layer surface holds an
+  `IdleInhibitor`. That works with either bar. It survives a quickshell reload
+  (PersistentProperties) but not a restart.
+- **Sliders** (`DashSlider`): volume through `rp-audio volume set` with
+  `RP_AUDIO_NO_OSD=1`, because the OSD flashing over the slider looked broken.
+  Brightness goes through brightnessctl, clamped to at least 1 %, and the slider
+  is hidden without a backlight. While dragging, a slider shows its own value
+  and writes are coalesced: if one is still running, only the latest value
+  follows it. `BarData` stays active while the dashboard is open, even with
+  waybar.
+
 **Now Playing** talks to `Quickshell.Services.Mpris`. Two things it is easy to
 get wrong: the properties are `position` and `length` (**seconds**, already
 converted from the DBus microseconds) — there is no `trackPosition` or
@@ -448,7 +471,12 @@ replacement for waybar that behaves the same and looks like the rest of the
 quickshell windows.
 
 - **Left:** the workspaces of that monitor (empty ones hidden, like
-  `hide-empty`), the window focused on that monitor, cava.
+  `hide-empty`), the window focused on that monitor, cava, then the player
+  (artist – title, replacing waybar's `custom/player`). Click toggles play and
+  pause, middle click skips to the next track, right click opens the dashboard
+  with the full player card. It is dimmed while paused and hidden when no
+  player is running. It uses the same player choice as the dashboard
+  (`BarData.player`, playerctld filtered out).
 - **Centre:** the clock. It is anchored to the centre; the left and right sides
   have their width capped at the clock's edges and get clipped, so the clock
   never moves.
@@ -467,15 +495,18 @@ when it says `quickshell`. The Nerd Font icons are `\u` escapes in QML: typed as
 literal characters they got lost when edited, which is also how the waybar clock
 lost its icon.
 
-Everything that pops up shares one look. `PopupCard.qml` sets the card's color,
-border, radius and open/close animation (a fade plus a slight grow from 96 %,
-160 ms in and 120 ms out). `bar/BarPopup.qml` is the window around it for
-anything that comes out of the bar: it anchors under the item, blurs behind the
-open card only (no blurred rectangle left behind a closing card) and closes on
-Esc. Tooltips (`BarTooltip`) and the calendar (`ClockPopup`) are `BarPopup`
-with their own content. The tray menu and the flyouts (`Flyout.qml`: power,
-audio, network) keep their own windows but use `PopupCard` for the card, so a
-change in `PopupCard` shows up everywhere at once.
+Everything that pops up from the bar looks like the flyouts (power, audio,
+network): `PopupCard.qml` carries their card — `surfaceContainer` at 94 %,
+radius 16, an `outlineVariant` border, and their animation (slide down 20 px
+and fade in). `bar/BarPopup.qml` is the window around it for anything that
+comes out of the bar (anchored under the item, Esc closes). Tooltips
+(`BarTooltip`) and the calendar (`ClockPopup`) are `BarPopup` with their own
+content; the tray menu and the session menu keep their own windows but use
+`PopupCard`, and the tray menu's rows copy the power menu (heading, 36 px rows,
+the checked entry tinted with a ✓ on the right). None of them blur behind:
+the card is nearly opaque, and a blur region appears at full size while the
+card is still fading in, which showed as a flash. The flyouts and the
+dashboard keep their own original chrome.
 
 Tray menus are drawn in QML (`bar/TrayMenu.qml`: `QsMenuOpener` over DBusMenu,
 `entry.triggered()` on click, submenus fly out beside the entry on hover or
