@@ -43,12 +43,28 @@ Scope {
     }
     Timer { id: captureTimeout; interval: 1500; onTriggered: { capture.running = false; root.engage() } }
 
+    readonly property string pamDir: Quickshell.env("HOME") + "/.config/quickshell/lock/pam"
+    property bool ownPam: false
+    FileView {
+        path: root.pamDir + "/rp-lock"
+        printErrors: false
+        onLoaded: root.ownPam = text().indexOf("pam_unix") >= 0
+        onLoadFailed: root.ownPam = false
+    }
+
     function refreshLayout() { layoutQuery.running = false; layoutQuery.running = true }
 
     function submit() {
         if (busy || password === "") return
         busy = true
         message = ""
+        if (root.ownPam) {
+            pam.configDirectory = root.pamDir
+            pam.config = "rp-lock"
+            if (pam.start()) return
+        }
+        pam.configDirectory = "/etc/pam.d"
+        pam.config = "swaylock"
         if (!pam.start()) fail("Authentication is unavailable")
     }
 
@@ -97,7 +113,6 @@ Scope {
 
     PamContext {
         id: pam
-        config: "swaylock"
         onResponseRequiredChanged: if (responseRequired) respond(root.password)
         onCompleted: result => {
             if (result === PamResult.Success) {

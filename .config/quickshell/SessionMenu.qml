@@ -9,7 +9,7 @@ PanelWindow {
     readonly property string fontFamily: "JetBrainsMono Nerd Font"
 
     readonly property var actions: [
-        { key: "L", label: "Lock",      glyph: "", cmd: ["swaylock"] },
+        { key: "L", label: "Lock",      glyph: "", cmd: [Quickshell.env("HOME") + "/.local/bin/rp-lock"] },
         { key: "S", label: "Suspend",   glyph: "", cmd: ["systemctl", "suspend"] },
         { key: "E", label: "Log out",   glyph: "", cmd: ["niri", "msg", "action", "quit", "--skip-confirmation"] },
         { key: "R", label: "Restart",   glyph: "", cmd: ["systemctl", "reboot"] },

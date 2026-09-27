@@ -1,0 +1,6 @@
+auth       required                    pam_faillock.so      preauth nodelay
+auth       [success=1 default=bad]     pam_unix.so          try_first_pass nullok nodelay
+auth       [default=die]               pam_faillock.so      authfail nodelay
+auth       optional                    pam_permit.so
+auth       required                    pam_faillock.so      authsucc nodelay
+account    required                    pam_unix.so

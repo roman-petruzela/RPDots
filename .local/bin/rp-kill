@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+pid=$(niri msg --json focused-window 2>/dev/null | jq -r '.pid // empty')
+[[ -n "$pid" ]] || exit 0
+comm=$(ps -o comm= -p "$pid" 2>/dev/null)
+
+# X11 apps all share one xwayland-satellite process; killing it would take every X app down
+case "$comm" in
+    niri|qs|quickshell|xwayland-satel*|Xwayland)
+        notify-send -a "Force quit" "Can't force quit this window" "It belongs to $comm, which other windows depend on."
+        exit 1 ;;
+esac
+
+pkill -KILL -P "$pid" 2>/dev/null
+kill -KILL "$pid"

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+flag="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/rp-locked"
+[[ -e "$flag" ]] && exit 0
+if "$HOME/.local/bin/rp-shell" lock lock 2>/dev/null; then
+    for _ in $(seq 40); do
+        [[ -e "$flag" ]] && exit 0
+        sleep 0.05
+    done
+fi
+exec swaylock -f
