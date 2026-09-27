@@ -6,6 +6,13 @@
 #   ./install.sh
 set -euo pipefail
 
+# Pod rootem by configy skončily v /root a paru pod rootem nepoběží — sudo si
+# skript řekne sám tam, kde je potřeba
+if [[ $EUID -eq 0 ]]; then
+    echo "Run install.sh as your normal user, not with sudo — it asks for sudo itself where needed." >&2
+    exit 1
+fi
+
 DOTFILES="$(cd "$(dirname "$0")" && pwd)"
 STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"
 
@@ -109,6 +116,8 @@ in_session() {
 
 install_packages() {
     echo "== Packages"
+    # Nejdřív čerstvá databáze, ať se balíky správně rozdělí na repo/AUR…
+    sudo pacman -Sy
     local pkg repo=() aur=()
     for pkg in "${PKGS[@]}"; do
         pacman -Qi "$pkg" &>/dev/null && continue
@@ -117,9 +126,14 @@ install_packages() {
 
     if [[ ${#repo[@]} -gt 0 ]]; then
         echo "From the repositories: ${repo[*]}"
-        sudo pacman -S --needed "${repo[@]}"
+        # …a pak -Su: instalovat nové balíky proti čerstvé databázi bez upgradu
+        # zbytku systému je částečný upgrade, který Arch nepodporuje (např. nová
+        # libbluray rozbije nainstalovaný ffmpeg: "breaks dependency libbluray.so")
+        echo "(this also upgrades the rest of the system — Arch doesn't support partial upgrades)"
+        sudo pacman -Su --needed "${repo[@]}"
     fi
     if [[ ${#aur[@]} -gt 0 ]]; then
+        command -v paru &>/dev/null || install_paru
         if command -v paru &>/dev/null; then
             echo "From the AUR: ${aur[*]}"
             paru -S --needed "${aur[@]}"
@@ -131,13 +145,38 @@ install_packages() {
     return 0
 }
 
+# Na čistém Archu paru není. paru-bin z AUR (předkompilovaný, bez stahování
+# celého Rust toolchainu) přes makepkg.
+install_paru() {
+    echo "Some packages are only in the AUR, and paru (the AUR helper) is not installed."
+    ask "Install paru from the AUR now?" || return 0
+    sudo pacman -S --needed base-devel git
+    local tmp; tmp="$(mktemp -d)"
+    if git clone --depth 1 https://aur.archlinux.org/paru-bin.git "$tmp/paru-bin" \
+        && (cd "$tmp/paru-bin" && makepkg -si --noconfirm); then
+        echo "paru installed."
+    else
+        echo "!! Installing paru failed — AUR packages are skipped." >&2
+    fi
+    rm -rf "$tmp"
+}
+
 # ----------------------------------------------------------------- configy
 
 # Soubory, které repo sleduje (i nové, ještě necommitnuté), bez ignorovaných —
 # vygenerované věci (Colors.js, mako/config…) tak nikdy nepřepíše.
+#
+# Bez .git (repo stažené z GitHubu jako ZIP) se berou všechny soubory — ZIP
+# obsahuje jen to, co repo sleduje, takže vygenerované věci v něm nejsou.
 repo_files() {
     local skip f
-    git -C "$DOTFILES" ls-files --cached --others --exclude-standard | while IFS= read -r f; do
+    {
+        if git -C "$DOTFILES" rev-parse --is-inside-work-tree &>/dev/null; then
+            git -C "$DOTFILES" ls-files --cached --others --exclude-standard
+        else
+            (cd "$DOTFILES" && find . -type f -not -path './.git/*' | sed 's|^\./||')
+        fi
+    } | while IFS= read -r f; do
         for skip in "${NOT_DEPLOYED[@]}"; do [[ "$f" == "$skip" ]] && continue 2; done
         [[ -f "$DOTFILES/$f" ]] && printf '%s\n' "$f"
     done

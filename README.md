@@ -432,6 +432,11 @@ no longer repeats it.
   and writes are coalesced: if one is still running, only the latest value
   follows it. `BarData` stays active while the dashboard is open, even with
   waybar.
+- **System stats** (`SystemWidget`) refresh every second, but only while the
+  dashboard is open, starting the moment it opens. The CPU value is a delta
+  against the previous sample. If that sample is more than 3 s old (the
+  dashboard was closed), the first reading would be the average over the whole
+  closed period, so it takes a fresh 250 ms sample instead.
 
 **Now Playing** talks to `Quickshell.Services.Mpris`. Two things it is easy to
 get wrong: the properties are `position` and `length` (**seconds**, already
@@ -502,8 +507,13 @@ and fade in). `bar/BarPopup.qml` is the window around it for anything that
 comes out of the bar (anchored under the item, Esc closes). Tooltips
 (`BarTooltip`) and the calendar (`ClockPopup`) are `BarPopup` with their own
 content; the tray menu and the session menu keep their own windows but use
-`PopupCard`, and the tray menu's rows copy the power menu (heading, 36 px rows,
-the checked entry tinted with a ✓ on the right). None of them blur behind:
+`PopupCard`. The tray menu is denser than the flyouts, because nm-applet menus
+are long: 28 px rows, 8 px padding, and the heading in the accent colour. Hover
+is the only row tint, in the accent colour. A checked entry gets a ✓, bold
+accent text and no background, because tinted checked rows blended into the
+hover tint. Disabled entries are smaller and dimmer, since nm-applet uses them
+as section headings. An icon's tooltip is suppressed while its menu is open,
+because it covered the heading. None of them blur behind:
 the card is nearly opaque, and a blur region appears at full size while the
 card is still fading in, which showed as a flash. The flyouts and the
 dashboard keep their own original chrome.
@@ -847,6 +857,21 @@ git clone https://github.com/roman-petruzela/RPRice ~/dotfiles
 cd ~/dotfiles
 ./install.sh
 ```
+
+Run it as your normal user, not with `sudo`: under sudo `$HOME` is `/root`, so
+the configs would land there, and paru refuses to run as root. The script asks
+for sudo itself where it needs it. It refuses to run as root.
+
+Packages are installed with `pacman -Syu --needed` (a `-Sy` sync first, then
+`-Su`), so **the whole system is upgraded along with them**. Installing new
+packages against a fresh database while leaving the rest of the system old is
+a partial upgrade. On a server that had not been updated in a while, that broke
+right away: `installing libbluray … breaks dependency 'libbluray.so' required
+by ffmpeg`. If paru is missing (clean Arch), it offers to build `paru-bin`
+from the AUR, so the AUR packages don't get skipped.
+
+A GitHub ZIP download (no `.git`) works too. Without git, the file list comes
+from `find`, which is the same set, because the ZIP holds only tracked files.
 
 ## Layout
 
