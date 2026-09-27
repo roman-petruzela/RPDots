@@ -1,6 +1,6 @@
 # RPRice
 
-Dotfiles for a [niri](https://github.com/YaLTeR/niri) desktop on Arch Linux and CachyOS. Colours are generated from the wallpaper with matugen; the bar, dashboard, launcher, settings and login screen are built in [quickshell](https://quickshell.outfoxxed.me/).
+Dotfiles for a [niri](https://github.com/YaLTeR/niri) desktop on Arch Linux and CachyOS. Colours are generated from the wallpaper with matugen; the bar, dashboard, launcher, settings, notifications, lock and login screens are built in [quickshell](https://quickshell.outfoxxed.me/).
 
 ## Components
 
@@ -9,8 +9,8 @@ Dotfiles for a [niri](https://github.com/YaLTeR/niri) desktop on Arch Linux and 
 | Compositor | niri |
 | Shell | quickshell (waybar available as an alternative bar) |
 | Terminal | kitty |
-| Notifications | mako |
-| Lock screen | swaylock-effects |
+| Notifications | quickshell (popups and a notification centre in the dashboard) |
+| Lock screen | quickshell (swaylock-effects as a fallback) |
 | Login screen | greetd with a quickshell greeter (optional) |
 | Wallpaper | awww, mpvpaper for video |
 | Theming | matugen |
@@ -50,6 +50,7 @@ Available from the installer's *System integration* option:
 | `Mod+Ctrl+V` | Clipboard history |
 | `Mod+E` | File manager |
 | `Mod+Q` | Close window |
+| `Mod+Shift+Q` | Force quit the focused app |
 | `Alt+Tab` | Window switcher |
 | `Mod+Tab` | Workspace switcher |
 | `Mod+O` | Overview |

@@ -7,13 +7,23 @@ command -v spicetify >/dev/null 2>&1 || exit 0
 spicetify config current_theme PywalDynamic 2>/dev/null || true
 spicetify config color_scheme wal 2>/dev/null || true
 
+warn_mismatch() {
+    grep -qi "mismatched" <<<"$1" || return 0
+    local flag="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/spicetify-warned"
+    [[ "$(cat "$flag" 2>/dev/null)" == "$(date +%F)" ]] && return 0
+    date +%F >"$flag"
+    notify-send -a Spicetify "Spotify colours are not updating" \
+        "Spotify was updated. Reinstall it (paru -S spotify), then run: spicetify backup apply" 2>/dev/null || true
+}
+
 SPOTIFY_SEL='.[] | select(.app_id | test("^spotify$"; "i"))'
 TARGET_OUTPUT=""
 TARGET_IDX=""
 OLD_WID=""
 
 if ! pgrep -x spotify >/dev/null 2>&1; then
-    spicetify -q -n apply 2>/dev/null || spicetify -q -n backup apply 2>/dev/null || true
+    out="$(spicetify -q -n apply 2>&1)" || out+="$(spicetify -q -n backup apply 2>&1)" || true
+    warn_mismatch "$out"
     exit 0
 fi
 
@@ -29,7 +39,8 @@ if command -v niri >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
     fi
 fi
 
-spicetify apply -q 2>/dev/null || spicetify backup apply -q 2>/dev/null || true
+out="$(spicetify apply -q 2>&1)" || out+="$(spicetify backup apply -q 2>&1)" || true
+warn_mismatch "$out"
 
 if [[ -n "$TARGET_IDX" && -n "$TARGET_OUTPUT" ]]; then
     (
