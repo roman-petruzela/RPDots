@@ -273,6 +273,9 @@ system_setup() {
     echo ":: System integration"
     local share="$HOME/.local/share"
 
+    if ask "Ask for the password once per system update instead of once per package (polkit rule)?"; then
+        sudo install -Dm644 "$DOTFILES/.local/share/rp-sys/49-rp-pacman.rules" /etc/polkit-1/rules.d/49-rp-pacman.rules
+    fi
     if ask "Install power profiles (rp-power)?"; then
         sudo "$share/rp-power/install.sh"
     fi

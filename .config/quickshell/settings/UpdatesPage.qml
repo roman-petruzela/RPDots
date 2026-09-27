@@ -145,11 +145,12 @@ Item {
                             onClicked: page.check()
                         }
                         SButton {
-                            visible: (page.result?.repo.length ?? 0) > 0
-                            icon: "󰚰"; text: "Update system"
+                            visible: (page.result?.repo.length ?? 0) + (page.result?.aur.length ?? 0)
+                                     + (page.result?.flatpak.length ?? 0) > 0
+                            icon: "󰚰"; text: "Update all"
                             busy: page.host.job.running
-                            onClicked: page.run("Updating system (pacman -Syu)", ["rp-sys", "upgrade"],
-                                                ["kitty", "--hold", "-e", "sudo", "pacman", "-Syu"])
+                            onClicked: page.run("Updating pacman, AUR and Flatpak", ["rp-sys", "upgrade-all"],
+                                                ["kitty", "--hold", "-e", "bash", "-c", "paru -Syu && flatpak update"])
                         }
                         SButton {
                             icon: "󰆍"; text: "Terminal"
@@ -162,8 +163,8 @@ Item {
             SHint {
                 width: parent.width
                 leftPadding: 14; rightPadding: 14
-                text: "Update system runs pacman -Syu through polkit with the log below. AUR builds as you and installs "
-                    + "through polkit too. Terminal opens paru for everything, with prompts."
+                text: "Update all runs paru -Syu (repositories and AUR) and then Flatpak, with the log below. "
+                    + "Terminal opens paru with prompts."
             }
 
             Group {

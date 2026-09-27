@@ -478,6 +478,19 @@ case "${1:-}" in
     upgrade)
         echo ":: pacman -Syu"
         exec pkexec pacman -Syu "${PACMAN_FLAGS[@]}" 2>&1 ;;
+    upgrade-all)
+        if has paru; then
+            echo ":: paru -Syu (repositories and AUR, building as $USER, installing through pkexec)"
+            paru -Syu --noconfirm --sudo pkexec --skipreview --noprogressbar --color never 2>&1 || exit $?
+        else
+            echo ":: pacman -Syu"
+            pkexec pacman -Syu "${PACMAN_FLAGS[@]}" 2>&1 || exit $?
+        fi
+        if has flatpak; then
+            echo ":: flatpak update"
+            flatpak update -y --noninteractive 2>&1 || exit $?
+        fi
+        echo ":: all up to date" ;;
     upgrade-aur)
         has paru || die "paru is not installed"
         echo ":: paru -Sua (building as $USER, installing through pkexec)"

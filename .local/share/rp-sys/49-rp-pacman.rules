@@ -1,0 +1,8 @@
+// pkexec pacman (Settings → Updates, paru --sudo pkexec) asks once per run, not once per package
+polkit.addRule(function (action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec"
+        && action.lookup("program") == "/usr/bin/pacman"
+        && subject.local && subject.active && subject.isInGroup("wheel")) {
+        return polkit.Result.AUTH_ADMIN_KEEP;
+    }
+});
