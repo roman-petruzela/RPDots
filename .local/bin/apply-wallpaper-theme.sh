@@ -304,8 +304,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 wallpaper_sig() {
-    local f="$1"
-    stat -c '%n|%Y|%s' "$f" 2>/dev/null || printf '%s\n' "$f"
+    local h
+    h="$(sha1sum "$CURRENT_WALL" 2>/dev/null)" && printf '%s\n' "${h%% *}" || printf '%s\n' "$CURRENT_WALL"
 }
 
 if [[ -n "$WALLPAPER_ARG" ]]; then
@@ -316,7 +316,7 @@ if [[ -n "$WALLPAPER_ARG" ]]; then
     }
     install_wallpaper_source "$WALLPAPER" || exit 1
     printf '%s\n' "$WALLPAPER" >"$CURRENT_SOURCE_FILE"
-    sig="$(wallpaper_sig "$WALLPAPER")"
+    sig="$(wallpaper_sig)"
     last_sig_file="$STATE_DIR/last-wallpaper.sig"
     if [[ -f "$last_sig_file" ]] && [[ "$(cat "$last_sig_file" 2>/dev/null || true)" == "$sig" ]]; then
         SAME_WALLPAPER=1
@@ -342,7 +342,7 @@ else
             cp -f "$WALLPAPER" "$CURRENT_WALL"
         fi
     fi
-    sig="$(wallpaper_sig "$WALLPAPER")"
+    sig="$(wallpaper_sig)"
     last_sig_file="$STATE_DIR/last-wallpaper.sig"
     if [[ -f "$last_sig_file" ]] && [[ "$(cat "$last_sig_file" 2>/dev/null || true)" == "$sig" ]]; then
         _wd="swww-daemon"; command -v awww-daemon >/dev/null 2>&1 && _wd="awww-daemon"
@@ -355,7 +355,7 @@ fi
 
 apply_wallpaper_now "$CURRENT_WALL"
 export WALLPAPER_TRANSITION_DONE=1
-printf '%s\n' "$(wallpaper_sig "$WALLPAPER")" >"$STATE_DIR/last-wallpaper.sig" 2>/dev/null || true
+printf '%s\n' "$(wallpaper_sig)" >"$STATE_DIR/last-wallpaper.sig" 2>/dev/null || true
 
 wal_source="$WALLPAPER"
 if [[ -f "$CURRENT_SOURCE_FILE" ]]; then
@@ -798,15 +798,11 @@ restart_waybar_if_running() {
 
 if [[ "$NO_RESTART" != "yes" ]]; then
     ensure_pidfile_running "$PID_DIR/waybar.pid" waybar waybar
-    ensure_pidfile_running "$PID_DIR/mako.pid" mako mako
 fi
 
 signal_running_processes waybar USR2
 if [[ "$waybar_css_changed" -eq 1 || "$waybar_config_changed" -eq 1 ]]; then
     restart_waybar_if_running
-fi
-if command -v makoctl >/dev/null 2>&1; then
-    makoctl reload >/dev/null 2>&1 || true
 fi
 
 niri msg action load-config-file >/dev/null 2>&1 || true

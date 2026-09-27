@@ -11,16 +11,6 @@ log() {
   printf '[%s] %s\n' "$(date +'%F %T')" "$*" >> "$LOG_FILE"
 }
 
-start_user_unit() {
-  local unit="$1"
-  if ! command -v systemctl >/dev/null 2>&1; then
-    return 1
-  fi
-  systemctl --user daemon-reload >/dev/null 2>&1 || true
-  systemctl --user start "$unit" >/dev/null 2>&1 || return 1
-  return 0
-}
-
 write_session_env() {
   cat > "$SESSION_ENV_FILE" <<EOF
 WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}
@@ -94,51 +84,36 @@ if command -v systemctl >/dev/null 2>&1 && ! systemctl --user is-active -q graph
 fi
 
 "$HOME/.local/bin/rp-settings" apply || log "rp-settings apply failed"
-
-if ! "$HOME/.local/bin/apply-wallpaper-theme.sh" --no-daemon-restart; then
-  log "apply-wallpaper-theme failed, continuing startup with existing theme"
-fi
-
 write_session_env
-[[ "$(cat "$HOME/.config/niri-rice/bar" 2>/dev/null)" == quickshell ]] || start_waybar_with_retry || true
 
-start_user_unit niri-rice-playerctld.service >/dev/null 2>&1 || true
-start_user_unit niri-rice-wallpaper-healthcheck.service >/dev/null 2>&1 || true
-start_user_unit niri-rice-quickshell.service >/dev/null 2>&1 || true
-start_user_unit niri-rice-audio-sync.service >/dev/null 2>&1 || true
-start_user_unit niri-rice-cliphist.service >/dev/null 2>&1 || true
 if command -v systemctl >/dev/null 2>&1; then
-  systemctl --user start niri-rice-wallpaper-healthcheck.timer >/dev/null 2>&1 || true
-  systemctl --user start niri-rice-waybar.timer >/dev/null 2>&1 || true
+  systemctl --user start --no-block niri-rice-quickshell.service niri-rice-audio-sync.service \
+    niri-rice-cliphist.service niri-rice-playerctld.service niri-rice-wallpaper-healthcheck.timer \
+    niri-rice-waybar.timer >/dev/null 2>&1 || true
 fi
 
-ensure_pidfile_running "$PID_DIR/mako.pid" mako mako
-if command -v makoctl >/dev/null 2>&1; then
-  makoctl reload >/dev/null 2>&1 || true
-fi
-
-if command -v nm-applet >/dev/null 2>&1; then
-  ensure_pidfile_running "$PID_DIR/nm-applet.pid" nm-applet nm-applet --indicator
-fi
-
-if command -v blueman-applet >/dev/null 2>&1; then
-  ensure_pidfile_running "$PID_DIR/blueman-applet.pid" blueman-applet blueman-applet
-fi
-
-if command -v xwayland-satellite >/dev/null 2>&1; then
-  ensure_pidfile_running "$PID_DIR/xwayland-satellite.pid" xwayland-satellite xwayland-satellite
-fi
-
-if command -v kanshi >/dev/null 2>&1 && [[ -f "$HOME/.config/kanshi/config" ]]; then
-  ensure_pidfile_running "$PID_DIR/kanshi.pid" kanshi kanshi
-fi
-
-if command -v wayvnc >/dev/null 2>&1; then
-  ensure_pidfile_running "$PID_DIR/wayvnc.pid" wayvnc wayvnc 127.0.0.1 5900
-fi
+command -v xwayland-satellite >/dev/null 2>&1 \
+  && ensure_pidfile_running "$PID_DIR/xwayland-satellite.pid" xwayland-satellite xwayland-satellite
+command -v kanshi >/dev/null 2>&1 && [[ -f "$HOME/.config/kanshi/config" ]] \
+  && ensure_pidfile_running "$PID_DIR/kanshi.pid" kanshi kanshi
+[[ -f /usr/lib/systemd/user/mako.service && ! -L "$HOME/.config/systemd/user/mako.service" ]] \
+  && { systemctl --user mask mako.service >/dev/null 2>&1 || true; }
+pkill -x mako 2>/dev/null || true
+command -v nm-applet >/dev/null 2>&1 \
+  && ensure_pidfile_running "$PID_DIR/nm-applet.pid" nm-applet nm-applet --indicator
+command -v blueman-applet >/dev/null 2>&1 \
+  && ensure_pidfile_running "$PID_DIR/blueman-applet.pid" blueman-applet blueman-applet
+command -v wayvnc >/dev/null 2>&1 \
+  && ensure_pidfile_running "$PID_DIR/wayvnc.pid" wayvnc wayvnc 127.0.0.1 5900
 
 "$HOME/.local/bin/rp-settings" nightlight || log "rp-settings nightlight failed"
+pgrep -x swayidle >/dev/null 2>&1 || "$HOME/.local/bin/rp-settings" idle || log "rp-settings idle failed"
 
-if ! pgrep -x swayidle >/dev/null 2>&1; then
-  "$HOME/.local/bin/rp-settings" idle || log "rp-settings idle failed"
-fi
+(
+  "$HOME/.local/bin/apply-wallpaper-theme.sh" --no-daemon-restart \
+    || log "apply-wallpaper-theme failed, continuing with the existing theme"
+  systemctl --user start --no-block niri-rice-wallpaper-healthcheck.service
+  [[ "$(cat "$HOME/.config/niri-rice/bar" 2>/dev/null)" == quickshell ]] || start_waybar_with_retry
+) >/dev/null 2>&1 &
+disown
+exit 0
