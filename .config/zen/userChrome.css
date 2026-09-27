@@ -1,0 +1,98 @@
+:root:not([zen-private-window="true"]) {
+  --rp-window:     #161618;
+  --rp-surface:    #242427;
+  --rp-surface-hi: #2c2c30;
+  --rp-view:       #121214;
+  --rp-entry:      #1e1e21;
+  --rp-sel:        #3d3d44;
+  --rp-primary:    #e4e4e7;
+  --rp-on-primary: #161618;
+  --rp-fg:         #e8e8ea;
+  --rp-fg-muted:   #a6a6ad;
+  --rp-outline:    #3a3a40;
+  --rp-alpha:      0.45;
+}
+
+:root:not([zen-private-window="true"]) {
+  --zen-primary-color: var(--rp-primary) !important;
+  --zen-branding-bg: var(--rp-window) !important;
+  --zen-branding-bg-reverse: var(--rp-fg) !important;
+  --zen-colors-primary: var(--rp-sel) !important;
+  --zen-colors-secondary: var(--rp-surface-hi) !important;
+  --zen-colors-tertiary: var(--rp-view) !important;
+  --zen-colors-primary-foreground: var(--rp-primary) !important;
+  --zen-colors-border: color-mix(in srgb, var(--rp-outline) 55%, transparent) !important;
+  --zen-colors-input-bg: var(--rp-entry) !important;
+  --zen-dialog-background: var(--rp-surface) !important;
+  --zen-urlbar-background: var(--rp-surface) !important;
+
+  --toolbox-textcolor: var(--rp-fg) !important;
+  --toolbar-color-scheme: dark !important;
+  --toolbar-field-color: var(--rp-fg) !important;
+  --toolbar-field-focus-color: var(--rp-fg) !important;
+  --toolbar-field-focus-background-color: var(--rp-entry) !important;
+  --toolbar-field-focus-border-color: var(--rp-primary) !important;
+  --focus-outline-color: var(--rp-primary) !important;
+
+  --arrowpanel-background: var(--rp-surface) !important;
+  --arrowpanel-color: var(--rp-fg) !important;
+  --arrowpanel-border-color: var(--rp-outline) !important;
+  --panel-separator-color: color-mix(in srgb, var(--rp-outline) 60%, transparent) !important;
+
+  --tab-selected-bgcolor: color-mix(in srgb, var(--rp-primary) 16%, var(--rp-surface)) !important;
+  --tab-selected-textcolor: var(--rp-fg) !important;
+  --zen-toolbar-element-bg: color-mix(in srgb, var(--rp-primary) 8%, transparent) !important;
+  --toolbarbutton-background-color-hover: color-mix(in srgb, var(--rp-primary) 14%, transparent) !important;
+  --toolbarbutton-background-color-active: color-mix(in srgb, var(--rp-primary) 22%, transparent) !important;
+
+  --button-background-color-primary: var(--rp-primary) !important;
+  --button-primary-hover-bgcolor: color-mix(in srgb, var(--rp-primary) 88%, white) !important;
+  --button-primary-active-bgcolor: color-mix(in srgb, var(--rp-primary) 76%, white) !important;
+  --button-primary-color: var(--rp-on-primary) !important;
+  --button-text-color-primary: var(--rp-on-primary) !important;
+  --link-color: var(--rp-primary) !important;
+}
+
+:root:not([zen-private-window="true"]) {
+  --rp-window-a: color-mix(in srgb, var(--rp-window) calc(var(--rp-alpha) * 100%), transparent);
+  --zen-themed-toolbar-bg-transparent: transparent !important;
+  --zen-main-browser-background: var(--rp-window-a) !important;
+  --zen-main-browser-background-toolbar: var(--rp-window-a) !important;
+  --tabpanel-background-color: transparent !important;
+}
+
+:root:not([zen-private-window="true"]) #main-window,
+:root:not([zen-private-window="true"]) #browser,
+:root:not([zen-private-window="true"]) #navigator-toolbox,
+:root:not([zen-private-window="true"]) #tabbrowser-tabpanels,
+:root:not([zen-private-window="true"]) #tabbrowser-tabpanels browser[type="content"] {
+  background: transparent !important;
+}
+
+:root:not([zen-private-window="true"]) .zen-browser-generic-background:not(.zen-toolbar-background) {
+  &::before { opacity: 0 !important; }
+  &::after { background: var(--rp-window-a) !important; opacity: 1 !important; }
+  & .zen-browser-grain { display: none !important; }
+}
+
+:root:not([zen-private-window="true"]) .zen-toolbar-background {
+  background: color-mix(in srgb, var(--rp-window) 92%, transparent) !important;
+  &::before, &::after { background: transparent !important; }
+}
+
+:root:not([zen-private-window="true"]) :is(menupopup, panel) {
+  --panel-background: var(--rp-surface) !important;
+  --panel-color: var(--rp-fg) !important;
+  --panel-border-color: var(--rp-outline) !important;
+  --menuitem-hover-background-color: color-mix(in srgb, var(--rp-primary) 18%, transparent) !important;
+}
+
+#urlbar[breakout-extend] > .urlbar-background {
+  background: var(--rp-surface) !important;
+  outline-color: var(--rp-primary) !important;
+}
+
+::selection {
+  background-color: var(--rp-sel) !important;
+  color: var(--rp-fg) !important;
+}

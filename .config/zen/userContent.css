@@ -1,0 +1,19 @@
+@-moz-document url-prefix("about:newtab"), url-prefix("about:home"), url("about:blank") {
+  :root { color-scheme: dark; background: transparent !important; }
+  body {
+    background: transparent !important;
+    color: #e8e8ea !important;
+  }
+}
+
+@-moz-document url-prefix("about:preferences"), url-prefix("about:addons"), url-prefix("about:settings") {
+  :root {
+    --in-content-page-background: #121214 !important;
+    --in-content-box-background: #242427 !important;
+    --in-content-page-color: #e8e8ea !important;
+    --in-content-accent-color: #e4e4e7 !important;
+    --color-accent-primary: #e4e4e7 !important;
+    --button-background-color-primary: #e4e4e7 !important;
+    --button-text-color-primary: #161618 !important;
+  }
+}
