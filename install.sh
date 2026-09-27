@@ -48,9 +48,6 @@ PKGS=(
     cliphist                # historie schránky (Mod+Ctrl+V)
     grim
     slurp
-    tesseract
-    tesseract-data-ces      # OCR: tesseract -l ces+eng
-    tesseract-data-eng
     libnotify
     zenity
     playerctl
@@ -60,7 +57,6 @@ PKGS=(
     pavucontrol
     networkmanager
     nm-connection-editor
-    gamemode
     rsync
     stow
     git
@@ -69,20 +65,12 @@ PKGS=(
     zsh
     eza
     zoxide
-    atuin
-    fnm
-    yazi
-    neovim
     cava
-    btop
-    fastfetch
 
     # vzhled
     ttf-jetbrains-mono-nerd
     papirus-icon-theme
-    bibata-cursor-theme-bin
     nwg-look
-    qt5ct
     qt6ct
 
     # soubory
@@ -91,16 +79,39 @@ PKGS=(
     thunar-volman
     xfce4-settings
     gvfs
-    gvfs-smb
-    gvfs-afc
     tumbler
     ffmpegthumbnailer
     poppler-glib
     libgsf
 )
 
+# Doplňky: rice bez nich funguje, install.sh se na ně zeptá jednou na začátku.
+# Na serveru nebo slabším stroji ušetří kolem 350 MB.
+EXTRAS=(
+    tesseract               # OCR z výřezu obrazovky (wl-ocr)
+    tesseract-data-ces      # tesseract -l ces+eng
+    tesseract-data-eng
+    gamemode                # herní režim
+    qt5ct                   # téma pro Qt5 aplikace (přitahuje celé Qt 5)
+    gvfs-smb                # sdílené složky Windows / Samba v Thunaru
+    gvfs-afc                # iPhone v Thunaru
+    atuin                   # historie příkazů
+    fnm                     # verze Node.js
+    yazi                    # souborový manažer v terminálu
+    neovim
+    btop
+    fastfetch
+)
+
+# Kurzor: jen varianta, kterou rice používá (28 MB), ne celý AUR balík se
+# všemi dvanácti variantami (322 MB). Do ~/.local/share/icons, bez roota.
+CURSOR_THEME=Bibata-Modern-Ice
+CURSOR_URL="https://github.com/ful1e5/Bibata_Cursor/releases/latest/download/$CURSOR_THEME.tar.xz"
+
 # Soubory z repa, které do $HOME nepatří
-NOT_DEPLOYED=(.gitignore .stow-local-ignore README.md install.sh CLAUDE.md)
+# .gitconfig je osobní (jméno, e-mail, cesty) — na cizím stroji by commity
+# šly pod cizím jménem
+NOT_DEPLOYED=(.gitignore .stow-local-ignore README.md install.sh CLAUDE.md .gitconfig)
 
 # Heslo pro sudo jednou na začátku, pak ho smyčka na pozadí drží platné
 # (výchozí timeout sudo je 5 minut, build z AUR trvá déle) — pacman, makepkg
@@ -126,12 +137,26 @@ in_session() {
 
 # ------------------------------------------------------------------ balíky
 
+# Na doplňky se ptá hned na začátku, ať pak instalace doběhne bez dotazů
+WANT_EXTRAS=0
+choose_extras() {
+    echo "Optional extras (the rice works without them, ~350 MB):"
+    printf '  %s\n' "${EXTRAS[@]}"
+    ask "Install the extras too?" && WANT_EXTRAS=1
+    return 0
+}
+
+# Bez potvrzování: --noconfirm bere u každé otázky výchozí odpověď (u výběru
+# poskytovatele první volbu, např. qt6-multimedia-ffmpeg), paru navíc
+# přeskočí prohlížení PKGBUILDů
 install_packages() {
     echo "== Packages"
+    local list=("${PKGS[@]}")
+    [[ $WANT_EXTRAS == 1 ]] && list+=("${EXTRAS[@]}")
     # Nejdřív čerstvá databáze, ať se balíky správně rozdělí na repo/AUR…
     sudo pacman -Sy
     local pkg repo=() aur=()
-    for pkg in "${PKGS[@]}"; do
+    for pkg in "${list[@]}"; do
         pacman -Qi "$pkg" &>/dev/null && continue
         if pacman -Si "$pkg" &>/dev/null; then repo+=("$pkg"); else aur+=("$pkg"); fi
     done
@@ -142,27 +167,38 @@ install_packages() {
         # zbytku systému je částečný upgrade, který Arch nepodporuje (např. nová
         # libbluray rozbije nainstalovaný ffmpeg: "breaks dependency libbluray.so")
         echo "(this also upgrades the rest of the system — Arch doesn't support partial upgrades)"
-        sudo pacman -Su --needed "${repo[@]}"
+        sudo pacman -Su --needed --noconfirm "${repo[@]}"
     fi
     if [[ ${#aur[@]} -gt 0 ]]; then
         command -v paru &>/dev/null || install_paru
         if command -v paru &>/dev/null; then
             echo "From the AUR: ${aur[*]}"
-            paru -S --needed "${aur[@]}"
+            paru -S --needed --noconfirm --skipreview "${aur[@]}"
         else
             echo "Not in the repositories and no paru to get them from the AUR: ${aur[*]}" >&2
         fi
     fi
     [[ ${#repo[@]} -eq 0 && ${#aur[@]} -eq 0 ]] && echo "Everything is installed."
+    install_cursor
     return 0
+}
+
+install_cursor() {
+    local d
+    for d in /usr/share/icons "$HOME/.local/share/icons" "$HOME/.icons"; do
+        [[ -d "$d/$CURSOR_THEME/cursors" ]] && return 0
+    done
+    echo "Cursor theme $CURSOR_THEME → ~/.local/share/icons"
+    mkdir -p "$HOME/.local/share/icons"
+    curl -fsSL "$CURSOR_URL" | tar -xJ -C "$HOME/.local/share/icons" \
+        || echo "!! Downloading the cursor theme failed — $CURSOR_URL" >&2
 }
 
 # Na čistém Archu paru není. paru-bin z AUR (předkompilovaný, bez stahování
 # celého Rust toolchainu) přes makepkg.
 install_paru() {
-    echo "Some packages are only in the AUR, and paru (the AUR helper) is not installed."
-    ask "Install paru from the AUR now?" || return 0
-    sudo pacman -S --needed base-devel git
+    echo "Some packages are only in the AUR — installing paru (the AUR helper) first."
+    sudo pacman -S --needed --noconfirm base-devel git
     local tmp; tmp="$(mktemp -d)"
     if git clone --depth 1 https://aur.archlinux.org/paru-bin.git "$tmp/paru-bin" \
         && (cd "$tmp/paru-bin" && makepkg -si --noconfirm); then
@@ -318,10 +354,10 @@ select action in \
     "System integration (sudo helpers, login screen)" \
     "Cancel"; do
     case "$REPLY" in
-        1) need_sudo; install_packages; copy_configs; post_deploy
+        1) choose_extras; need_sudo; install_packages; copy_configs; post_deploy
            echo; ask "Also run the system integration steps?" && system_setup
            break ;;
-        2) need_sudo; install_packages; break ;;
+        2) choose_extras; need_sudo; install_packages; break ;;
         3) copy_configs; post_deploy; break ;;
         4) copy_configs 1; break ;;
         5) stow_configs; post_deploy; break ;;
