@@ -138,7 +138,7 @@ and `gvfs` + `gvfs-smb` / `gvfs-afc` for mounting.
 
 **LightDM greeter** (login screen) mirrors the RPRice GTK3 theme and the
 current wallpaper. `lightdm-gtk-greeter` runs as its own user and can't read
-`/home/roman` (chmod 700), so `theme-modules/84-lightdm.sh` shells out to a
+the home directory (chmod 700), so `theme-modules/84-lightdm.sh` shells out to a
 privileged helper that copies both into `/usr/share/themes/` and
 `/usr/share/backgrounds/` and points `lightdm-gtk-greeter.conf` at them. Same
 pattern as [power modes](#power-modes) below: install once with
@@ -873,6 +873,43 @@ a partial upgrade. On a server that had not been updated in a while, that broke
 right away: `installing libbluray … breaks dependency 'libbluray.so' required
 by ffmpeg`. If paru is missing (clean Arch), it offers to build `paru-bin`
 from the AUR, so the AUR packages don't get skipped.
+
+Apart from the choices that matter, the install runs without questions. The
+only prompts are the menu, whether to install the extras (asked up front) and
+the system-integration steps. pacman and paru run with `--noconfirm`, so every
+question takes its default answer: for a provider choice that is the first
+option (`qt6-multimedia-ffmpeg`). paru also gets `--skipreview`.
+
+The packages are split into `PKGS`, which the rice needs, and `EXTRAS` (about
+350 MB): OCR, gamemode, qt5ct, Samba and iPhone support in Thunar, atuin, fnm,
+yazi, neovim, btop and fastfetch. `.zshrc` guards every tool from the extras
+(`(( $+commands[x] ))`), because otherwise a missing `fnm`/`atuin` would
+throw errors at every shell start.
+
+The cursor is not the `bibata-cursor-theme-bin` AUR package, which holds all
+twelve Bibata variants (322 MB). Only `Bibata-Modern-Ice` (27 MB), the one the
+rice uses, is downloaded from the upstream release into
+`~/.local/share/icons`, where rp-settings' cursor list looks too. For the
+record, measured on this machine: the rice with its dependencies is about
+2.9 GB on top of `base`, and the largest items were the cursor theme, the
+JetBrains Mono Nerd font (232 MB) and Papirus (112 MB). A much larger total
+from pacman usually means the `-Syu` is upgrading an outdated system. The
+"Net Upgrade Size" line shows what actually gets added.
+
+Nothing in the deployed files is tied to one user or machine:
+- **Paths:** `$HOME` or `~` instead of `/home/<user>`.
+- **Root helpers:** the sudoers rules of `rp-power` and `rp-lightdm-sync` are
+  written for `$SUDO_USER` and fail without it, instead of falling back to a
+  hard-coded name.
+- **`.gitconfig`:** stays in the repo but is never deployed (`NOT_DEPLOYED`,
+  `.stow-local-ignore`), because it would make commits on someone else's
+  machine carry this name and e-mail.
+- **Monitors:** mode, scale and position live only in the generated,
+  gitignored `displays.kdl` and `~/.config/kanshi/config`, which rp-display
+  (Settings → Displays) writes. kanshi only starts once that config exists.
+- **`steam-fast`:** applies the NVIDIA PRIME variables only when
+  `nvidia_icd.json` is present. Without it, `VK_DRIVER_FILES` would leave
+  Vulkan with no driver at all.
 
 A GitHub ZIP download (no `.git`) works too. Without git, the file list comes
 from `find`, which is the same set, because the ZIP holds only tracked files.

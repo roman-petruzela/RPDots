@@ -103,7 +103,7 @@ source $ZSH/oh-my-zsh.sh
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='vim'
 else
-  export EDITOR='nvim'
+  (( $+commands[nvim] )) && export EDITOR='nvim' || export EDITOR='vim'
 fi
 
 # Compilation flags
@@ -120,8 +120,9 @@ fi
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-alias ls="eza --icons --group-directories-first"
-alias fetch="fastfetch"
+# Tools from install.sh's optional extras may be missing, so each is guarded
+(( $+commands[eza] )) && alias ls="eza --icons --group-directories-first"
+(( $+commands[fastfetch] )) && alias fetch="fastfetch"
 
 # Powerlevel10k prompt — layout
 typeset -g POWERLEVEL9K_MODE=nerdfont-complete
@@ -143,9 +144,9 @@ source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
 
 export PATH=$PATH:$HOME/.spicetify
 
-eval "$(fnm env --use-on-cd)"
-eval "$(zoxide init zsh)"
-eval "$(atuin init zsh)"
+(( $+commands[fnm] ))    && eval "$(fnm env --use-on-cd)"
+(( $+commands[zoxide] )) && eval "$(zoxide init zsh)"
+(( $+commands[atuin] ))  && eval "$(atuin init zsh)"
 export PATH="$HOME/.local/bin:$PATH"
 
 # Kitty modifier-arrow bindings
@@ -164,5 +165,5 @@ add-zsh-hook precmd __rice_sync_cli_theme_env
 add-zsh-hook preexec __rice_sync_cli_theme_env
 
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
-export SDKMAN_DIR="/home/roman/.sdkman"
-[[ -s "/home/roman/.sdkman/bin/sdkman-init.sh" ]] && source "/home/roman/.sdkman/bin/sdkman-init.sh"
+export SDKMAN_DIR="$HOME/.sdkman"
+[[ -s "$SDKMAN_DIR/bin/sdkman-init.sh" ]] && source "$SDKMAN_DIR/bin/sdkman-init.sh"
