@@ -4,11 +4,6 @@ After=graphical-session.target
 
 [Service]
 Type=oneshot
-# mpvpaper se z rp-power sync (přes wallpaper-video-ctl.sh) forkuje na pozadí
-# (-f) a zůstává navázaný jako mrtvé dítě v cgroup téhle jednotky. S výchozím
-# KillMode=control-group ho systemd při dokončení oneshotu zabije spolu s ním
-# — video tapeta tak naskočí a vzápětí zase zmizí. KillMode=process nechá
-# systemd sáhnout jen na hlavní (skriptový) proces, ne na jeho potomky.
 KillMode=process
 ExecStart=%h/.local/bin/rp-power sync
 StandardOutput=journal

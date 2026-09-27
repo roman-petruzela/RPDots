@@ -4,22 +4,16 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Síť: stav a IP, režim letadlo, veřejná IP, speedtest, Wi-Fi (připojení
-// s heslem), uložená připojení, VPN a detail rozhraní. Data z `rp-net`;
-// `nmcli monitor` hlásí změny, podle něj se stránka obnoví.
-//
-// Heslo k Wi-Fi jde do `rp-net connect` přes stdin, ne v argumentech
-// (ty vidí každý proces v /proc) — stejně jako NetworkSwitcher.
 Item {
     id: page
     required property var host
 
-    property var info: null          // rp-net details
-    property var wifi: null          // rp-net status (seznam sítí)
+    property var info: null
+    property var wifi: null
     property var publicIp: null
     property bool publicIpLoading: false
-    property var speed: ({})         // latency, download, upload, phase
-    property string askPassword: ""  // SSID, u kterého je otevřené pole na heslo
+    property var speed: ({})
+    property string askPassword: ""
     property string connecting: ""
     property string connectError: ""
 
@@ -113,14 +107,12 @@ Item {
         onExited: if (page.speed.phase !== "done" && page.speed.phase !== "error") page.speed = Object.assign({}, page.speed, { phase: "error" })
     }
 
-    // Změny v NetworkManageru (připojení, odpojení, VPN) — obnovit s prodlevou
     Process {
         running: true
         command: ["nmcli", "monitor"]
         stdout: SplitParser { onRead: refresh.restart() }
     }
     Timer { id: refresh; interval: 400; onTriggered: page.reload() }
-    // Seznam okolních sítí se mění i bez událostí
     Timer { interval: 15000; running: true; repeat: true; onTriggered: statusProc.running = true }
 
     readonly property var primary: info ? (info.interfaces.find(i => i.device === info.routeDevice) ?? null) : null
@@ -135,7 +127,6 @@ Item {
         return s >= 75 ? "󰤨" : s >= 50 ? "󰤥" : s >= 25 ? "󰤢" : "󰤟"
     }
 
-    // Klíč → hodnota v kartě rozhraní
     component Field: Item {
         id: fld
         property string label
@@ -153,7 +144,6 @@ Item {
         }
     }
 
-    // Velké číslo speedtestu
     component Metric: Column {
         id: mt
         property string label
@@ -189,7 +179,6 @@ Item {
             spacing: 2
             topPadding: 8
 
-            // ── Stav
             SCard {
                 width: parent.width
                 height: 96
@@ -241,7 +230,6 @@ Item {
 
             Item { width: 1; height: 10 }
 
-            // ── Rychlost a veřejná IP
             SCard {
                 width: parent.width
                 height: speedCol.implicitHeight + 36
@@ -303,7 +291,6 @@ Item {
                 }
             }
 
-            // ── Wi-Fi
             SHeading { text: "WI-FI" }
             SRow {
                 label: "Wi-Fi"
@@ -386,7 +373,7 @@ Item {
                             SButton {
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: nw.modelData.active
-                                width: 124   // stejně jako Connect, ať sloupec vlevo nelítá
+                                width: 124
                                 icon: "󰅖"; text: "Disconnect"
                                 onClicked: page.net(["disconnect"])
                             }
@@ -403,7 +390,6 @@ Item {
                             }
                         }
                     }
-                    // Pole na heslo (jen u neuložených zabezpečených sítí)
                     Row {
                         visible: nw.asking
                         anchors { left: parent.left; leftMargin: 46; top: nwHead.bottom }
@@ -421,7 +407,6 @@ Item {
                 }
             }
 
-            // ── VPN
             SHeading { text: "VPN" }
             SHint {
                 visible: (page.info?.vpn.length ?? 0) === 0
@@ -447,7 +432,6 @@ Item {
                 SButton { icon: "󰏌"; text: "Open"; onClicked: Quickshell.execDetached(["protonvpn-app"]) }
             }
 
-            // ── Uložená připojení
             SHeading { text: "SAVED CONNECTIONS" }
             Repeater {
                 model: page.info?.connections ?? []
@@ -480,7 +464,6 @@ Item {
                 }
             }
 
-            // ── Rozhraní
             SHeading { text: "INTERFACES" }
             Flow {
                 width: parent.width

@@ -1,7 +1,6 @@
 import QtQuick
 import "../Colors.js" as Colors
 
-// Tlačítko; `danger` pro odinstalaci apod., `busy` ho ztlumí a zablokuje
 Rectangle {
     id: btn
     property string text

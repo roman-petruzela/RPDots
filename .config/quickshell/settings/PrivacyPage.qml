@@ -4,9 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Soukromí: kdo právě používá mikrofon, kameru a sdílení obrazovky (obnovuje
-// se každé 3 s), a úklid stop — nedávné soubory, náhledy, historie launcheru.
-// Historie schránky a terminálu je na stránce History.
 Item {
     id: page
     required property var host
@@ -40,7 +37,6 @@ Item {
         return b.toFixed(i < 2 ? 0 : 1) + " " + u[i]
     }
 
-    // Stav jednoho zařízení (mikrofon/kamera/obrazovka)
     component UseRow: SRow {
         id: ur
         property var users: []

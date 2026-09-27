@@ -2,13 +2,6 @@ import Quickshell.Services.Mpris
 import QtQuick
 import "Colors.js" as Colors
 
-// Now Playing.
-//
-// Dvě věci, o které se to dřív rozbíjelo:
-//  * vlastnosti se jmenují position/length (v sekundách), ne trackPosition
-//    a trackLength — ty neexistují, takže čas i progressbar stály na nule,
-//  * na sběrnici visí i proxy playerctld, která hlásí NoActivePlayer; když
-//    padla volba na ni, tlačítka nedělala nic. Skutečný přehrávač má přednost.
 Item {
     id: root
 
@@ -19,9 +12,6 @@ Item {
     readonly property var players: Mpris.players.values.filter(
         p => (p.dbusName || "").indexOf("playerctld") < 0)
 
-    // Proxy se nebere ani jako záloha: po zavření přehrávače na ní zůstane
-    // viset poslední stopa, takže by widget dál ukazoval hudbu, která nehraje,
-    // a tlačítka by šla do prázdna.
     readonly property var activePlayer: {
         for (const p of players)
             if (p.playbackState === MprisPlaybackState.Playing) return p
@@ -32,8 +22,6 @@ Item {
         if (!activePlayer) return ""
         const direct = (activePlayer.trackArtUrl || "").toString()
         if (direct !== "") return direct
-        // Firefox u YouTube neposílá mpris:artUrl, ale posílá adresu videa —
-        // náhled se z ní dá složit.
         const url = ((activePlayer.metadata || {})["xesam:url"] || "").toString()
         const id = url.match(/[?&]v=([\w-]{11})/) || url.match(/youtu\.be\/([\w-]{11})/)
         return id ? "https://img.youtube.com/vi/" + id[1] + "/hqdefault.jpg" : ""
@@ -48,11 +36,6 @@ Item {
         ? (activePlayer.length || 0) : 0
     readonly property real trackPos: activePlayer && activePlayer.positionSupported
         ? (activePlayer.position || 0) : 0
-    // Firefox mpris:length nevysílá vůbec (lengthSupported je false) a quickshell
-    // pak za délku vydává pozici — podíl by vycházel pořád 1.0.
-    //
-    // Délka se drží do konce stopy: kdyby ji přehrávač na okamžik nehlásil,
-    // proužek by bez toho poskočil na prázdno a zase zpátky.
     property real stickyLen: 0
     onTrackLenChanged: if (trackLen > 0) stickyLen = trackLen
 
@@ -66,8 +49,6 @@ Item {
     readonly property real trackProgress: hasLength
         ? Math.min(trackPos / effectiveLen, 1.0) : 0
 
-    // position se sama neaktualizuje — dokud se nešťouchne do signálu,
-    // vazby drží poslední přečtenou hodnotu.
     Timer {
         interval: 1000
         repeat: true
@@ -94,7 +75,6 @@ Item {
         border.width: 1
         clip: true
 
-        // Album art banner
         Rectangle {
             id: artBanner
             visible: root.hasArt
@@ -110,8 +90,6 @@ Item {
                 asynchronous: true
             }
 
-            // Přes světlou náhledovku by byl bílý nadpis nečitelný, proto
-            // přechod sahá výš a uprostřed už pořádně kryje.
             Rectangle {
                 anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
                 height: 96
@@ -154,7 +132,6 @@ Item {
             }
         }
 
-        // Controls + progress
         Column {
             anchors {
                 left: parent.left; right: parent.right
@@ -163,7 +140,6 @@ Item {
             }
             spacing: 8
 
-            // Track info (no art)
             Column {
                 visible: !root.hasArt
                 width: parent.width
@@ -185,7 +161,6 @@ Item {
                 }
             }
 
-            // Progress bar + seek
             Column {
                 width: parent.width
                 spacing: 4
@@ -205,7 +180,6 @@ Item {
                         Behavior on width { NumberAnimation { duration: 800; easing.type: Easing.Linear } }
                     }
 
-                    // Kliknutím se přeskakuje, ale jen když to přehrávač umí
                     MouseArea {
                         anchors.fill: parent
                         anchors.topMargin: -8
@@ -245,7 +219,6 @@ Item {
                 }
             }
 
-            // Controls — zašedlé, když je přehrávač neumí
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 4

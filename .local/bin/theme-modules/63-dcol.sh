@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# priority: 63
 
 template_dir="${XDG_CONFIG_HOME:-$HOME/.config}/niri-rice/templates"
 mkdir -p "$template_dir"

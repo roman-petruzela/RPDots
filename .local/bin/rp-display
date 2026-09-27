@@ -1,23 +1,4 @@
 #!/usr/bin/env bash
-# rp-display — monitory pro okno Settings (stránka Displays).
-#
-#   rp-display list                    výstupy s režimy a aktuálním nastavením (JSON)
-#   rp-display set <výstup> <klíč> <hodnota>
-#        mode <W>x<H>@<Hz> | scale <0.5–3> | transform normal|90|180|270|flipped…
-#        position <x>,<y> | vrr off|on|on-demand | enabled true|false
-#   rp-display identify                na každém monitoru na 2 s jeho název (notifikace)
-#
-# Změna se hned projeví (niri msg output) a uloží se na dvě místa:
-#   ~/.config/niri/displays.kdl   bloky output (include na konci config.kdl),
-#                                 před zápisem `niri validate`, při chybě zpět
-#   ~/.config/kanshi/config       profil pro právě připojenou sadu monitorů —
-#                                 kanshi při každém připojení monitoru přepíše
-#                                 režim a pozici, bez tohohle by změnu vrátil
-# Uložené hodnoty drží ~/.config/niri-rice/displays.json.
-#
-# Výstupy se v niri configu jmenují stejně jako v config.kdl: "výrobce model
-# sériové číslo", když ho monitor hlásí, jinak konektor (eDP-1). Blok se stejným
-# jménem z include pak přepíše ten v config.kdl místo toho, aby vznikl druhý.
 set -uo pipefail
 export LC_ALL=C
 
@@ -52,7 +33,6 @@ list() {
         | sort_by(.x)'
 }
 
-# Uložené hodnoty → displays.kdl
 render_kdl() {
     echo "// Generováno skriptem rp-display (okno Settings → Displays) — needitovat ručně."
     jq -r 'to_entries[] | .key as $id | .value as $v
@@ -81,10 +61,7 @@ apply_kdl() {
     rm -f "$tmp" "$backup"
 }
 
-# Profil kanshi pro aktuálně připojenou sadu výstupů: přepsat, nebo přidat
 sync_kanshi() {
-    # Na novém stroji config ještě není — vznikne s prvním profilem
-    # (start-rice-services.sh pouští kanshi, jen když existuje)
     mkdir -p "$(dirname "$KANSHI")"
     [[ -f "$KANSHI" ]] || : > "$KANSHI"
     local cur; cur=$(list)
@@ -157,7 +134,6 @@ set_value() {
         enabled)
             [[ "$val" =~ ^(true|false)$ ]] || die "enabled: true|false"
             if [[ "$val" == false ]]; then
-                # Posledního zapnutého nevypínat — zůstala by černá obrazovka
                 (( $(list | jq '[.[] | select(.enabled)] | length') > 1 )) || die "can't turn off the last display"
                 niri msg output "$out" off >/dev/null 2>&1
             else

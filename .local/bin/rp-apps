@@ -51,11 +51,9 @@ CATEGORIES = [
     ("archives", "Archives", ["application/zip", "application/x-tar", "application/x-7z-compressed", "application/vnd.rar"]),
 ]
 
-
 def die(msg):
     print(f"rp-apps: {msg}", file=sys.stderr)
     sys.exit(1)
-
 
 def read_desktop(path):
     cp = configparser.RawConfigParser(interpolation=None, strict=False)
@@ -67,7 +65,6 @@ def read_desktop(path):
         return None
     return dict(cp["Desktop Entry"]) if cp.has_section("Desktop Entry") else None
 
-
 def shown_here(e):
     only = [x for x in e.get("OnlyShowIn", "").split(";") if x]
     never = [x for x in e.get("NotShowIn", "").split(";") if x]
@@ -75,7 +72,6 @@ def shown_here(e):
     if only and not any(d in only for d in desk):
         return False
     return not any(d in never for d in desk)
-
 
 def all_apps():
     """id → (cesta, položka); první výskyt vyhrává (uživatelské přebíjí systémové)."""
@@ -89,7 +85,6 @@ def all_apps():
             if e and e.get("Type", "Application") == "Application":
                 apps[aid] = (path, e)
     return apps
-
 
 def cmd_list():
     out = []
@@ -108,7 +103,6 @@ def cmd_list():
         })
     out.sort(key=lambda a: a["name"].lower())
     print(json.dumps(out, ensure_ascii=False))
-
 
 def set_key(path, key, value):
     """Nastaví klíč v sekci [Desktop Entry] (ostatní sekce, např. akce, nechá)."""
@@ -130,7 +124,6 @@ def set_key(path, key, value):
     if sec == "Desktop Entry" and not done and value is not None:
         out.append(f"{key}={value}")
     open(path, "w").write("\n".join(out))
-
 
 def cmd_hide(aid, state):
     apps = all_apps()
@@ -154,11 +147,9 @@ def cmd_hide(aid, state):
             set_key(user_path, HIDE_MARK, None)
     subprocess.run(["update-desktop-database", USER_APPS], capture_output=True)
 
-
 def xdg_default(mime):
     r = subprocess.run(["xdg-mime", "query", "default", mime], capture_output=True, text=True)
     return r.stdout.strip()
-
 
 def cmd_defaults():
     apps = all_apps()
@@ -176,7 +167,6 @@ def cmd_defaults():
                     "candidates": cands})
     print(json.dumps(out, ensure_ascii=False))
 
-
 def cmd_set_default(cid, aid):
     cat = next((c for c in CATEGORIES if c[0] == cid), None)
     if not cat:
@@ -187,7 +177,6 @@ def cmd_set_default(cid, aid):
     if cid == "browser":
         subprocess.run(["xdg-settings", "set", "default-web-browser", aid], capture_output=True)
 
-
 def autostart_entries():
     files = {}
     for d in (SYS_AUTOSTART, USER_AUTOSTART):
@@ -195,13 +184,10 @@ def autostart_entries():
             files[os.path.basename(path)] = path      # uživatelský přebije systémový
     return files
 
-
 def unit_name(fname):
-    # systemd-xdg-autostart-generator: app-<escapované jméno bez .desktop>@autostart.service
     base = fname[:-len(".desktop")]
     esc = subprocess.run(["systemd-escape", base], capture_output=True, text=True).stdout.strip()
     return f"app-{esc}@autostart.service"
-
 
 def cmd_autostart():
     out = []
@@ -229,7 +215,6 @@ def cmd_autostart():
     out.sort(key=lambda a: (not a["here"], a["name"].lower()))
     print(json.dumps(out, ensure_ascii=False))
 
-
 def cmd_autostart_set(fname, state):
     files = autostart_entries()
     if fname not in files or "/" in fname:
@@ -240,14 +225,12 @@ def cmd_autostart_set(fname, state):
         shutil.copy(files[fname], user_path)
     set_key(user_path, "Hidden", None if state == "on" else "true")
     set_key(user_path, "X-GNOME-Autostart-enabled", "true" if state == "on" else "false")
-    # Kopie shodná se systémovou (jen zapnutá) je zbytečná — smazat
     sys_path = os.path.join(SYS_AUTOSTART, fname)
     if state == "on" and os.path.exists(sys_path):
         se = read_desktop(sys_path) or {}
         if se.get("Hidden") != "true" and se.get("X-GNOME-Autostart-enabled", "true") != "false":
             os.remove(user_path)
     subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
-
 
 def cmd_autostart_add(aid):
     apps = all_apps()
@@ -260,7 +243,6 @@ def cmd_autostart_add(aid):
     set_key(dst, "X-GNOME-Autostart-enabled", "true")
     subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
 
-
 def cmd_autostart_remove(fname):
     path = os.path.join(USER_AUTOSTART, fname)
     if "/" in fname or not os.path.exists(path):
@@ -269,7 +251,6 @@ def cmd_autostart_remove(fname):
         die("this one comes with the system — turn it off instead")
     os.remove(path)
     subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
-
 
 def main():
     a = sys.argv[1:] or ["list"]
@@ -288,7 +269,6 @@ def main():
         print(__doc__, file=sys.stderr)
         sys.exit(1)
     fn()
-
 
 if __name__ == "__main__":
     main()

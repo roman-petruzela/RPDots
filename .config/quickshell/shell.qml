@@ -1,6 +1,3 @@
-//@ pragma IconTheme Papirus-Dark
-// Bez tohohle quickshell hledá ikony jen v hicolor a obecné názvy
-// (utilities-system-monitor, …) vykreslí jako šachovnici.
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -11,9 +8,6 @@ import "bar"
 ShellRoot {
     id: root
 
-    // Horní panel: waybar, nebo bar/TopBar.qml. Volbu drží ~/.config/niri-rice/bar
-    // (přepíná `rp-bar`): "waybar" (výchozí), "quickshell" = na všech monitorech,
-    // "test:<výstup>" = qs panel jen na jednom monitoru vedle waybaru, na zkoušení.
     FileView {
         id: barFlag
         path: Quickshell.env("HOME") + "/.config/niri-rice/bar"
@@ -27,7 +21,6 @@ ShellRoot {
         : []
 
     BarData { id: barSource; active: root.barScreens.length > 0 || dashboard.visible }
-    // Pod jiným jménem: v delegátu by `niri: niri` ukazovalo samo na sebe
     readonly property var niriRef: niri
 
     IpcHandler {
@@ -37,8 +30,6 @@ ShellRoot {
         function hide(): void   { dashboard.visible = false }
     }
 
-    // Pozor: funkce se nesmí jmenovat `show` — kolidovalo by to
-    // s podpříkazem `qs ipc show` a volání by se jen vypsalo.
     IpcHandler {
         target: "audio"
         function toggle(): void { root.openFlyout(audioSwitcher, true) }
@@ -107,7 +98,6 @@ ShellRoot {
         function hide(): void   { wallpaperPicker.visible = false }
     }
 
-    // Okna vyjíždějí na stejné místo, takže se navzájem vylučují.
     function openFlyout(target, allowToggle) {
         for (const f of [dashboard, audioSwitcher, powerSwitcher, networkSwitcher, wallpaperPicker, launcher, sessionMenu, clipboardHistory])
             if (f !== target) f.visible = false
@@ -116,15 +106,9 @@ ShellRoot {
         else target.open()
     }
 
-    // Rychlá cesta pro klávesové zkratky a waybar: `rp-shell <cíl> <funkce>`
-    // pošle řádek "cíl funkce" na tenhle socket. `qs ipc call` pokaždé startuje
-    // celý Qt klient (~40 ms), což je u OSD hlasitosti a otevírání oken znát;
-    // socat na socket trvá pár ms. IpcHandlery výš zůstávají pro kompatibilitu.
     SocketServer {
         active: true
         path: Quickshell.env("XDG_RUNTIME_DIR") + "/rp-shell.sock"
-        // Spojení zavírá server hned po přečtení příkazu — kdyby ho zavřel
-        // klient, quickshell by každé volání zalogoval jako PeerClosedError.
         handler: Socket {
             id: client
             parser: SplitParser {
@@ -137,7 +121,6 @@ ShellRoot {
     }
 
     function dispatch(line) {
-        // Přepínače (Mod+Tab / Alt+Tab) se navzájem vylučují
         const [t, f] = line.split(/\s+/)
         if (t === "workspaces" || t === "windows") {
             const sw = t === "workspaces" ? wsSwitcher : winSwitcher
@@ -158,12 +141,10 @@ ShellRoot {
         if (flyout) {
             if (fn === "toggle") root.openFlyout(flyout, true)
             else if (fn === "open") root.openFlyout(flyout, false)
-            // Okna s PopAnim se schovávají animací přes vlastní hide()
             else if (fn === "hide") { if (flyout.hide) flyout.hide(); else flyout.visible = false }
             else if (fn === "next" && target === "audio") audioSwitcher.selectNext()
             return
         }
-        // Settings je normální okno, ne flyout — nevylučuje se s ostatními
         if (target === "settings") {
             if (fn === "toggle") settingsWindow.toggle()
             else if (fn === "open") settingsWindow.open()
@@ -184,7 +165,6 @@ ShellRoot {
         }
     }
 
-    // Bar on every connected screen
     Variants {
         model: root.barScreens
         delegate: TopBar { barData: barSource; niri: root.niriRef }
@@ -222,7 +202,6 @@ ShellRoot {
 
     Settings { id: settingsWindow }
 
-    // Polkit agent (dialog na heslo pro pkexec, systemctl, firewalld…) — místo polkit-gnome
     PolkitDialog {}
 
     NiriState { id: niri }
@@ -237,7 +216,6 @@ ShellRoot {
         niri: niri
     }
 
-    // Náhled vybrané tapety pod okny, na všech monitorech
     Variants {
         model: Quickshell.screens
         delegate: WallpaperPreview {

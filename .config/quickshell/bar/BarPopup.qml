@@ -2,21 +2,13 @@ import Quickshell
 import QtQuick
 import ".."
 
-// Společné okno pro všechno, co vyskakuje z panelu (tooltipy, kalendář):
-// ukotvení pod položku, karta PopupCard, rozmazané pozadí, animace otevření
-// a zavření, Esc. Obsah se vkládá jako děti:
-//
-//     BarPopup { target: item; Text { … } }
-//     popup.show() / popup.dismiss()
-//
-// Obsah určuje velikost (implicitWidth/Height dětí + padding).
 PopupWindow {
     id: pop
 
     default property alias content: inner.data
     required property Item target
     property int padding: 12
-    property bool alignRight: false        // u pravého okraje zarovnat k pravé hraně položky
+    property bool alignRight: false
     property bool open: false
     readonly property bool hovered: cardHover.hovered
     readonly property alias card: card
@@ -33,9 +25,6 @@ PopupWindow {
     implicitHeight: inner.childrenRect.height + 2 * padding
     color: "transparent"
     visible: false
-
-    // Bez blur: karta je skoro neprůhledná a rozmazání v plné velikosti
-    // naskočilo dřív, než karta doanimovala — za ní to problikávalo
 
     PopupCard {
         id: card

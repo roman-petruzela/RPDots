@@ -2,13 +2,10 @@ import Quickshell
 import QtQuick
 import "../Colors.js" as Colors
 
-// Hlavička dashboardu: výřez aktuální tapety (tatáž zmenšenina, kterou
-// apply-wallpaper-theme.sh dělá pro matugen) a přes něj velké hodiny.
-// Jediný výrazný prvek dashboardu — ukazuje, z čeho se celý rice barví.
 Item {
     id: head
 
-    property string subtitle: ""           // síť apod., pod datem
+    property string subtitle: ""
     property var now: new Date()
     implicitHeight: 176
 
@@ -23,7 +20,6 @@ Item {
         sourceSize.width: 760
     }
 
-    // Tapeta přechází do barvy panelu, ať text dole čte na jakékoli tapetě
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {

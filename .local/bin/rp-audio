@@ -1,32 +1,4 @@
 #!/usr/bin/env bash
-# rp-audio — unified audio output control for RPRice.
-#
-#   rp-audio switch <sink>   switch the default output (name or index)
-#   rp-audio cycle           switch to the next output in order
-#   rp-audio volume up|down|set <0-100>
-#   rp-audio mute [on|off|toggle]
-#   rp-audio unpin           release all streams back to the default output
-#   rp-audio sync            match the volume of all outputs to the default one
-#   rp-audio list            list outputs (JSON)
-#   rp-audio daemon          watch volume and new streams (systemd unit)
-#
-# For the Settings window (Sound page):
-#   rp-audio status                    outputs, inputs, app streams, cards (JSON)
-#   rp-audio input <source>            default input
-#   rp-audio source-volume <source> <0-150>
-#   rp-audio source-mute <source> [toggle|on|off]
-#   rp-audio stream-volume <id> <0-150>   one app's playback stream
-#   rp-audio stream-mute <id> [toggle|on|off]
-#   rp-audio stream-move <id> <sink>      pin an app to another output
-#   rp-audio rec-move <id> <source>       move a recording stream to another input
-#   rp-audio profile <card> <profile>     card profile (e.g. headset mic on/off)
-#   rp-audio port <sink|source> <port>    speakers vs. headphones etc.
-#   rp-audio blacklist [a,b,…]            print or replace the blacklist
-#
-# Volume is always set on ALL outputs at once, so switching between them
-# isn't heard as a jump. Streams from the blacklist (~/.config/rp-audio/blacklist.conf)
-# stay wherever the app itself routed them.
-
 set -uo pipefail
 
 CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/rp-audio"
@@ -36,14 +8,12 @@ VOL_STATE="$STATE_DIR/volume"
 MUTE_STATE="$STATE_DIR/mute"
 APPLY_LOCK="$STATE_DIR/applying"
 
-MAX_VOL=65536                    # 100%
-STEP=$(( MAX_VOL * 2 / 100 ))    # 2% step
+MAX_VOL=65536
+STEP=$(( MAX_VOL * 2 / 100 ))
 
 DEFAULT_BLACKLIST=(obs easyeffects)
 
 mkdir -p "$STATE_DIR"
-
-# ── helpers ──────────────────────────────────────────────────────────────
 
 sink_ids()   { pactl list short sinks 2>/dev/null | awk '{print $1}'; }
 sink_names() { pactl list short sinks 2>/dev/null | awk '{print $2}'; }
@@ -64,16 +34,10 @@ read_blacklist() {
     fi | tr -d ' \t' | tr '[:upper:]' '[:lower:]' | grep -v '^$'
 }
 
-# The OSD reads the value from PipeWire itself — `qs ipc call` in 0.3.0
-# can't pass an argument.
 osd() {
-    # The dashboard slider shows the volume itself; the OSD would flash over it
     [[ -n "${RP_AUDIO_NO_OSD:-}" ]] && return 0
     "$HOME/.local/bin/rp-shell" osd-volume trigger || true
 }
-
-# ── writing to all outputs ─────────────────────────────────────────────
-# APPLY_LOCK keeps the daemon quiet while our own batch of writes is in flight.
 
 set_all_raw() {
     local raw="$1" id
@@ -84,8 +48,6 @@ set_all_raw() {
         pactl set-sink-volume "$id" "$raw" 2>/dev/null || true
     done
     echo "$raw" > "$VOL_STATE"
-    # Lock release doesn't need to block the caller (osd() included) — the
-    # audio is already at its final value once the loop above returns.
     ( sleep 0.15; rm -f "$APPLY_LOCK" ) &
     disown
 }
@@ -101,10 +63,6 @@ set_all_mute() {
     ( sleep 0.15; rm -f "$APPLY_LOCK" ) &
     disown
 }
-
-# ── releasing streams ───────────────────────────────────────────────────
-# Clears the stream's explicit target, so WirePlumber sends it to the
-# default output and keeps it following the default output from then on.
 
 unpin_streams() {
     local bl ids
@@ -130,8 +88,6 @@ unpin_streams() {
         pw-metadata -n default "$nid" target.node   -1 Spa:Id >/dev/null 2>&1 || true
     done
 }
-
-# ── commands ───────────────────────────────────────────────────────────
 
 cmd_switch() {
     local target="${1:-}"
@@ -198,9 +154,6 @@ cmd_list() {
         ]'
 }
 
-# ── Settings page ──────────────────────────────────────────────────────
-
-# Everything the Sound page shows, in one JSON (volume = first channel, in %)
 cmd_status() {
     local sinks sources inputs outputs cards
     sinks=$(pactl -f json list sinks 2>/dev/null || echo '[]')
@@ -234,7 +187,6 @@ cmd_status() {
                       | app + { id: .index, sink: .sink, volume: pct, muted: .mute,
                                 corked: .corked }],
             recording: [$outputs[] | select((.properties."application.id" // "") != "org.PulseAudio.pavucontrol")
-                        # cava a spol. čtou monitor výstupu — to není nahrávání mikrofonu
                         | select(.source as $s | $monitors | index($s) | not)
                         | app + { id: .index, source: .source }],
             cards: [$cards[] | { id: .index, name, description: (.properties."device.description" // .name),
@@ -264,12 +216,6 @@ cmd_blacklist() {
     } > "$BLACKLIST_FILE"
 }
 
-# ── daemon ───────────────────────────────────────────────────────────────
-
-# A freshly added device generates `change` events for a moment while it
-# catches up with its stored values — typically at full volume. Without
-# this quarantine, the daemon would treat that startup as a manual change
-# and stretch 100% volume onto everything.
 SETTLE_SECS=4
 SETTLE_DIR="$STATE_DIR/settling"
 
@@ -296,7 +242,6 @@ apply_global_to() {
 cmd_daemon() {
     rm -rf "$SETTLE_DIR"; mkdir -p "$SETTLE_DIR"
 
-    # Initial sync based on the currently selected default output.
     echo "$(raw_of  @DEFAULT_SINK@)" > "$VOL_STATE"
     echo "$(mute_of @DEFAULT_SINK@)" > "$MUTE_STATE"
     set_all_raw  "$(global_vol)"
@@ -317,8 +262,6 @@ cmd_daemon() {
                         apply_global_to "$id"
                         ;;
                     change)
-                        # While a device is settling in, its values aren't
-                        # adopted — it's just forced to match the shared ones.
                         if is_settling "$id"; then
                             apply_global_to "$id"
                             continue
@@ -334,14 +277,11 @@ cmd_daemon() {
                 esac
                 ;;
             sink-input)
-                # A new stream must not stay stuck on another device.
                 [[ "$ev" == "new" ]] && unpin_streams
                 ;;
         esac
     done
 }
-
-# ── dispatcher ───────────────────────────────────────────────────────────
 
 case "${1:-}" in
     switch) shift; cmd_switch "$@" ;;
@@ -362,7 +302,6 @@ case "${1:-}" in
     rec-move)      pactl move-source-output "$2" "$3" ;;
     profile)       pactl set-card-profile "$2" "$3" ;;
     port)
-        # Port patří buď výstupu, nebo vstupu — zkusit obojí
         pactl set-sink-port "$2" "$3" 2>/dev/null || pactl set-source-port "$2" "$3" ;;
     blacklist) shift; cmd_blacklist "$@" ;;
     *)      sed -n '2,20p' "$0" | sed 's/^# \?//'; exit 1 ;;

@@ -4,10 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Čas a jazyk: časové pásmo, synchronizace času, formát hodin ve waybaru,
-// jazyk systému a regionální formáty. timedatectl/localectl si o heslo řeknou
-// přes polkit samy (dialog PolkitDialog.qml); jazyk a formáty platí až po
-// novém přihlášení. Chybějící locale `rp-sys set-locale` nejdřív vygeneruje.
 Item {
     id: page
     required property var host
@@ -48,8 +44,6 @@ Item {
         }
     }
 
-    // Formáty hodin ve waybaru (strftime ve {:…}); začínají ikonou hodin (U+F017),
-    // bez ní by výběr formátu ikonu z waybaru smazal
     readonly property var clockFormats: [
         { f: "  {:%d.%m. %H:%M}", label: "26.09. 14:30" },
         { f: "  {:%H:%M}", label: "14:30" },

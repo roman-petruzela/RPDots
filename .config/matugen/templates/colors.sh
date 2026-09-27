@@ -1,5 +1,3 @@
-# Generováno matugenem — needituj ručně.
-# Nahrazuje dřívější ~/.cache/wal/colors.sh (pywal se už nepoužívá).
 background='{{colors.surface_container_lowest.default.hex}}'
 foreground='{{colors.on_surface.default.hex}}'
 background_alt='{{colors.surface_container.default.hex}}'

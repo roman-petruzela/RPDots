@@ -24,7 +24,6 @@ Item {
         anchors.left: parent.left
         spacing: 6
 
-        // Play/pause icon — click to toggle
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: root.playing ? "" : ""

@@ -1,17 +1,5 @@
 @define-color rp_tint        mix(@m3_primary_container, @m3_primary, 0.18);
 
-/* Alphas are tuned so the *effective* opacity lands on kitty's 0.75, since the
- * window sits behind everything else and the two multiply out:
- *   file list  1-(1-0.55)(1-0.46) = 0.76
- *   chrome     1-(1-0.55)(1-0.55) = 0.80
- * Anything that carries text directly on its own background — dialogs, menus,
- * popovers — stays near opaque instead; at 0.75 that text is unreadable over a
- * busy wallpaper. */
-/* The colours themselves come from the matugen template (rp_*_base), which pins
- * lightness and saturation and takes only the hue from the wallpaper. That is
- * what lets the Zed theme emit byte-identical surfaces from the same
- * expressions — see the comment in templates/gtk3-dark.css. Only the alphas
- * are decided here. */
 @define-color rp_window      alpha(@rp_window_base, 0.55);
 @define-color rp_surface     alpha(@rp_surface_base, 0.55);
 @define-color rp_surface_hi  alpha(@rp_surface_hi_base, 0.62);
@@ -20,22 +8,11 @@
 @define-color rp_base        alpha(@rp_entry_base, 0.65);
 @define-color rp_popover     alpha(@rp_surface_hi_base, 0.97);
 @define-color rp_dialog      alpha(@rp_window_base, 0.96);
-/* Selections stay near the container tone. Pulling them further towards
- * @m3_primary looks punchier but lifts the background luminance under
- * @m3_on_primary_container text: at 0.42 the contrast is only ~3.2:1, at 0.20
- * it is ~4.9:1. Treat 0.25 as the ceiling. */
 @define-color rp_sel         @rp_sel_base;
 @define-color rp_sel_soft    @rp_sel_soft_base;
 
 @define-color borders        mix(@m3_outline, @rp_tint, 0.55);
 
-/* Split view, inactive pane. Thunar loads its own stylesheet above the theme
- * with `.split-view-inactive-pane .view { background-color: @theme_unfocused_bg_color; }`,
- * and provider priority beats specificity — no selector here can outrank it.
- * The rule resolves the colour by name though, and Adwaita only defines
- * @theme_unfocused_bg_color without ever using it, so redefining it is the way
- * in and touches nothing else. Lighter and more opaque than @rp_view so the
- * pane still reads as inactive. */
 @define-color theme_unfocused_bg_color alpha(@rp_unfocused_base, 0.52);
 
 window,
@@ -44,10 +21,6 @@ window,
   color: @theme_fg_color;
 }
 
-/* Dialogs put label text straight onto the window background, so they get their
- * own near-opaque colour. GTK3 really does name these nodes `dialog` and
- * `messagedialog`, and `.background` matches them too — hence the qualified
- * selectors, which outrank it (0,1,1 vs 0,1,0) instead of relying on order. */
 dialog,
 dialog.background,
 messagedialog,
@@ -228,7 +201,6 @@ radio:checked {
   color: @m3_on_primary_container;
 }
 
-/* Standalone image preview pane (MiscImagePreviewMode=..._STANDALONE). */
 .preview-pane,
 .preview-pane .view,
 .preview-pane scrolledwindow {
@@ -278,8 +250,6 @@ window.thunar:backdrop {
   color: @theme_fg_color;
 }
 
-/* Needs the class too: `.background:backdrop` is (0,2,0) and would otherwise
- * outrank a plain `dialog:backdrop` (0,1,1). */
 dialog.background:backdrop,
 messagedialog.background:backdrop {
   background-color: @rp_dialog;

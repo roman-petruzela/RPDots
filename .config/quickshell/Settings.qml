@@ -6,38 +6,10 @@ import QtQuick.Controls
 import "Colors.js" as Colors
 import "settings"
 
-// Okno nastavení ricu (Mod+S, `rp-shell settings toggle`, v launcheru jako
-// „Settings“). Je to obyčejné plovoucí okno (xdg toplevel), ne vrstva — dá se
-// přesouvat, niri mu kreslí otevírací animaci a window-rule v config.kdl ho
-// otevře plovoucí. `rp-shell settings <id stránky>` ho otevře rovnou na stránce.
-//
-// Dva druhy stránek:
-//  - nastavení (Personalization): typy, rozsahy, volby i výchozí stavy dodává
-//    `rp-settings dump`, změny jdou přes `rp-settings set`, které je ověří
-//    a aplikuje. Tady je jen rozložení — `pages` říká, který klíč patří na
-//    kterou stránku a jak se jmenuje; ovládací prvek se vybere podle typu
-//    (bool → přepínač, číslo → posuvník, enum → segmenty/rozbalovací seznam,
-//    string → textové pole). Nová volba = klíč ve schématu rp-settings + řádek tady.
-//  - systémové (`view`): vlastní komponenty v settings/ (AboutPage, UpdatesPage,
-//    PackagesPage, FirewallPage) nad `rp-sys`. Root akce jdou přes polkit a jejich
-//    log ukazuje sdílený panel `job` (settings/SJob.qml).
-//
-// Ovládací prvky (SRow, SToggle, SSlider, …) jsou v settings/, aby je sdílely
-// obě skupiny stránek.
-//
-// Změna tématu přepíše Colors.js a quickshell se celý znovu načte — otevřené
-// okno a vybraná stránka proto přežívají v PersistentProperties.
-//
-// Okno se při každém otevření vytváří znovu (LazyLoader) a při zavření zahazuje.
-// Když ho zavře niri (Mod+Q), quickshell zničí jeho toplevel, ale objekt zůstane
-// s visible: true — `visible = true` pak už nic neotevře.
 Scope {
     id: outer
     reloadableId: "rpSettingsScope"
 
-    // Řádek: { key, label, hint, labels (pro enum), suffix, step, decimals,
-    //          percent (0–1 jako %), zero (popisek pro 0, např. "Off") }
-    // nebo zvláštní druh: { kind: "button" | "modules" | "power" | "tools" | "note" }
     readonly property var pageList: [
         { id: "network", group: "CONNECTIONS", icon: "󰛳", label: "Network", view: "network",
           keywords: "wifi wi-fi ethernet ip address dns vpn proton airplane speed test public" },
@@ -243,8 +215,6 @@ Scope {
         ]},
     ]
 
-    // Pořadí v postranním panelu: skupiny jdou za sebou a každá jen jednou, bez
-    // ohledu na to, kde je stránka v pageList (a jakou skupinu tam má napsanou)
     readonly property var groups: [
         { name: "SYSTEM", ids: ["about", "updates", "packages", "storage", "power", "backup", "tools"] },
         { name: "DEVICES", ids: ["displays", "sound", "bluetooth", "keyboard", "mouse", "printers"] },
@@ -254,12 +224,10 @@ Scope {
         { name: "ACCOUNT", ids: ["account", "privacy", "timelang", "accessibility"] },
     ]
     readonly property var pages: {
-        // QML seznam není JS pole (chybí mu flatMap) — nejdřív převést
         const gs = Array.from(groups), all = Array.from(pageList)
         const listed = [].concat(...gs.map(g => Array.from(g.ids)))
         const out = [].concat(...gs.map(g => Array.from(g.ids).map(id => all.find(p => p.id === id))
                                            .filter(p => p).map(p => Object.assign({}, p, { group: g.name }))))
-        // Stránka, kterou někdo zapomněl zařadit, skončí na konci Systému — ne zmizí
         return out.concat(all.filter(p => !listed.includes(p.id)).map(p => Object.assign({}, p, { group: "OTHER" })))
     }
 
@@ -270,7 +238,6 @@ Scope {
         property int page: 0
     }
 
-    // Otevření okna začíná na About; odkaz na konkrétní stránku (openPage) ne
     function open() {
         if (!persist.open) persist.page = Math.max(0, pages.findIndex(p => p.id === "about"))
         persist.open = true
@@ -278,7 +245,6 @@ Scope {
     function hide()   { persist.open = false }
     function toggle() { if (persist.open) hide(); else open() }
 
-    // `rp-shell settings theme` apod. — otevřít rovnou na stránce
     function openPage(name) {
         const i = pages.findIndex(p => p.id === name || p.label.toLowerCase() === name)
         if (i < 0) return false
@@ -306,7 +272,7 @@ Scope {
 
             BackgroundEffect.blurRegion: Region { item: bg; radius: 16 }
 
-            property var settings: ({})      // klíč → { value, default, min, max, options, changed }
+            property var settings: ({})
             property var modules: []
             property string error: ""
             property string powerMode: "?"
@@ -314,15 +280,12 @@ Scope {
             property var tools: []
             property bool applyingTheme: false
             property string query: ""
-            // Výsledek `rp-sys updates` — přežije přepnutí stránky (kontrola trvá ~15 s)
             property var updatesCache: null
             property alias job: jobPanel
 
             readonly property var pages: outer.pages ?? []
-            // Pojistka: při (re)loadu může být seznam ještě prázdný nebo index mimo
             readonly property var page: pages[persist.page] ?? pages[0] ?? ({ id: "", label: "", sections: [] })
 
-            // Hledání: řádky s klíčem nebo tlačítkem a systémové stránky podle názvu
             readonly property var results: {
                 const q = query.trim().toLowerCase()
                 if (q === "") return []
@@ -365,7 +328,6 @@ Scope {
                 errorTimer.restart()
             }
 
-            // Stejná bublina, ale neutrální (potvrzení akce, ne chyba)
             function showInfo(msg) {
                 errorIsInfo = true
                 error = msg
@@ -378,7 +340,6 @@ Scope {
                 persist.page = pages.findIndex(p => p.id === id)
             }
 
-            // Hned překreslit (optimisticky), zapsat na pozadí; chyba vrátí stav z dumpu
             function set(key, value) {
                 const s = settings[key]
                 if (!s || s.value === value) return
@@ -415,9 +376,6 @@ Scope {
                     Quickshell.execDetached(["kitty", "--directory", Quickshell.env("HOME") + "/dotfiles", "yazi"])
             }
 
-            // ---------------------------------------------------------- procesy
-
-            // Příkazy za sebou, ať se dva zápisy settings.json nepřebíjejí
             property var queue: []
 
             function run(cmd) {
@@ -443,7 +401,6 @@ Scope {
                             root.showError(text.slice(4).trim().split("\n").pop().replace(/^rp-settings: /, ""))
                     }
                 }
-                // Po poslední změně si stáhnout skutečný stav (rp-settings hodnoty normalizuje)
                 onExited: {
                     if (root.queue.length === 0) dumpProc.running = true
                     root.next()
@@ -513,7 +470,6 @@ Scope {
                 { cmd: "btop",                 icon: "󰍛", label: "System monitor",      hint: "btop in kitty", term: true },
             ]
 
-            // Jen nástroje, které jsou nainstalované
             Process {
                 id: toolsProc
                 command: ["bash", "-c", "for c in " + root.toolList.map(t => t.cmd).join(" ")
@@ -526,11 +482,6 @@ Scope {
                 }
             }
 
-            // Bez argumentu by apply-wallpaper-theme.sh u stejné tapety nic neudělal —
-            // s cestou k aktuální tapetě téma přegeneruje. Spouští se přes
-            // `setsid -f`: matugen uprostřed běhu přepíše Colors.js, quickshell se
-            // přenačte a zabil by i skript, kdyby byl potomkem tohohle okna
-            // (a nechal by po sobě zámek). Tenhle proces jen čeká, než zámek zmizí.
             Process {
                 id: themeProc
                 command: ["bash", "-c",
@@ -546,8 +497,6 @@ Scope {
                 themeProc.running = true
             }
 
-            // Jeden řádek z `pages`: vybere ovládací prvek podle typu klíče.
-            // Obyčejná Component (ne inline `component`), aby viděla id `root`.
             property Component rowDelegate: Component {
                 Column {
                     id: rd
@@ -557,7 +506,6 @@ Scope {
                     readonly property string kind: d.kind ?? (s ? s.type : "")
                     width: parent ? parent.width : 0
 
-                    // ── nastavení s klíčem
                     SRow {
                         visible: rd.s !== null
                         label: rd.d.label ?? ""
@@ -632,7 +580,6 @@ Scope {
                         }
                     }
 
-                    // ── tlačítko
                     SRow {
                         visible: rd.kind === "button"
                         label: rd.d.label ?? ""
@@ -646,7 +593,6 @@ Scope {
                         }
                     }
 
-                    // ── odkaz na systémovou stránku (výsledek hledání)
                     SRow {
                         visible: rd.kind === "page"
                         icon: rd.d.icon ?? ""
@@ -658,7 +604,6 @@ Scope {
                         }
                     }
 
-                    // ── poznámka
                     SHint {
                         visible: rd.kind === "note"
                         width: parent.width
@@ -666,7 +611,6 @@ Scope {
                         text: rd.d.text ?? ""
                     }
 
-                    // ── theme moduly
                     Repeater {
                         model: rd.kind === "modules"
                             ? root.modules.filter(m => !/cache-hygiene|smoke-test|postprocess/.test(m.name)) : []
@@ -682,7 +626,6 @@ Scope {
                         }
                     }
 
-                    // ── power režimy
                     SHint {
                         visible: rd.kind === "power"
                         width: parent.width
@@ -704,7 +647,6 @@ Scope {
                         }
                     }
 
-                    // ── nástroje
                     Repeater {
                         model: rd.kind === "tools" ? root.tools : []
                         SRow {
@@ -722,8 +664,6 @@ Scope {
                 }
             }
 
-            // ------------------------------------------------------------------ okno
-
             Rectangle {
                 id: bg
                 anchors.fill: parent
@@ -735,7 +675,6 @@ Scope {
                     else outer.hide()
                 }
                 Keys.onPressed: event => {
-                    // Ctrl+F hledá, Ctrl+Tab / Ctrl+Shift+Tab listují stránky
                     const ctrl = event.modifiers & Qt.ControlModifier
                     if (ctrl && event.key === Qt.Key_F) {
                         search.inputItem.forceActiveFocus()
@@ -747,10 +686,8 @@ Scope {
                     event.accepted = true
                 }
 
-                // Klik do prázdna vezme fokus textovým polím (a tím je zapíše)
                 TapHandler { onTapped: bg.forceActiveFocus() }
 
-                // ── Postranní panel
                 Rectangle {
                     id: sidebar
                     width: 240
@@ -790,7 +727,6 @@ Scope {
 
                     }
 
-                    // Stránky — posuvné, ať se vejdou i na nižší okno
                     SWheel { flick: navFlick }
                     Flickable {
                         id: navFlick
@@ -814,7 +750,6 @@ Scope {
                                     readonly property bool firstInGroup: index === 0 || root.pages[index - 1].group !== modelData.group
                                     width: navCol.width
 
-                                    // Nadpis skupiny (Personalization / System)
                                     Item {
                                         visible: firstInGroup
                                         width: parent.width
@@ -828,7 +763,6 @@ Scope {
                                         }
                                     }
 
-                                    // Položka: ikona i text svisle na středu (Row by je zarovnal nahoru)
                                     Rectangle {
                                         width: parent.width
                                         height: 36
@@ -870,7 +804,6 @@ Scope {
 
                 }
 
-                // ── Obsah
                 Item {
                     id: contentArea
                     anchors {
@@ -879,7 +812,6 @@ Scope {
                         leftMargin: 24; rightMargin: 12; topMargin: 20
                     }
 
-                    // Nadpis ve stejné výšce jako „Settings“ vlevo
                     Item {
                         id: pageTitle
                         width: parent.width
@@ -894,7 +826,6 @@ Scope {
                         }
                     }
 
-                    // Stránky nastavení: sekce s nadpisem a řádky
                     SWheel { flick: flick }
                     Flickable {
                         id: flick
@@ -924,7 +855,6 @@ Scope {
                                 }
                             }
 
-                            // Výsledky hledání
                             Repeater {
                                 model: root.results
                                 delegate: root.rowDelegate
@@ -937,7 +867,6 @@ Scope {
                         }
                     }
 
-                    // Systémové stránky (vlastní rozložení)
                     Loader {
                         anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: 12 + jobPanel.occupied }
                         active: root.query === "" && !!root.page.view
@@ -969,10 +898,6 @@ Scope {
                     Component { id: printersC; PrintersPage { host: root } }
                     Component { id: gamingC; GamingPage { host: root } }
 
-                    // Log akcí (aktualizace, instalace, firewall) — vyjede zespodu; stránky
-                    // nad ním končí podle jeho horní hrany (jobPanel.occupied), nic nepřekryje
-                    // Přes celou šířku mezi postranním panelem a okrajem okna (contentArea
-                    // má odsazení 24 vlevo a 12 vpravo), spodní hrana na spodku okna
                     SJob {
                         id: jobPanel
                         x: -24
@@ -981,13 +906,11 @@ Scope {
                     }
                 }
 
-                // Při přepnutí stránky nahoru
                 Connections {
                     target: persist
                     function onPageChanged() { flick.contentY = 0 }
                 }
 
-                // ── Chybová hláška (např. niri odmítlo změnu)
                 Rectangle {
                     visible: root.error !== ""
                     anchors { bottom: parent.bottom; horizontalCenter: contentArea.horizontalCenter; bottomMargin: 18 }

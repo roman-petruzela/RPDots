@@ -4,13 +4,6 @@ import Quickshell.Widgets
 import QtQuick
 import "Colors.js" as Colors
 
-// Alt+Tab: přepínač oken ve stejném stylu jako Mod+Tab (WorkspaceSwitcher).
-// Drž Alt, Tab listuje (Shift+Tab zpět), puštění Alt přepne. Alt+` ukáže jen
-// okna stejné aplikace jako to zaostřené.
-//
-// Živé náhledy oken quickshell na niri nemá (screencopy jednotlivých oken
-// niri nenabízí), karta proto místo nich ukazuje, kde okno leží: minimapu
-// jeho workspace s tímhle oknem zvýrazněným.
 PanelWindow {
     id: root
 
@@ -20,7 +13,6 @@ PanelWindow {
     readonly property int cardW: 212
     readonly property int cardH: 162
     readonly property int gap: 12
-    // Mřížka max 7×3; víc oken se posouvá po řádcích (grid.positionViewAtIndex)
     readonly property int cols: Math.max(1, Math.min(7, items.length,
         Math.floor(((screen?.width ?? 1920) * 0.9 - 36 + gap) / (cardW + gap))))
     readonly property int rows: Math.min(3, Math.ceil(items.length / cols))
@@ -57,7 +49,6 @@ PanelWindow {
             selected = n > 1 ? (delta > 0 ? 1 : n - 1) : 0
             const fw = niri.focusedWorkspace()
             const scr = fw ? Quickshell.screens.find(s => s.name === fw.output) : null
-            // Otevření během doznívajícího zavírání: okno už na obrazovce je
             if (!pop.cancelClose()) {
                 if (scr) screen = scr
                 visible = true
@@ -78,7 +69,6 @@ PanelWindow {
         Quickshell.execDetached(["niri", "msg", "action", "focus-window", "--id", String(it.win.id)])
     }
 
-    // Snímek při otevření: od naposledy zaostřeného, pořadí se během listování nemění
     function build(sameApp) {
         let wins = Object.values(niri.windows)
         const focused = wins.find(w => w.is_focused)
@@ -108,7 +98,6 @@ PanelWindow {
 
     Rectangle {
         id: panel
-        // Buňky mřížky v sobě mají mezeru i za posledním sloupcem/řádkem
         width: grid.width - root.gap + 36 + (root.overflow ? 12 : 0)
         height: grid.height - root.gap + 36 + (root.overflow ? 16 : 0)
         radius: 22
@@ -132,9 +121,6 @@ PanelWindow {
             }
             event.accepted = true
         }
-        // Tab při drženém Alt jde do niri (bind → rp-shell), sem dorazí jen
-        // puštění Alt. Pustíš-li ho dřív, než okno dostane klávesnici, zůstane
-        // přepínač otevřený a přepne Enter.
         Keys.onReleased: event => {
             if (event.key === Qt.Key_Alt || event.key === Qt.Key_AltGr) {
                 root.commit()
@@ -249,7 +235,6 @@ PanelWindow {
             }
         }
 
-        // Posuvník a počitadlo jen když se okna nevejdou do 7×3
         Rectangle {
             visible: root.overflow
             x: grid.x + grid.width - root.gap + 8

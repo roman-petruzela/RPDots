@@ -1,4 +1,3 @@
-# Generované matugenem (šablony jsou v .config/matugen/templates/)
 .config/waybar/colors.css
 .config/kitty/current-theme.conf
 .config/rofi/pywal-dynamic.rasi
@@ -10,32 +9,25 @@
 .config/nvim/lua/matugen_colors.lua
 .config/yazi/theme.toml
 
-# GTK témata generovaná matugenem (šablony jsou v .config/matugen/templates/)
 .local/share/themes/RPRice/gtk-3.0/gtk.css
 .local/share/themes/RPRice/gtk-3.0/gtk-dark.css
 .config/gtk-3.0/gtk.css
 .config/gtk-4.0/gtk.css
 
-# Cache a dočasné soubory
 .config/btop/btop.log
 .config/fastfetch/*.jsonc.bak
 *.bak
 *.log
 __pycache__/
 
-# Generované skriptem rp-power (kanonický obsah je v .local/bin/rp-power)
 .config/niri/power-mode.kdl
 
-# Generované skriptem rp-settings (hodnoty v ~/.config/niri-rice/settings.json)
 .config/niri/settings.kdl
 .config/niri/displays.kdl
 .config/kanshi/config
 
-# Osobní / lokální
 .config/niri/theme-colors.kdl
 
-# Yazi plugins nainstalované přes `ya pkg install` (viz .config/yazi/package.toml)
 .config/yazi/plugins/
 
-# Claude Code guidance, lokální pro tento stroj
 CLAUDE.md

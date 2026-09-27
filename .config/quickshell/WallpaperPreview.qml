@@ -2,21 +2,12 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 
-// Náhled tapety vybrané ve WallpaperPickeru, na jednom monitoru. Leží ve
-// vrstvě Bottom — pod okny, takže vypadá jako skutečná tapeta: aplikace
-// zůstávají vidět (na monitoru s pickerem rozmazané jeho blurem). Nad awww
-// (Background) i nad mpvpaperem, který je taky v Bottom, ale mapuje se dřív.
-//
-// shell.qml ho vytváří pro každý monitor (Variants), takže při listování se
-// mění tapeta všude, nejen tam, kde je picker.
 PanelWindow {
     id: root
 
     property bool active: false
     property url source: ""
 
-    // Ručně, ne vazbou `active || fadeOut.running` — ta by se přepočítala dřív,
-    // než stihne fadeOut naběhnout, a okno by zmizelo bez prolnutí.
     property bool shown: false
     visible: shown
     color: "transparent"
@@ -26,7 +17,6 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Bottom
     WlrLayershell.namespace: "rp-wallpaper-preview"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    // Na prázdné ploše nesmí chytat kliky místo niri
     mask: Region {}
 
     property bool frontIsA: true

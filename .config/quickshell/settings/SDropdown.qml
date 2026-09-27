@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Rozbalovací seznam pro enumy s víc volbami (nebo dlouhými popisky)
 ComboBox {
     id: dd
     property var options: []

@@ -4,14 +4,6 @@ import Quickshell.Services.Polkit
 import QtQuick
 import "Colors.js" as Colors
 
-// Polkit agent: dialog na heslo, když si o něj řekne pkexec, systemctl,
-// firewalld, NetworkManager… Nahrazuje polkit-gnome (v session smí být jen
-// jeden registrovaný agent). Vypadá jako zbytek ricu: rozmazané okolí
-// (rp-overlay), karta uprostřed s PopAnim, Enter potvrdí, Esc zruší.
-//
-// Chybné heslo neukončí požadavek — AuthFlow pošle supplementaryMessage
-// a nový dotaz, pole se jen vyprázdní. Pozor na faillock: po 3 chybách
-// (i zrušených dialozích) zamkne účet na 10 minut, proto to dialog říká.
 PanelWindow {
     id: root
 
@@ -30,7 +22,6 @@ PanelWindow {
 
     PopAnim { id: pop; window: root; target: card }
 
-    // Na monitoru, kde pracuješ (screen se nastaví před zobrazením)
     FocusedOutput { id: opener; window: root }
 
     onActiveChanged: {
@@ -42,7 +33,6 @@ PanelWindow {
         }
     }
 
-    // Nový dotaz (i po chybném hesle) — vyčistit pole a vrátit do něj fokus
     Connections {
         target: root.flow
         function onIsResponseRequiredChanged() {
@@ -63,7 +53,6 @@ PanelWindow {
         if (flow) flow.cancelAuthenticationRequest()
     }
 
-    // Ztmavení za kartou; klik mimo kartu nic nedělá (zrušit jde jen tlačítkem/Esc)
     Rectangle {
         anchors.fill: parent
         color: Qt.alpha(Colors.scrim, 0.35 * card.opacity)
@@ -85,7 +74,6 @@ PanelWindow {
             anchors { left: parent.left; right: parent.right; top: parent.top; margins: 28 }
             spacing: 14
 
-            // Zámek v kruhu
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: 56; height: 56; radius: 28
@@ -119,7 +107,6 @@ PanelWindow {
                 color: Colors.onSurfaceVariant
             }
 
-            // Kdo se ověřuje (u jednoho uživatele jen informativně)
             Text {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
@@ -129,7 +116,6 @@ PanelWindow {
                 color: Colors.outline
             }
 
-            // Pole na heslo
             Rectangle {
                 width: parent.width
                 height: 42
@@ -165,7 +151,6 @@ PanelWindow {
                 }
             }
 
-            // Chyba / info od PAM (špatné heslo apod.)
             Text {
                 visible: text !== ""
                 width: parent.width

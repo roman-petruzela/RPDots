@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# priority: 62
-
-# matugen already wrote RPRice.conf to qt5ct/qt6ct colors directories.
-# Here we point the qt*ct configs at that file and keep Kvantum theme consistent.
 
 qt5_dir="${XDG_CONFIG_HOME:-$HOME/.config}/qt5ct"
 qt6_dir="${XDG_CONFIG_HOME:-$HOME/.config}/qt6ct"
@@ -22,10 +18,8 @@ _set_color_scheme() {
 _set_color_scheme "$qt5_dir/qt5ct.conf" "$qt5_dir"
 _set_color_scheme "$qt6_dir/qt6ct.conf" "$qt6_dir"
 
-# Kvantum: ensure kvantum.kvconfig exists and points to an installed dark theme
 mkdir -p "$kv_dir"
 kv_cfg="$kv_dir/kvantum.kvconfig"
-# Prefer niri-rice if the user has set it up; otherwise fall back to KvGnomeDark
 desired_theme="niri-rice"
 [[ -d "$kv_dir/niri-rice" ]] || desired_theme="KvGnomeDark"
 

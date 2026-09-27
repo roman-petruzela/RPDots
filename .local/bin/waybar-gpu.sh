@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Waybar modul pro GPU. V liště je vytížení dGPU (nebo iGPU, když dGPU spí),
-# v tooltipu podrobnosti o obou kartách.
-#
-# nvidia-smi se volá jen když je dGPU vzhůru — jinak by ji každý dotaz probudil
-# a v úsporném režimu by nikdy neusnula (stejný důvod jako v rp-power status).
 set -uo pipefail
 
 DGPU_PCI=/sys/bus/pci/devices/0000:01:00.0
@@ -11,7 +6,6 @@ IGPU=/sys/class/drm/card1/device
 
 json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g'; }
 
-# ── iGPU (AMD) ─────────────────────────────────────────────────────────────
 igpu_busy=""; igpu_lines=""
 if [[ -r "$IGPU/gpu_busy_percent" ]]; then
     igpu_busy=$(cat "$IGPU/gpu_busy_percent" 2>/dev/null)
@@ -29,14 +23,12 @@ if [[ -r "$IGPU/gpu_busy_percent" ]]; then
     [[ -n "$temp" ]] && igpu_lines+=$'\n'"  temp  ${temp} °C"
 fi
 
-# ── dGPU (NVIDIA) ──────────────────────────────────────────────────────────
 dgpu_busy=""; dgpu_lines=""
 rt=$(cat "$DGPU_PCI/power/runtime_status" 2>/dev/null || echo "")
 
 if [[ "$rt" == "suspended" ]]; then
     dgpu_lines=$'NVIDIA dGPU\n  asleep (0 W)'
 elif command -v nvidia-smi >/dev/null 2>&1; then
-    # Název je víceslovný, proto se čte zvlášť od číselných hodnot.
     name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1)
     read -r util memu memt gtemp power clk < <(
         nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,clocks.gr \
@@ -53,8 +45,6 @@ elif command -v nvidia-smi >/dev/null 2>&1; then
     fi
 fi
 
-# ── výstup ─────────────────────────────────────────────────────────────────
-# V liště je dGPU, dokud je vzhůru; když spí, ukazuje se iGPU.
 if [[ -n "$dgpu_busy" ]]; then
     text="󰢮 ${dgpu_busy}%"
 elif [[ -n "$igpu_busy" ]]; then

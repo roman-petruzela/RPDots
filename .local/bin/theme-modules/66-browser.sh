@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# priority: 66
 
 ZEN_BASE="$HOME/.var/app/app.zen_browser.zen/.zen"
 

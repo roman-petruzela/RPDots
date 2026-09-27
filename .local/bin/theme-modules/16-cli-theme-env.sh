@@ -28,7 +28,6 @@ export GH_COLOR_LABELS=1
 EOF
 chmod 0644 "$ENV_FILE"
 
-# P10k hex prompt colors — track wallpaper palette for new terminals
 cat > "$P10K_FILE" <<EOF
 typeset -g POWERLEVEL9K_DIR_FOREGROUND='${accent}'
 typeset -g POWERLEVEL9K_DIR_SHORTENED_FOREGROUND='${accent_soft}'

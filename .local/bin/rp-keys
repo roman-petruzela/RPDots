@@ -29,15 +29,12 @@ LIVE = os.path.expanduser("~/.config/niri/config.kdl")
 REPO = os.path.expanduser("~/dotfiles/.config/niri/config.kdl")
 ADDED_MARK = "// rp-keys"   # komentář za bindy přidanými z okna
 
-# Klávesa: modifikátory + jedna klávesa (XKB název, Mouse*, Wheel*, Touchpad*)
 KEY_RE = re.compile(r"^(?:(?:Mod|Super|Ctrl|Control|Alt|Shift|ISO_Level3_Shift|ISO_Level5_Shift|Win)\+)*[A-Za-z0-9_]+$")
 LINE_RE = re.compile(r"^(?P<indent>\s*)(?P<off>/-)?(?P<key>[A-Za-z0-9_+]+)(?P<props>(?:\s+[a-z-]+=(?:\"[^\"]*\"|\S+))*)\s*\{\s*(?P<body>.*?)\s*\}\s*(?P<tail>//.*)?$")
-
 
 def die(msg):
     print(f"rp-keys: {msg}", file=sys.stderr)
     sys.exit(1)
-
 
 def binds_range(lines):
     start = next((i for i, l in enumerate(lines) if re.match(r"^binds\s*\{", l)), None)
@@ -49,7 +46,6 @@ def binds_range(lines):
         if depth == 0:
             return start, i
     die("unterminated binds block")
-
 
 def parse(lines):
     start, end = binds_range(lines)
@@ -68,7 +64,6 @@ def parse(lines):
         body = m["body"].rstrip(";").strip()
         action = body.split()[0] if body else ""
         args = body[len(action):].strip()
-        # hotkey-overlay-title=null jen schová bind z přehledu niri, není to popisek
         title = props.get("hotkey-overlay-title", "").strip('"')
         if title == "null":
             title = ""
@@ -87,15 +82,12 @@ def parse(lines):
         comment = []
     return out
 
-
 def read(path):
     with open(path) as f:
         return f.read().split("\n")
 
-
 def validate():
     return subprocess.run(["niri", "validate"], capture_output=True).returncode == 0
-
 
 def write_checked(new_lines, old_lines):
     """Zapíše živý config; když ho niri odmítne, vrátí původní."""
@@ -108,7 +100,6 @@ def write_checked(new_lines, old_lines):
         os.unlink(backup)
         die("niri rejected the change (conflicting or invalid key?), config restored")
     os.unlink(backup)
-
 
 def mirror(old_line, new_line, insert_after=None):
     """Stejnou změnu do repa, pokud tam je stejný řádek."""
@@ -130,13 +121,11 @@ def mirror(old_line, new_line, insert_after=None):
     with open(REPO, "w") as f:
         f.write("\n".join(l for l in lines if l is not None))
 
-
 def find(binds, key):
     b = next((b for b in binds if b["key"] == key), None)
     if not b:
         die(f"no bind for {key}")
     return b
-
 
 def check_key(key, binds, ignore=None):
     if not KEY_RE.match(key):
@@ -144,7 +133,6 @@ def check_key(key, binds, ignore=None):
     clash = next((b for b in binds if b["key"].lower() == key.lower() and b["key"] != ignore and b["enabled"]), None)
     if clash:
         die(f"{key} is already bound to {clash['action']} {clash['args']}".strip())
-
 
 def main():
     args = sys.argv[1:]
@@ -184,7 +172,6 @@ def main():
         check_key(key, binds)
         if not re.match(r"^[a-z][a-z0-9-]*$", action):
             die(f"invalid action: {action}")
-        # Argumenty: čísla nechat, zbytek jako KDL řetězce
         kdl_args = " ".join(a if re.match(r"^-?\d+(\.\d+)?$", a) else json.dumps(a) for a in rest)
         body = f"{action} {kdl_args}".strip()
         _, end = binds_range(lines)
@@ -203,7 +190,6 @@ def main():
     else:
         print(__doc__, file=sys.stderr)
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

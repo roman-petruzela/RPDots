@@ -1,15 +1,4 @@
 #!/usr/bin/env bash
-# rp-job — běh akcí okna Settings (aktualizace, instalace, firewall…) mimo quickshell.
-#
-#   rp-job start <název> <terminal-json> -- <příkaz…>   spustí akci na pozadí
-#   rp-job status                                       JSON: název, stav, exit kód, log
-#   rp-job dismiss                                      zapomene dokončenou akci
-#
-# Akce dřív běžely jako potomci okna Settings, a každý reload quickshellu
-# (změna tapety, tématu, nasazení QML) je zabil — i `pacman -Syu` uprostřed
-# transakce. Teď běží přes `setsid`, výstup jde do souboru a panel (SJob.qml)
-# ho jen čte; po reloadu se k běžící akci znovu připojí. Na konec logu se
-# připíše řádek `── exit N ──`, podle kterého panel pozná konec.
 set -uo pipefail
 
 DIR="${XDG_RUNTIME_DIR:-/tmp}/rp-job"

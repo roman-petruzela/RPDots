@@ -4,11 +4,7 @@ input {
             layout "cz,us"
             options "grp:alt_shift_toggle"
         }
-        // numlock: v settings.kdl (rp-settings) — flag by include nevypnul
     }
-    // tap, natural-scroll, accel-speed a focus-follows-mouse jsou v settings.kdl
-    // (okno Settings / rp-settings). Flag zapnutý tady by include nevypnul —
-    // niri nezná `natural-scroll false`.
     touchpad {
     }
     mouse {
@@ -16,8 +12,6 @@ input {
     trackpoint {
     }
 }
-// Monitory (režim, měřítko, pozice) jsou v displays.kdl, který píše
-// Settings → Displays (rp-display) — tady nic, ať config sedí na každý stroj
 layout {
     gaps 16
     center-focused-column "never"
@@ -50,13 +44,6 @@ layout {
     struts {
     }
 }
-// Blur (niri 26.04+, ext-background-effect). Default is xray: a window blurs the
-// backdrop (layers with place-within-backdrop — awww and mpvpaper), not what is
-// really behind it. A static wallpaper is blurred once and reused, so it is nearly
-// free; a playing video wallpaper forces a re-blur every video frame. `xray false`
-// blurs the actual content underneath (used by the wallpaper picker overlay).
-// Windows opt in either themselves via the protocol (kitty `background_blur`,
-// quickshell `BackgroundEffect`) or via `background-effect` rules below.
 blur {
     passes 2
     offset 3.0
@@ -67,31 +54,16 @@ include optional=true "~/.config/niri/theme-colors.kdl"
 spawn-sh-at-startup "~/.local/bin/start-rice-services.sh"
 hotkey-overlay {
 }
-// prefer-no-csd je v settings.kdl (okno Settings → Appearance) — flag by include nevypnul
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
-// Křivky animací žijí v power-mode.kdl (rp-power); rychlost a vypnutí přebíjí
-// settings.kdl z okna Settings, includovaný na konci.
 include optional=true "~/.config/niri/power-mode.kdl"
-// Pozn.: dřív tu bylo namespace="^wallpaper$", což nesedělo na nic — awww-daemon
-// registruje vrstvu pod svým vlastním jménem, takže se backdrop neuplatňoval.
 layer-rule {
     match namespace="^awww-daemon$"
     place-within-backdrop true
 }
-// Video wallpaper: mpvpaper runs in the background layer (wallpaper-video-ctl.sh)
-// so it can join the backdrop too — xray blur then follows the playing video
-// instead of showing awww's static first frame underneath it.
 layer-rule {
     match namespace="^mpvpaper$"
     place-within-backdrop true
 }
-// Blur behind fuzzel. The radius must match its own corner radius
-// (templates/fuzzel.ini `radius`), otherwise the blurred rectangle pokes out past
-// the rounded corners. mako gets no blur: it draws all notifications into one
-// surface with `margin` *inside* it, so the blur filled a frame around and a band
-// between the bubbles — the odd border. Its background is 93 % opaque anyway.
-// waybar is left out on purpose: its surface is a full-width transparent strip
-// with floating pills, so blurring it would smear a band across the whole top.
 layer-rule {
     match namespace="^launcher$"
     geometry-corner-radius 12
@@ -99,8 +71,6 @@ layer-rule {
         blur true
     }
 }
-// Launcher and session menu (quickshell): full-screen like the wallpaper picker,
-// windows underneath blurred for real (xray off).
 layer-rule {
     match namespace="^rp-overlay$"
     background-effect {
@@ -108,13 +78,6 @@ layer-rule {
         xray false
     }
 }
-// Mod+Tab / Alt+Tab switchers and the Mod+D launcher (quickshell) need no rule:
-// they request their own blur shape via ext-background-effect (PopAnim.qml), so
-// it can follow the card while it scales in/out. `blur true` here would blur the
-// whole surface at full size from the first frame of the open animation.
-// Wallpaper picker (quickshell): xray off, so the windows under the overlay get
-// blurred instead of being replaced by the blurred wallpaper. The preview of the
-// picked wallpaper sits below the windows (rp-wallpaper-preview, Bottom layer).
 layer-rule {
     match namespace="^rp-wallpaper-picker$"
     background-effect {
@@ -148,28 +111,6 @@ window-rule {
     match app-id=r#"^blueman-manager$"#
     open-floating true
 }
-// Pozor na velikost písmen: skutečné app-id je "Spotify", ne "spotify",
-// a niri porovnává regexem citlivým na velikost — bez (?i) pravidlo nesedlo.
-// (Pod nativním Waylandem hlásí Spotify "spotify" malým, takže (?i) drží obojí.)
-//
-// Průhlednost tady musí dělat kompozitor, na rozdíl od Vesktopu. Vesktop je
-// Electron a v settings.json má `transparent: true`, čímž si sám vyrobí okno
-// s alfa kanálem; CSS pak jen odkryje kořenové plochy. Spotify je CEF a žádný
-// takový přepínač nemá — změřeno na třech cestách, ve všech zůstalo okno krycí
-// (korelace pixelů s tapetou r ≈ -0,06, čili nula):
-//   1) X11/XWayland + --enable-transparent-visuals
-//   2) nativní Wayland (--ozone-platform=wayland)
-//   3) --default-background-color=00000000 na obou
-// Kontrola, že CSS vůbec zabírá, proběhla přes dočasné #ff0000 — okno zčervenalo.
-//
-// Zbývá tedy `opacity`, a ta má jednu daň: prosvítí celé okno včetně textu,
-// ne jen pozadí jako v GTK. Rozdělit to nejde — kompozitor vidí jen hotové
-// pixely okna a text od pozadí v nich nerozezná. Hodnota je schválně stejná
-// jako `background_opacity` v kitty, aby rice držel jednu průhlednost.
-//
-// Zkoušelo se i obejít to rozmazanou tapetou vepsanou do CSS (okno by zůstalo
-// krycí a průhledné by vypadalo jen pozadí). Text tak sice ostrý byl, ale
-// celkově to vypadalo hůř, tak se to zahodilo.
 window-rule {
     match app-id="(?i)^spotify$"
     opacity 0.75
@@ -178,14 +119,6 @@ window-rule {
         blur true
     }
 }
-// niri kreslí focus-ring za oknem, a u oken s CSD jako vyplněný obdélník, ne
-// jako dutý prstenec. Zed má průhledné pozadí, takže se skrz něj místo tapety
-// dívá právě ten obdélník — a protože je aktivní barva jasný gradient
-// (#7aa2ff → #9d7cff) a neaktivní tmavá (#4f4568), vypadá to, jako by
-// průhlednost mizela přesně ve chvíli, kdy okno dostane focus.
-// Thunar se to netýká: prefer-no-csd + MiscUseCsd=FALSE mu dávají SSD.
-// Vesktop má stejný problém ze stejného důvodu — frameless:true v jeho
-// nastavení znamená CSD, takže mu focus-ring prosvítá průhledným pozadím.
 window-rule {
     match app-id=r#"^dev\.zed\.Zed$"#
     match app-id=r#"^vesktop$"#
@@ -194,10 +127,6 @@ window-rule {
         blur true
     }
 }
-// Settings okno (quickshell Settings.qml): plovoucí, zaoblené. Blur si žádá
-// samo přes ext-background-effect, okno má 86% průhledné pozadí.
-// Launcher (Mod+D, quickshell Launcher.qml): plovoucí okno jako Settings, ať ho
-// niri otevírá a zavírá stejnou animací; blur si žádá samo
 window-rule {
     match title="^RPLauncher$"
     open-floating true
@@ -220,13 +149,10 @@ window-rule {
     clip-to-geometry true
 }
 
-// Mod+O: zoomed further out than the default 0.5, so more workspaces fit.
 overview {
     zoom 0.35
 }
 
-// Alt+Tab is the quickshell window switcher (WindowSwitcher.qml, see binds),
-// so niri's built-in one is off — otherwise its defaults would also grab Mod+Tab.
 recent-windows {
     off
 }
@@ -236,7 +162,6 @@ binds {
     Mod+Shift+Slash { show-hotkey-overlay; }
     Mod+T hotkey-overlay-title="Open a Terminal: kitty" { spawn "kitty"; }
     Mod+E hotkey-overlay-title="File Manager: yazi" { spawn "kitty" "--" "yazi"; }
-    // quickshell Launcher.qml; fuzzel only when quickshell isn't running
     Mod+D hotkey-overlay-title="Run an Application" { spawn-sh "~/.local/bin/rp-shell launcher toggle || fuzzel"; }
     Super+Alt+L hotkey-overlay-title="Lock the Screen: swaylock" { spawn "swaylock"; }
     Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
@@ -251,20 +176,14 @@ binds {
     XF86MonBrightnessUp   allow-when-locked=true { spawn "~/.local/bin/brightness-osd.sh" "up"; }
     XF86MonBrightnessDown allow-when-locked=true { spawn "~/.local/bin/brightness-osd.sh" "down"; }
     Mod+O repeat=false { toggle-overview; }
-    // Workspace switcher (quickshell WorkspaceSwitcher.qml): hold Mod, Tab cycles,
-    // releasing Mod switches. Mod+O stays the overview.
     Mod+Tab       { spawn "~/.local/bin/rp-shell" "workspaces" "next"; }
     Mod+Shift+Tab { spawn "~/.local/bin/rp-shell" "workspaces" "prev"; }
-    // Window switcher, same style: hold Alt, Tab cycles, release switches.
-    // Alt+` limits it to windows of the focused app.
     Alt+Tab         { spawn "~/.local/bin/rp-shell" "windows" "next"; }
     Alt+Shift+Tab   { spawn "~/.local/bin/rp-shell" "windows" "prev"; }
     Alt+grave       { spawn "~/.local/bin/rp-shell" "windows" "next-app"; }
     Alt+Shift+grave { spawn "~/.local/bin/rp-shell" "windows" "prev-app"; }
     Mod+Q repeat=false { close-window; }
     Mod+Left  { focus-column-left; }
-    // Down/up moves between windows stacked in a column; past the last one it
-    // continues to the next workspace.
     Mod+Down  { focus-window-or-workspace-down; }
     Mod+Up    { focus-window-or-workspace-up; }
     Mod+Right { focus-column-right; }
@@ -394,22 +313,15 @@ binds {
     Mod+Shift+V { switch-focus-between-floating-and-tiling; }
     Mod+W { toggle-column-tabbed-display; }
     Mod+Space       { spawn "~/.local/bin/keyboard-layout-osd.sh" "next"; }
-    // niri's own screenshot UI instead of slurp+grim: it renders a captured
-    // snapshot, so the screen is frozen while you drag out the region. Saves to
-    // screenshot-path and copies to the clipboard, same as the old script did.
     Print { screenshot; }
     Mod+Shift+S { screenshot; }
     Ctrl+Print { screenshot; }
     Alt+Print { screenshot; }
-    // rp-shell napřímo (pár ms); rofi jen když quickshell neběží.
     Mod+Shift+W { spawn-sh "~/.local/bin/rp-shell wallpaper toggle || ~/.local/bin/pick-wallpaper.sh --rofi"; }
     Mod+Shift+D hotkey-overlay-title="Dashboard: quickshell" { spawn "qs" "ipc" "call" "dashboard" "toggle"; }
     Mod+Shift+O hotkey-overlay-title="Přepínač výstupu zvuku" { spawn "qs" "ipc" "call" "audio" "toggle"; }
     Mod+Ctrl+O hotkey-overlay-title="Další výstup zvuku" { spawn "qs" "ipc" "call" "audio" "next"; }
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
-    // quickshell SessionMenu.qml (lock/suspend/log out/restart/shut down);
-    // falls back to niri's own exit dialog. Ctrl+Alt+Delete always gets that.
-    // Clipboard history (quickshell ClipboardHistory.qml + cliphist)
     Mod+Ctrl+V { spawn "~/.local/bin/rp-shell" "clipboard" "toggle"; }
     Mod+Shift+E { spawn-sh "~/.local/bin/rp-shell session toggle || niri msg action quit"; }
     Ctrl+Alt+Delete { quit; }
@@ -417,17 +329,9 @@ binds {
     Mod+S hotkey-overlay-title="Settings: quickshell" { spawn "~/.local/bin/rp-shell" "settings" "toggle"; }
 }
 
-// Displeje visí na AMD iGPU, ale niri renderovalo na NVIDII — každý snímek se
-// tak kopíroval přes PCIe a při animované tapetě to shazovalo plynulost celé
-// plochy. Cesta přes by-path je stabilní, číslování renderD* se může měnit.
 debug {
     render-drm-device "/dev/dri/by-path/pci-0000:06:00.0-render"
 }
 
-// Okno Settings (quickshell Settings.qml → rp-settings): mezery, focus ring, stín,
-// zaoblení, touchpad… Generovaný soubor (gitignored), kanonické hodnoty jsou
-// v ~/.config/niri-rice/settings.json. Musí být poslední, ať přepíše layout výš.
 include optional=true "~/.config/niri/settings.kdl"
-// Monitory z okna Settings → Displays (rp-display): režim, škála, otočení, pozice, VRR.
-// Generovaný soubor; bloky output se jmenují stejně jako výše, takže je přepíšou.
 include optional=true "~/.config/niri/displays.kdl"

@@ -7,16 +7,6 @@ import QtQuick
 import QtQuick.Effects
 import "../Colors.js" as Colors
 
-// Horní panel (náhrada waybaru) — jeden na monitor. Rozložení a chování 1:1
-// s waybarem (viz .config/waybar/config.jsonc), vzhled sjednocený s okny
-// ricu (Settings, flyouty): stejný font, barvy a zaoblení.
-//
-//   vlevo   workspacy tohohle monitoru · okno zaměřené na tomhle monitoru · cava · přehrávač
-//   střed   hodiny a datum — vždy přesně uprostřed; levá/pravá strana se
-//           zkrátí (ořízne), nikdy hodiny neodsunou
-//   vpravo  síť (↓ ↑, VPN) · CPU GPU paměť teplota · zvuk baterie jas · tray · napájení
-//
-// Data dodává sdílený BarData, stav niri sdílený NiriState (shell.qml).
 PanelWindow {
     id: bar
 
@@ -26,10 +16,10 @@ PanelWindow {
     screen: modelData
 
     readonly property string output: modelData.name
-    readonly property int barHeight: 36          // stejně jako waybar
+    readonly property int barHeight: 36
     readonly property int pillHeight: 28
-    readonly property int edge: 8                // okraj panelu vlevo i vpravo (symetrie)
-    readonly property int gap: 6                 // mezera mezi pilulkami
+    readonly property int edge: 8
+    readonly property int gap: 6
     readonly property string fontFamily: "JetBrainsMono Nerd Font"
 
     color: "transparent"
@@ -39,8 +29,6 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "rp-bar"
 
-    // Podklad přes celou šířku jako okno Settings: tmavý, poloprůhledný,
-    // s rozmazanou tapetou pod sebou a tenkou linkou dole
     BackgroundEffect.blurRegion: Region { item: barBg }
     Rectangle {
         id: barBg
@@ -56,13 +44,11 @@ PanelWindow {
     function sh(cmd) { Quickshell.execDetached(["bash", "-c", cmd]) }
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
 
-    // ── Stav niri pro tenhle monitor
     readonly property var workspaces: {
         if (!niri) return []
         niri.revision
         return Object.values(niri.workspaces)
             .filter(w => w.output === output)
-            // jako waybar hide-empty: prázdné pryč, kromě aktivního
             .filter(w => w.is_active || Object.values(niri.windows).some(x => x.workspace_id === w.id))
             .sort((a, b) => a.idx - b.idx)
     }
@@ -72,15 +58,12 @@ PanelWindow {
         const ws = Object.values(niri.workspaces).find(w => w.output === output && w.is_active)
         const win = ws && ws.active_window_id != null ? niri.windows[ws.active_window_id] : null
         const t = win ? (win.title || win.app_id || "") : ""
-        return t.length > 50 ? t.slice(0, 49) + "…" : t      // max-length 50 jako waybar
+        return t.length > 50 ? t.slice(0, 49) + "…" : t
     }
 
-    // ── Společné prvky
-    // Pilulka: stejný podklad pro všechny skupiny, obsah v řadě na střed
     component Pill: Rectangle {
         id: pill
         default property alias content: row.data
-        // Stejný podklad jako karty/okna Settings; tint jen pro zvýraznění (napájení)
         property color tint: Colors.surfaceContainerHigh
         property real tintAlpha: 0.9
         property int pad: 10
@@ -114,11 +97,10 @@ PanelWindow {
         }
     }
 
-    // Text modulu (ikona + hodnota), svisle na středu, s hover/kliky a tooltipem
     component Item_: Text {
         id: it
         property string tip: ""
-        property string icon: ""               // ikona v barvě iconColor, text = value
+        property string icon: ""
         property string value: ""
         property color iconColor: Colors.primary
         property color baseColor: Colors.onSurface
@@ -154,17 +136,13 @@ PanelWindow {
     TrayMenu { id: trayMenu }
     ClockPopup { target: center; targetHovered: clockHover.hovered }
 
-    // ═══ Levá strana ═════════════════════════════════════════════════════
     Row {
         id: left
         anchors { left: parent.left; leftMargin: bar.edge; verticalCenter: parent.verticalCenter }
         spacing: bar.gap
-        // Nikdy nezasáhne do hodin: šířka omezená do poloviny minus hodiny
         width: Math.min(implicitWidth, center.x - bar.gap - bar.edge)
         clip: true
 
-        // Workspacy tohohle monitoru: čtverce stejné šířky i výšky, zvýraznění
-        // aktivního k němu plynule přejede, tečka aktivního se zvětší
         Pill {
             id: wsPill
             pad: 3
@@ -216,7 +194,6 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                // focus-workspace bere pořadí na zaměřeném monitoru — proto nejdřív monitor
                                 onClicked: bar.sh("niri msg action focus-monitor " + bar.output
                                                   + " && niri msg action focus-workspace " + modelData.idx)
                             }
@@ -226,7 +203,6 @@ PanelWindow {
             }
         }
 
-        // Okno zaměřené na tomhle monitoru
         Pill {
             visible: bar.windowTitle !== ""
             Text {
@@ -238,7 +214,6 @@ PanelWindow {
             }
         }
 
-        // cava — i potichu (ploché sloupce), ať se panel při pauze nepřeskládá
         Text {
             visible: bar.barData.cava !== ""
             anchors.verticalCenter: parent.verticalCenter
@@ -250,9 +225,6 @@ PanelWindow {
             layer.enabled: true
             layer.effect: MultiEffect { shadowEnabled: true; shadowColor: "#000000"; shadowOpacity: 0.85; shadowBlur: 0.5; shadowVerticalOffset: 1 }
         }
-        // Přehrávač (jako custom/player ve waybaru): interpret – skladba.
-        // Klik = pauza/přehrát, prostřední = další, pravý = dashboard s celou
-        // kartou přehrávače. Bez přehrávače zmizí; při pauze zůstane ztlumený.
         Pill {
             id: mediaPill
             readonly property var p: bar.barData.player
@@ -292,7 +264,6 @@ PanelWindow {
         }
     }
 
-    // ═══ Střed: hodiny ═══════════════════════════════════════════════════
     property var now: new Date()
     Timer { interval: 1000; running: true; repeat: true; onTriggered: bar.now = new Date() }
 
@@ -312,7 +283,6 @@ PanelWindow {
         }
     }
 
-    // ═══ Pravá strana ════════════════════════════════════════════════════
     Row {
         id: right
         anchors { right: parent.right; rightMargin: bar.edge; verticalCenter: parent.verticalCenter }
@@ -321,7 +291,6 @@ PanelWindow {
         width: Math.min(implicitWidth, bar.width - (center.x + center.width) - bar.gap - bar.edge)
         clip: true
 
-        // Síť + VPN — v pilulce: bez podkladu byl text na světlé tapetě nečitelný
         Pill {
             Item_ {
                 value: bar.barData.network.text ?? ""
@@ -342,14 +311,12 @@ PanelWindow {
             }
         }
 
-        // Hardware
         Pill {
             Item_ {
                 icon: "\uf4bc"; value: bar.barData.cpu + "%"; iconColor: Colors.secondary
                 tip: {
                     const c = bar.barData.cores
                     let lines = ["CPU " + bar.barData.cpu + " %   ·   load " + bar.barData.load, ""]
-                    // jádra ve dvou sloupcích
                     const half = Math.ceil(c.length / 2)
                     for (let i = 0; i < half; i++) {
                         const a = ("core " + i).padEnd(8) + String(c[i]).padStart(3) + " %"
@@ -359,7 +326,6 @@ PanelWindow {
                     return lines.join("\n")
                 }
             }
-            // waybar-gpu.sh vrací "ikona hodnota" — rozdělit, ať má ikona akcent
             Item_ {
                 readonly property string raw: bar.barData.gpu.text ?? ""
                 icon: raw.split(" ")[0]; value: raw.split(" ").slice(1).join(" ")
@@ -368,14 +334,12 @@ PanelWindow {
             }
             Item_ { icon: "\uefc5"; value: bar.barData.mem + "%"; iconColor: Colors.secondary }
             Item_ {
-                // critical-threshold 85 jako waybar
                 icon: "\uf2c9"; value: bar.barData.temp + "°C"
                 iconColor: bar.barData.temp >= 85 ? Colors.errorColor : Colors.tertiary
                 baseColor: bar.barData.temp >= 85 ? Colors.errorColor : Colors.onSurface
             }
         }
 
-        // Zvuk, baterie, jas
         Pill {
             Item_ {
                 icon: bar.barData.muted ? "\ueee8" : (bar.barData.volume < 34 ? "\uf026" : bar.barData.volume < 67 ? "\uf027" : "\uf028")
@@ -400,7 +364,6 @@ PanelWindow {
                 baseColor: low ? Colors.errorColor : Colors.onSurface
                 clickable: true
                 onLeftClicked: bar.sh(bar.bin + "rp-shell power toggle")
-                // warning 30 % bliká pomaleji, critical 15 % rychleji (jako waybar)
                 SequentialAnimation on opacity {
                     running: batt.low
                     loops: Animation.Infinite
@@ -415,7 +378,6 @@ PanelWindow {
             }
         }
 
-        // Tray
         Pill {
             visible: SystemTray.items.values.length > 0
             pad: 10
@@ -430,8 +392,6 @@ PanelWindow {
                     IconImage {
                         id: trayIcon
                         anchors.fill: parent
-                        // Symbolické ikony (Easy Effects…) jsou černé šablony — GTK je
-                        // přebarví podle textu, tady to udělá MultiEffect níž
                         visible: !ti.symbolic
                         source: {
                             const ic = ti.modelData.icon
@@ -447,7 +407,6 @@ PanelWindow {
                         colorization: 1.0
                         colorizationColor: Colors.onSurface
                     }
-                    // Ikona, kterou téma nemá (Steam posílá vlastní jméno) → první písmeno
                     Rectangle {
                         visible: trayIcon.status !== Image.Ready
                         anchors.fill: parent
@@ -472,18 +431,15 @@ PanelWindow {
                         onClicked: e => {
                             if (e.button === Qt.LeftButton && !ti.modelData.onlyMenu) ti.modelData.activate()
                             else if (e.button === Qt.MiddleButton) ti.modelData.secondaryActivate()
-                            // vlastní QML menu (display() by chtělo QApplication režim)
                             else if (ti.modelData.hasMenu) trayMenu.toggleAt(ti, ti.modelData.menu, ti.modelData.tooltipTitle || ti.modelData.title)
                         }
                         onWheel: e => ti.modelData.scroll(e.angleDelta.y, false)
                     }
-                    // Když je menu té ikony otevřené, tooltip by ho zakrýval
                     BarTooltip { target: ti; text: ti.modelData.tooltipTitle || ti.modelData.title; wanted: tiArea.containsMouse && !(trayMenu.visible && trayMenu.owner === ti) }
                 }
             }
         }
 
-        // Napájení → dashboard
         Pill {
             tint: hovered ? Colors.errorColor : Colors.surfaceContainerHigh
             tintAlpha: hovered ? 0.3 : 0.9

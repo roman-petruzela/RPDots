@@ -4,23 +4,19 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Balíčky: nainstalované (pacman + flatpak) s hledáním, filtry a řazením,
-// a procházení repozitářů/AUR s instalací. Klik na řádek rozbalí detail
-// (`rp-sys pkginfo`) s odinstalací — ta se ptá dvakrát.
 Item {
     id: page
     required property var host
 
-    property string mode: "installed"      // installed | browse
+    property string mode: "installed"
     property var packages: []
     property bool loading: false
     property string query: ""
-    property string filter: "explicit"      // all | explicit | aur | flatpak | orphans
-    property string sort: "name"            // name | size | date
+    property string filter: "explicit"
+    property string sort: "name"
     property string expanded: ""
     property var details: []
     property string confirmRemove: ""
-    // Sirotky se mažou až na druhý klik — první jen ukáže, co by šlo pryč
     property bool confirmOrphans: false
     property var searchResults: []
     property bool searching: false
@@ -122,7 +118,6 @@ Item {
         }
     }
 
-    // ── Lišta: režim, hledání, filtry
     Column {
         id: toolbar
         anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 8; rightMargin: 12 }
@@ -177,7 +172,6 @@ Item {
                     }
                 }
             }
-            // Rozbalovací seznam, ne segmenty — vedle pěti čipů by se nevešly
             SDropdown {
                 anchors { right: parent.right; verticalCenter: parent.verticalCenter }
                 width: 150
@@ -190,7 +184,6 @@ Item {
         }
     }
 
-    // ── Údržba (jen u sirotků / vždy dole)
     Item {
         id: footer
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom; rightMargin: 12 }
@@ -234,7 +227,6 @@ Item {
         }
     }
 
-    // ── Seznam
     SWheel { flick: list }
     ListView {
         id: list
@@ -287,7 +279,6 @@ Item {
                     id: meta
                     anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
                     spacing: 10
-                    // Štítky: zdroj a důvod instalace
                     Repeater {
                         model: {
                             const p = pkgRow.modelData
@@ -346,7 +337,6 @@ Item {
                     onClicked: page.toggleDetails(pkgRow.modelData.name)
                 }
                 TapHandler {
-                    // šipka vpravo (mimo tlačítka) také rozbaluje
                     onTapped: eventPoint => { if (eventPoint.position.x > head.width - 40) page.toggleDetails(pkgRow.modelData.name) }
                 }
             }
@@ -359,7 +349,6 @@ Item {
 
                 SHint { visible: page.details.length === 0; text: "Loading…" }
                 Repeater {
-                    // Jen to podstatné, v rozumném pořadí
                     model: {
                         const want = ["Description", "Version", "Repository", "Installed From", "URL", "Licenses",
                                       "Installed Size", "Install Date", "Install Reason", "Depends On",
@@ -398,7 +387,6 @@ Item {
                         busy: page.host.job.running
                         onClicked: page.remove(pkgRow.modelData.name)
                     }
-                    // Sirotek, kterého používáš přímo: označit jako explicitní
                     SButton {
                         visible: pkgRow.modelData.orphan || pkgRow.modelData.reason === "dependency"
                         icon: "󰐃"; text: "Keep"

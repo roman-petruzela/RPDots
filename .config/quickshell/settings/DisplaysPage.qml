@@ -4,11 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Monitory: náhled rozložení (přetažením se monitor přesune a přichytí
-// k nejbližší hraně jiného), a pro vybraný monitor zapnutí, režim, škála,
-// otočení a VRR. Všechno přes `rp-display set`, které změnu hned aplikuje
-// a uloží do niri configu i do profilu kanshi (jinak by ji kanshi při
-// dalším připojení monitoru vrátil).
 Item {
     id: page
     required property var host
@@ -22,8 +17,6 @@ Item {
         listProc.running = true
     }
 
-    // Napřímo, ne přes sdílený panel akcí: ten běžící aktualizace blokuje
-    // a změna displeje by se pak potichu neprovedla
     function set(key, value, output) {
         setProc.running = false
         setProc.command = [Quickshell.env("HOME") + "/.local/bin/rp-display", "set",
@@ -55,15 +48,11 @@ Item {
         }
     }
 
-    // Tažení: jméno taženého monitoru, jeho logická pozice po přichycení a
-    // rozměry náhledu zmrazené na začátku tažení (jinak by se náhled pod
-    // myší přeměřoval)
     property string dragName: ""
     property real dragX: 0
     property real dragY: 0
     property var frozen: null
 
-    // Rozměry náhledu: všechny zapnuté monitory se vejdou do plochy
     readonly property var bounds: frozen ?? liveBounds
     readonly property var liveBounds: {
         const on = outputs.filter(o => o.enabled)
@@ -73,12 +62,8 @@ Item {
         return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
     }
 
-    // Přichycení za tažení: každá osa zvlášť k nejbližší hraně jiného monitoru
-    // (vedle, nad, pod, zarovnané na začátek, konec i střed) a k 0 — levý horní
-    // roh se tak zasekne v 0,0. Když by se monitory překrývaly, přiskočí na
-    // nejbližší místo těsně vedle.
     function snap(o, nx, ny) {
-        const T = 140      // dosah přichycení v logických pixelech
+        const T = 140
         const others = outputs.filter(p => p.enabled && p.name !== o.name)
         let xs = [0], ys = [0]
         for (const t of others) {
@@ -122,7 +107,6 @@ Item {
             spacing: 2
             topPadding: 8
 
-            // ── Náhled rozložení
             SCard {
                 id: preview
                 width: parent.width
@@ -165,8 +149,6 @@ Item {
                             }
                         }
 
-                        // target: null — obdélník se nehýbe sám (tím by si rozbil vazbu
-                        // na skutečnou pozici), pozici za tažení počítá snap()
                         DragHandler {
                             id: drag
                             target: null
@@ -211,7 +193,6 @@ Item {
                 }
             }
 
-            // Výběr monitoru (i vypnutých — ty v náhledu nejsou)
             Item { width: 1; height: 8 }
             Row {
                 spacing: 8
@@ -227,7 +208,6 @@ Item {
                 }
             }
 
-            // ── Nastavení vybraného
             SHeading { text: page.sel ? (page.sel.make + " " + page.sel.model).toUpperCase() : "" }
             SRow {
                 label: "Use this display"
@@ -246,7 +226,6 @@ Item {
                     options: page.sel ? page.sel.modes.map(m => m.spec) : []
                     labels: page.sel ? page.sel.modes.map(m => m.label + (m.preferred ? "  ★" : "")) : []
                     current: page.sel?.mode ?? ""
-                    // Aktuální režim nemusí být přesně stejný řetězec (zaokrouhlení) — vybrat podle rozměrů a Hz
                     displayText: {
                         const s = page.sel
                         if (!s) return ""

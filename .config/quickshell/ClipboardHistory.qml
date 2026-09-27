@@ -4,13 +4,6 @@ import Quickshell.Wayland
 import QtQuick
 import "Colors.js" as Colors
 
-// Historie schránky (Mod+Ctrl+V), vzhledem stejná jako Launcher (fuzzel-like
-// okno uprostřed). Data drží cliphist (niri-rice-cliphist.service ukládá každý
-// nový výběr). Psaní filtruje, Enter položku zkopíruje zpátky do schránky
-// (vložíš Ctrl+V), Shift+Delete ji z historie smaže.
-//
-// Obrázky mají náhled: dekódují se až pro řádky, které se opravdu vykreslí,
-// do $XDG_RUNTIME_DIR/rp-clip (tmpfs, maže se při každém otevření).
 PanelWindow {
     id: root
 
@@ -21,10 +14,10 @@ PanelWindow {
     readonly property int pad: 12
     readonly property string thumbDir: Quickshell.env("XDG_RUNTIME_DIR") + "/rp-clip"
 
-    property var entries: []     // { id, line, text, image, meta }
+    property var entries: []
     property var results: []
     property int selected: 0
-    property bool missing: false // cliphist není nainstalovaný
+    property bool missing: false
 
     visible: false
     color: "transparent"
@@ -32,7 +25,6 @@ PanelWindow {
     implicitHeight: panel.height
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    // Stejný namespace jako fuzzel/Launcher → stejný blur se zaoblením z niri
     WlrLayershell.namespace: "launcher"
     WlrLayershell.keyboardFocus: root.visible
         ? WlrKeyboardFocus.Exclusive
@@ -64,7 +56,6 @@ PanelWindow {
                     const tab = line.indexOf("\t")
                     if (tab < 0) continue
                     const body = line.slice(tab + 1)
-                    // "[[ binary data 45 KiB png 1920x1080 ]]"
                     const m = body.match(/^\[\[ binary data (.+?) (\w+) (\d+x\d+) \]\]$/)
                     out.push({
                         id: line.slice(0, tab),
@@ -99,7 +90,6 @@ PanelWindow {
     function remove(i) {
         const e = results[i]
         if (!e) return
-        // cliphist delete bere celý řádek z `list` na stdin
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" | cliphist delete", "sh", e.line])
         entries = entries.filter(x => x.id !== e.id)
         const keep = Math.min(selected, results.length - 2)
@@ -131,7 +121,7 @@ PanelWindow {
             Text {
                 id: glyph
                 anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-                text: ""   // FontAwesome clipboard
+                text: ""
                 font.family: root.fontFamily
                 font.pixelSize: 16
                 color: Colors.primary
@@ -220,7 +210,6 @@ PanelWindow {
                 radius: 8
                 color: sel ? Colors.primaryContainer : "transparent"
 
-                // Náhled obrázku: dekódovat, až je řádek vykreslený
                 Process {
                     id: decoder
                     running: row.modelData.image
@@ -256,7 +245,6 @@ PanelWindow {
                         right: parent.right; rightMargin: 10
                         verticalCenter: parent.verticalCenter
                     }
-                    // Víceřádkový text zobrazit na jednom řádku
                     text: row.modelData.image ? row.modelData.meta
                         : row.modelData.text.replace(/\s+/g, " ").trim()
                     textFormat: Text.PlainText

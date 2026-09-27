@@ -12,7 +12,7 @@ Item {
 
     property bool open: false
     property var  screen: null
-    property real popupRightMargin: 4  // set from Bar.qml: barBg.width - (rightSection.x + barTray.x + barTray.implicitWidth)
+    property real popupRightMargin: 4
 
     Rectangle {
         id: btn

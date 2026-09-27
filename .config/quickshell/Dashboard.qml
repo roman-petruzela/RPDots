@@ -12,8 +12,6 @@ PanelWindow {
     visible: false
     color: "transparent"
 
-    // Okno drží celou plochu, aby se dalo zavřít kliknutím kamkoliv mimo panel.
-    // Panel samotný zůstává 380 px vpravo.
     anchors { left: true; right: true; top: true; bottom: true }
 
     exclusionMode: ExclusionMode.Ignore
@@ -25,14 +23,11 @@ PanelWindow {
 
     BackgroundEffect.blurRegion: Region { item: panel }
 
-    property int barHeight: 36     // výška waybaru
-    property var barData           // BarData ze shell.qml (hlasitost, jas)
-    property var caffeine          // Caffeine ze shell.qml
+    property int barHeight: 36
+    property var barData
+    property var caffeine
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
 
-    // Posuvníky: bez OSD (hodnotu ukazuje posuvník sám), jas aspoň 1 %,
-    // ať se displej nedá zhasnout úplně. Když předchozí zápis ještě běží,
-    // pošle se po něm jen poslední hodnota.
     property var volPending: null
     property var blPending: null
     Process {
@@ -74,13 +69,11 @@ PanelWindow {
         }
     }
 
-    // U více monitorů vyjede na tom, na kterém zrovna pracuješ.
     FocusedOutput { id: opener; window: root }
 
     function open()   { opener.show() }
     function toggle() { if (root.visible) root.visible = false; else root.open() }
 
-    // Zavření kliknutím mimo panel
     MouseArea {
         anchors.fill: parent
         onClicked: root.visible = false
@@ -103,7 +96,6 @@ PanelWindow {
                        Qt.color(Colors.surfaceContainer).g,
                        Qt.color(Colors.surfaceContainer).b, 0.90)
 
-        // Left border
         Rectangle {
             x: 0; y: 0; width: 1; height: parent.height
             color: Colors.outlineVariant
@@ -112,9 +104,6 @@ PanelWindow {
 
         MouseArea { anchors.fill: parent }
 
-        // Obsah: hlavička s tapetou přes celou šířku, pod ní přepínače,
-        // posuvníky, přehrávač (jen když něco hraje) a systém; session
-        // tlačítka drží dno panelu.
         Item {
             anchors.fill: parent
             anchors.leftMargin: 1

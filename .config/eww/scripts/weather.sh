@@ -1,5 +1,4 @@
 #!/bin/bash
-# Získá počasí z wttr.in ve formátu JSON
 weather=$(curl -sf "wttr.in/?format=j1")
 if [ -z "$weather" ]; then
     echo '{"temp": "N/A", "desc": "Nelze načíst"}'

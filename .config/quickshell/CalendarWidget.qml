@@ -5,7 +5,6 @@ Item {
     implicitWidth: 340
     implicitHeight: headerRow.height + 10 + dayNamesRow.height + 6 + calGrid.height
 
-    // Velikost buňky dne (dashboard 26, kalendář pod hodinami v panelu menší)
     property int cell: 26
     property int viewYear:  (new Date()).getFullYear()
     property int viewMonth: (new Date()).getMonth()
@@ -21,7 +20,7 @@ Item {
     function build() {
         calModel.clear()
         var first = new Date(viewYear, viewMonth, 1).getDay()
-        first = first === 0 ? 7 : first          // Mon=1 … Sun=7
+        first = first === 0 ? 7 : first
         var dim  = new Date(viewYear, viewMonth + 1, 0).getDate()
         var prev = new Date(viewYear, viewMonth, 0).getDate()
 
@@ -51,7 +50,6 @@ Item {
 
     Component.onCompleted: build()
 
-    // Header
     Item {
         id: headerRow
         width: parent.width
@@ -88,7 +86,6 @@ Item {
         }
     }
 
-    // Day name headers
     Row {
         id: dayNamesRow
         anchors.top: headerRow.bottom
@@ -108,7 +105,6 @@ Item {
         }
     }
 
-    // Day grid
     Grid {
         id: calGrid
         anchors.top: dayNamesRow.bottom

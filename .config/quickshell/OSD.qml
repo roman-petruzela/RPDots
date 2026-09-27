@@ -5,10 +5,6 @@ import Quickshell.Services.Pipewire
 import QtQuick
 import "Colors.js" as Colors
 
-// Pozn.: IPC funkce se NESMÍ jmenovat `show` — koliduje s podpříkazem
-// `qs ipc show` a volání se pak jen vypíše místo provedení. Proto `trigger`.
-// Zároveň `qs ipc call` v quickshellu 0.3.0 neumí předat argument, takže si
-// OSD hodnotu načítá samo — hlasitost z PipeWire, jas z brightnessctl.
 Item {
     id: root
 
@@ -21,7 +17,6 @@ Item {
     readonly property PwNode sink: Pipewire.defaultAudioSink
     PwObjectTracker { objects: root.sink ? [root.sink] : [] }
 
-    // Volá je IpcHandler i rychlý socket v shell.qml (rp-shell).
     function triggerVolume() {
         if (!root.sink || !root.sink.audio) return
         root.osdType = "volume"
@@ -56,7 +51,6 @@ Item {
         command: ["brightnessctl", "--class=backlight", "-m"]
         stdout: StdioCollector {
             onStreamFinished: {
-                // formát: název,typ,aktuální,XX%,max
                 const pct = parseFloat((text.split(",")[3] || "").replace("%", ""))
                 if (isNaN(pct)) return
                 root.osdType = "brightness"

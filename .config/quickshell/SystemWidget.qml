@@ -2,14 +2,10 @@ import Quickshell.Io
 import QtQuick
 import "Colors.js" as Colors
 
-// Přehled systému. Procento samo o sobě moc neřekne, proto každý řádek nese
-// i konkrétní čísla — teplotu a takt CPU, obsazené GiB, zbývající čas baterie.
 Item {
     implicitWidth: 340
     implicitHeight: col.implicitHeight
 
-    // Obnovovat jen při otevřeném dashboardu — pak ale každou sekundu a hned
-    // po otevření, ať neukazuje čísla z doby, kdy byl naposledy vidět
     property bool active: true
 
     property real cpuUsage: 0
@@ -28,7 +24,6 @@ Item {
 
     Process {
         id: sysProc
-        // Jeden shell na všechno — pět procesů každou sekundu by bylo zbytečné.
         command: ["bash", "-c", `
             f="\${XDG_RUNTIME_DIR:-/tmp}/qs-cpu-prev"
             prev=$(cat "$f" 2>/dev/null || echo '0 0 0 0 0 0 0')
@@ -149,7 +144,6 @@ Item {
                     : Colors.secondary
         }
 
-        // Údaje, které nemají smysl jako proužek
         Row {
             width: parent.width
             topPadding: 4

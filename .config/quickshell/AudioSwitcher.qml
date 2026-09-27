@@ -4,36 +4,28 @@ import Quickshell.Services.Pipewire
 import QtQuick
 import "Colors.js" as Colors
 
-// Přepínač zvukového výstupu ve stylu Windows.
-// Hlasitost se vždy nastavuje na všechna zařízení naráz, aby přepnutí mezi
-// nimi nebylo slyšet jako skok.
 Flyout {
     id: root
 
     heading: "Audio output"
 
-    // Všechny reálné výstupy (ne streamy aplikací)
     readonly property var sinks: Pipewire.nodes.values.filter(n => n.isSink && !n.isStream)
 
-    // Bez trackeru nejsou props (hlasitost, mute) živé
     PwObjectTracker { objects: root.sinks }
 
     readonly property PwNode active: Pipewire.defaultAudioSink
     readonly property real volume: active && active.audio ? active.audio.volume : 0
     readonly property bool muted: active && active.audio ? active.audio.muted : false
 
-    // „Sound settings" otevře stránku Sound v okně Settings (pavucontrol je odkázaný odtamtud)
     Process { id: mixerProc; command: ["bash", "-c", "$HOME/.local/bin/rp-shell settings sound"] }
     Process { id: unpinProc; command: ["bash", "-c", "$HOME/.local/bin/rp-audio unpin"] }
 
     function selectSink(node) {
         Pipewire.preferredDefaultAudioSink = node
-        // Uvolní streamy, které se předtím přilepily na konkrétní zařízení
         unpinProc.running = false
         unpinProc.running = true
     }
 
-    // Přepnutí na další výstup bez otevírání okna (pro klávesovou zkratku)
     function selectNext() {
         if (root.sinks.length < 2) return
         const cur = root.active
@@ -42,7 +34,6 @@ Flyout {
         root.selectSink(root.sinks[(cur + 1) % root.sinks.length])
     }
 
-    // Hlasitost jde na všechna zařízení, ne jen na to výchozí
     function setVolumeAll(v) {
         const clamped = Math.max(0, Math.min(1, v))
         for (const s of root.sinks)
@@ -69,7 +60,6 @@ Flyout {
         return "󰕿"
     }
 
-    // ── Seznam výstupů ─────────────────────────────────────────────────────
     Repeater {
         model: root.sinks
 
@@ -107,7 +97,6 @@ Flyout {
                     color: isActive ? Colors.primary : Colors.onSurfaceVariant
                 }
 
-                // Krátký název nahoře, plný popis pod ním — jako ve Windows
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width - 62
@@ -149,7 +138,6 @@ Flyout {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                // Okno zůstává otevřené — zavře se až kliknutím mimo něj.
                 onClicked: root.selectSink(modelData)
             }
         }
@@ -159,7 +147,6 @@ Flyout {
     Divider { width: root.cardWidth - 32 }
     Item { width: 1; height: 10 }
 
-    // ── Hlasitost (společná pro všechna zařízení) ──────────────────────────
     Row {
         width: root.cardWidth - 32
         height: 28
@@ -179,7 +166,6 @@ Flyout {
             }
         }
 
-        // Vlastní slider — táhne se i kliknutím kamkoli do dráhy
         Item {
             id: slider
             anchors.verticalCenter: parent.verticalCenter
@@ -236,7 +222,6 @@ Flyout {
 
     Item { width: 1; height: 12 }
 
-    // ── Akce ───────────────────────────────────────────────────────────────
     Row {
         width: root.cardWidth - 32
         spacing: 8

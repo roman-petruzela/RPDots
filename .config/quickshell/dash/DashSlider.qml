@@ -1,14 +1,11 @@
 import QtQuick
 import "../Colors.js" as Colors
 
-// Tlustý posuvník (hlasitost, jas). Výplň nese ikonu, vpravo číslo.
-// Při tažení ukazuje vlastní hodnotu a nečeká na zpětné čtení ze systému,
-// ať výplň neodskakuje; `moved` se posílá přiškrceně, `released` na konci.
 Item {
     id: s
     property string icon: ""
-    property int value: 0            // skutečná hodnota ze systému
-    property bool dimmed: false      // např. ztlumeno
+    property int value: 0
+    property bool dimmed: false
     signal moved(int v)
     signal released(int v)
     signal iconClicked()
@@ -47,7 +44,6 @@ Item {
     }
     Timer { id: throttle; interval: 60; onTriggered: s.moved(s.dragValue) }
 
-    // Ikona sedí na výplni, takže je vždy kontrastní vůči primary
     Text {
         id: ic
         x: 0; width: s.height; height: s.height

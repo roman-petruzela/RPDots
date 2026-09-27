@@ -4,9 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Hraní: stav GameMode, MangoHud (pár nejčastějších voleb přímo v
-// ~/.config/MangoHud/MangoHud.conf + zapnutí ve všech Vulkan hrách přes
-// environment.d), rychlý přechod na power režim a VRR. Backend `rp-sys gaming`.
 Item {
     id: page
     required property var host

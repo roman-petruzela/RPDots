@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# enabled: 1
-# priority: 1
 
 CURRENT_WALL="${HOME}/.local/share/wallpapers/current"
 STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"
@@ -31,8 +29,6 @@ apply_wallpaper_transition() {
             step="${WALL_TRANSITION_STEP:-90}"
             fps="${WALL_TRANSITION_FPS:-120}"
         fi
-        # "none" = okamžitě (WallpaperPicker.qml má vlastní animaci). Explicitní
-        # --transition-step by jinak alias "none" (step 255) zase zpomalil.
         [[ "$trans" == "none" ]] && step=255
         swww img "$wall" \
             --transition-type "$trans" \
@@ -73,14 +69,6 @@ apply_wallpaper_transition() {
     fi
 }
 
-# Video tapeta: awww odbaví přechod na první snímek videa (CURRENT_WALL je u videa
-# právě on) a teprve pak se navrch položí mpvpaper. Přechod tak vypadá identicky
-# jako u obrázků — divák uvidí stejnou wave animaci a video se pak rozhýbe.
-# Pro statickou tapetu tohle mpvpaper naopak zabije.
-#
-# Běží odpojeně na pozadí: start videa musí počkat, až awww dokreslí přechod
-# (~3 s), a nemá smysl o tu dobu zdržovat matugen a zbytek témování. setsid ho
-# odpojí od procesní skupiny, aby přežil konec apply-wallpaper-theme.sh.
 sync_video_layer() {
     local ctl="$HOME/.local/bin/wallpaper-video-ctl.sh"
     [[ -x "$ctl" ]] || return 0
@@ -91,7 +79,6 @@ sync_video_layer() {
     fi
 }
 
-# Skip if apply-wallpaper-theme.sh already ran the transition at script start
 [[ "${WALLPAPER_TRANSITION_DONE:-}" == "1" ]] && exit 0
 
 if [[ -f "$CURRENT_WALL" ]]; then

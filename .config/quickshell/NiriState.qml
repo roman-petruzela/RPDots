@@ -2,17 +2,11 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
-// Živý stav niri (workspacy + okna) z `niri msg --json event-stream`.
-// Stream na začátku pošle celý stav (WorkspacesChanged, WindowsChanged) a pak
-// jen změny, takže přepínače se otevírají okamžitě — bez `niri msg` při
-// každém stisku (~13 ms a proces navíc).
-//
-// Objekty se mění na místě; kdo potřebuje reagovat, sleduje `revision`.
 Item {
     id: root
 
-    property var workspaces: ({})   // id -> workspace z niri IPC
-    property var windows: ({})      // id -> okno z niri IPC
+    property var workspaces: ({})
+    property var windows: ({})
     property int revision: 0
 
     Process {
@@ -22,7 +16,6 @@ Item {
         stdout: SplitParser {
             onRead: line => root.handle(line)
         }
-        // niri restart / reload sezení — připojit se znovu
         onExited: restartTimer.start()
     }
 
@@ -105,11 +98,6 @@ Item {
         return t ? t.secs * 1e9 + t.nanos : 0
     }
 
-    // Minimapa workspace pro přepínače: sloupce scrollovacího layoutu vedle
-    // sebe s mezerou jako v niri (gaps 16), celé zmenšené do boxW×boxH;
-    // plovoucí okna jako sloupec navíc. `hl` = zvýrazněná dlaždice.
-    // Pozici okna na obrazovce niri nehlásí (tile_pos_in_workspace_view je
-    // u dlaždic null), proto rozložení, ne screenshot.
     function minimap(wins, highlightId, outputName, boxW, boxH) {
         const scr = Quickshell.screens.find(s => s.name === outputName)
         const outH = scr ? scr.height : 1080
@@ -153,7 +141,6 @@ Item {
         return tiles
     }
 
-    // "eDP-1" nic neříká — vestavěný panel je „Laptop“, ostatní model monitoru
     function outputLabel(name) {
         if (name.startsWith("eDP")) return "Laptop"
         const scr = Quickshell.screens.find(s => s.name === name)
@@ -162,8 +149,6 @@ Item {
 
     function appIcon(appId) {
         const entry = DesktopEntries.heuristicLookup(appId)
-        // iconPath(name, fallback) náhradu nepoužije, když ikona v tématu jen
-        // chybí (vykreslí šachovnici); check=true vrátí prázdný řetězec
         return Quickshell.iconPath(entry?.icon ?? appId, true)
             || Quickshell.iconPath("application-x-executable")
     }

@@ -1,14 +1,5 @@
 import QtQuick
 
-// MouseArea pro seznamy ovládané klávesnicí: `moved()` hlásí jen skutečný
-// pohyb kurzoru. Obyčejné onEntered/onPositionChanged chodí i tehdy, když se
-// pod stojícím kurzorem posune obsah (rychlé listování šipkami) nebo když se
-// okno otevře pod ním — výběr pak skákal na položku pod myší.
-//
-// Porovnává se poloha ve scéně: posun obsahu ji nemění, pohyb myši ano. První
-// událost po najetí se jen zapamatuje, takže se nic nevybere samo od sebe.
-// Zaokrouhluje se na pixely — během animace zmenšení (PopAnim) vychází přepočet
-// přes scale s desetinnými chybami a výběr by skočil i pod stojící myší.
 MouseArea {
     id: area
 

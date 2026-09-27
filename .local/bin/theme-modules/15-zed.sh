@@ -6,9 +6,6 @@ THEME_NAME="RPRice Dark"
 
 [[ -f "$ZED_SETTINGS" ]] || exit 0
 
-# matugen already wrote ~/.config/zed/themes/rprice.json via its template.
-# Update settings.json (JSONC with // comments) to reference this theme.
-# Python handles stripping // comments before parsing and writes back as JSON.
 python3 - "$ZED_SETTINGS" "$THEME_NAME" <<'PY'
 import sys, re, json
 

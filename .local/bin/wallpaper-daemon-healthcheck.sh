@@ -39,13 +39,7 @@ if [[ -f "$CURRENT_WALL" ]]; then
     fi
 fi
 
-# Video vrstva: pokud je aktivní video tapeta a mpvpaper neběží (po restartu sezení
-# nebo když spadl), nahodit ho zpátky. 'ensure' běžící instanci nechá být, aby
-# healthcheck nerestartoval video při každém tiknutí timeru.
 if [[ -x "$HOME/.local/bin/wallpaper-video-ctl.sh" ]]; then
-    # Po restartu daemonu ale sync: mpvpaper sdílí s awww vrstvu background
-    # a niri kreslí později namapovaný povrch navrch — nový awww by jinak
-    # video překryl. sync mpvpaper restartuje, takže bude zase nahoře.
     if [[ "$restarted" == 1 ]]; then
         "$HOME/.local/bin/wallpaper-video-ctl.sh" sync >/dev/null 2>&1 || true
     else

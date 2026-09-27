@@ -6,16 +6,10 @@ CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/fastfetch"
 CFG_FILE="$CFG_DIR/config.jsonc"
 BASE_IMG="$CFG_DIR/rplogo.png"
 LOGO_OUT="$CACHE_DIR/rplogo-small.png"
-# Terminal logo only ever displays at --logo-width 16 cells; the source PNG is
-# 2000x2000, and sending that much data over the kitty graphics protocol on
-# every run silently fails (fastfetch reserves no space for it at all).
 LOGO_TARGET_SIZE=256
 mkdir -p "$CACHE_DIR"
 
 logo_source="$BASE_IMG"
-# fastfetch's own kitty-protocol implementation ("kitty") renders nothing on this
-# setup; kitty-icat shells out to kitty's own `kitten icat`, which is the
-# reference implementation and far less likely to have protocol edge cases.
 logo_type="kitty-icat"
 
 if command -v magick >/dev/null 2>&1 && [[ -f "$BASE_IMG" ]]; then

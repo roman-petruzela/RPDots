@@ -2,15 +2,12 @@ import Quickshell.Io
 import QtQuick
 import "Colors.js" as Colors
 
-// Zamknout / restart / vypnout. Restart a vypnutí se nejdřív ptají —
-// omylem trefené tlačítko by stálo rozdělanou práci.
 Item {
     id: root
 
     implicitWidth: 340
     implicitHeight: 44 + (confirming !== "" ? 42 : 0)
 
-    // id akce, na kterou se právě ptáme ("" = na nic)
     property string confirming: ""
 
     Process { id: lockProc;   command: ["swaylock"] }
@@ -31,7 +28,6 @@ Item {
             run(action.id)
             return
         }
-        // druhé kliknutí na stejné tlačítko dotaz zase schová
         root.confirming = (root.confirming === action.id) ? "" : action.id
     }
 
@@ -109,7 +105,6 @@ Item {
             }
         }
 
-        // ── Potvrzení ──────────────────────────────────────────────────────
         Rectangle {
             width: parent.width
             height: 34

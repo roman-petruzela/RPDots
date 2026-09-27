@@ -1,13 +1,10 @@
 import QtQuick
 import "../Colors.js" as Colors
 
-// Tooltip panelu — stejné okno a karta jako kalendář a menu (BarPopup),
-// jen s menším okrajem. Ukáže se po krátké prodlevě, ať při přejíždění
-// myší přes panel neblikají.
 BarPopup {
     id: tip
     property string text: ""
-    property bool wanted: false            // myš je nad položkou
+    property bool wanted: false
     padding: 10
 
     Timer {

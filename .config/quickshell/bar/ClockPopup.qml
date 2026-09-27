@@ -2,17 +2,12 @@ import QtQuick
 import ".."
 import "../Colors.js" as Colors
 
-// Kalendář pod hodinami v panelu (BarPopup — stejné okno a karta jako
-// tooltipy a menu). Ukáže se po najetí na hodiny a zůstane, dokud je myš
-// na hodinách nebo na něm (šipkami jde listovat měsíce).
 BarPopup {
     id: pop
     property bool targetHovered: false
     readonly property bool anyHovered: targetHovered || hovered
     padding: 12
 
-    // Otevřít po krátké prodlevě, zavřít až chvíli po odjetí myši (přejezd
-    // z hodin do kalendáře ho nesmí zavřít)
     Timer { id: openDelay; interval: 300; onTriggered: if (pop.anyHovered) { cal.reset(); pop.show() } }
     Timer { id: closeDelay; interval: 350; onTriggered: if (!pop.anyHovered) pop.dismiss() }
     onAnyHoveredChanged: {
@@ -50,12 +45,11 @@ BarPopup {
             id: cal
             width: parent.width
             cell: 22
-            // Při každém otevření zpátky na aktuální měsíc
             function reset() {
                 const d = new Date()
                 viewYear = d.getFullYear()
                 viewMonth = d.getMonth()
-                build()     // CalendarWidget se sám přepočítá jen po šipkách
+                build()
             }
         }
     }

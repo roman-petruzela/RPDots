@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Tenký posuvník: viditelný jen při posouvání nebo najetí myší
 ScrollBar {
     id: sb
     policy: ScrollBar.AsNeeded

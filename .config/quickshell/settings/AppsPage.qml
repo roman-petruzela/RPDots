@@ -5,10 +5,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Aplikace: nainstalované (hledání, spustit, skrýt z launcheru, odinstalovat
-// přes stránku balíčků), výchozí aplikace po kategoriích a autostart.
-// Backend `rp-apps`; odinstalace dohledá balíček (`pacman -Qqo`) a jde přes
-// sdílený job jako na stránce Packages.
 Item {
     id: page
     required property var host
@@ -65,7 +61,6 @@ Item {
         stderr: StdioCollector { onStreamFinished: if (text.trim() !== "") page.host.showError(text.trim().replace(/^rp-apps: /, "")) }
         onExited: page.reload()
     }
-    // Který balíček aplikaci dodal (pro odinstalaci)
     Process {
         id: ownerProc
         stdout: StdioCollector { onStreamFinished: page.owner = text.trim() }
@@ -87,7 +82,6 @@ Item {
             && (q === "" || (a.name + " " + a.comment + " " + a.id).toLowerCase().includes(q)))
     }
 
-    // ── Záložky a hledání
     Column {
         id: toolbar
         anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 8; rightMargin: 12 }
@@ -114,7 +108,6 @@ Item {
         }
     }
 
-    // ── Nainstalované (a výběr pro autostart)
     SWheel { flick: appList }
     ListView {
         id: appList
@@ -235,7 +228,6 @@ Item {
         }
     }
 
-    // ── Výchozí aplikace a autostart
     SWheel { flick: flick }
     Flickable {
         id: flick
@@ -251,7 +243,6 @@ Item {
             width: flick.width - 12
             spacing: 2
 
-            // Výchozí
             Column {
                 visible: page.tab === "defaults"
                 width: parent.width
@@ -280,7 +271,6 @@ Item {
                 }
             }
 
-            // Autostart
             Column {
                 visible: page.tab === "startup" && !page.adding
                 width: parent.width

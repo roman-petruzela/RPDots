@@ -1,7 +1,6 @@
 import QtQuick
 import "../Colors.js" as Colors
 
-// Filtrační čip (Explicit / AUR / Orphans …) s volitelným počtem
 Rectangle {
     id: chip
     property string text

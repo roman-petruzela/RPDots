@@ -14,8 +14,6 @@ done
 [[ -n "$WALL_DIR" ]] || exit 0
 mkdir -p "$THUMB_DIR"
 
-# Barvy generuje matugen (šablona ~/.config/matugen/templates/colors.sh).
-# Dřív se braly z pywalu, ten se už nepoužívá.
 if [[ -f "$STATE_COLORS" ]]; then
   set +u
   source "$STATE_COLORS"
@@ -32,24 +30,12 @@ is_video() {
   esac
 }
 
-# Cesta k náhledu je odvozená jen z cesty/mtimu/velikosti souboru — žádné IO,
-# žádná závislost na aktuální barvě motivu. Dřív byl v klíči i wal_bg, jenže
-# -background se u neprůhledných zdrojů (drtivá většina) vůbec neprojeví
-# (thumbnail ...^ + -extent vždy zaplní celou plochu, není co podbarvovat) —
-# takže každá změna tapety kvůli barvě motivu zneplatnila cache úplně všem
-# ostatním tapetám a picker je musel při příštím otevření přegenerovat znovu.
 thumb_key_for() {
   local img="$1" ver="$2" sig
   sig="$(stat -c '%Y_%s' "$img" 2>/dev/null || echo "0_0")"
   printf '%s|%s|%s' "$ver" "$img" "$sig" | md5sum | awk '{print $1}'
 }
 
-# Malý náhled pro rofi (fallback), velký 16:9 pro quickshell coverflow —
-# prostřední karta je přes 800 px široká, 240px náhled by na ní byl rozmazaný.
-# Velký náhled nemá md5 klíč, ale čitelné jméno z mtime/velikosti/názvu —
-# --list ho tak spočítá pro celý adresář jedním `stat`, bez podprocesu na
-# soubor (s md5sum trvalo otevření pickeru se 100 tapetami přes 1,5 s).
-# Adresář se prochází jen do hloubky 1, takže basename je jednoznačný.
 thumb_path_for() { echo "$THUMB_DIR/$(thumb_key_for "$1" v3).png"; }
 large_thumb_name() { printf 'large-v1-%s-%s.jpg' "$1" "$(basename "$2")"; }
 large_thumb_path_for() {
@@ -64,13 +50,9 @@ make_thumb() {
   if [[ ( ! -f "$thumb" || ! -f "$large" ) ]] && command -v magick >/dev/null 2>&1; then
     src="$img"
     tmpframe=""
-    # ImageMagick umí mp4 jen přes ffmpeg delegáta, který nemusí být k dispozici —
-    # u videa si snímek vytáhneme sami (jednou pro obě velikosti).
     if is_video "$img"; then
       if command -v ffmpeg >/dev/null 2>&1; then
         tmpframe="${large%.jpg}.src.png"
-        # thumbnail=100 vybere reprezentativní snímek — u videí s fade-in z černé
-        # by prostý první snímek dal černý náhled.
         ffmpeg -y -v error -i "$img" -vf "thumbnail=100" -frames:v 1 -f image2 "$tmpframe" >/dev/null 2>&1 \
           || ffmpeg -y -v error -i "$img" -frames:v 1 -f image2 "$tmpframe" >/dev/null 2>&1 \
           || tmpframe=""
@@ -81,8 +63,6 @@ make_thumb() {
     fi
     if [[ -n "$src" ]]; then
       [[ -f "$thumb" ]] || magick "$src[0]" -auto-orient -thumbnail "240x140^" -gravity center -background "$wal_bg" -extent 240x140 "$thumb" >/dev/null 2>&1 || true
-      # Zápis přes .tmp + mv: quickshell soubor načítá, jakmile existuje, a
-      # napůl zapsaný JPEG by se mu zobrazil jako useknutý obrázek.
       [[ -f "$large" ]] || { magick "$src[0]" -auto-orient -thumbnail "960x540^" -gravity center -extent 960x540 -quality 88 "$large.tmp.jpg" >/dev/null 2>&1 \
         && mv -f "$large.tmp.jpg" "$large"; } || rm -f "$large.tmp.jpg"
     fi
@@ -103,13 +83,6 @@ current_wallpaper_source() {
   cat "${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/current-wallpaper-source" 2>/dev/null || true
 }
 
-# Interní režim: sériově vygeneruje chybějící náhledy na pozadí a skončí.
-# Zámek přes mkdir (atomický) zaručuje, že běží nanejvýš jeden dispatcher
-# najednou — bez něj by opakované spuštění pick-wallpaper.sh (např. víc
-# stisků Mod+Shift+W dřív, než doběhne první vlna) odpálilo další a další
-# souběžné vlny ffmpeg/magick přes desítky video tapet najednou a spolehlivě
-# to sundá celý systém (přesně tohle se stalo — proto sériově, ne paralelně,
-# a proto zámek, ne jen "spustit na pozadí").
 if [[ "${1:-}" == "--warm-dispatch" ]]; then
   shift
   lock="$THUMB_DIR/.warm-dispatch.lock"
@@ -121,10 +94,6 @@ if [[ "${1:-}" == "--warm-dispatch" ]]; then
   exit 0
 fi
 
-# Rozjede generování chybějících náhledů jedním low-priority procesem na
-# pozadí, nečeká na něj. Menu se tak otevře okamžitě s tím, co je v cache —
-# chybějící náhledy se dotáhnou postupně, jeden po druhém, příště. Priorita
-# je název (vidíš ho hned), náhled je jen bonus.
 warm_missing_thumbs() {
   local file missing=()
   for file in "$@"; do
@@ -137,17 +106,11 @@ warm_missing_thumbs() {
   setsid "${prefix[@]}" "$0" --warm-dispatch "${missing[@]}" >/dev/null 2>&1 </dev/null &
 }
 
-# Výpis pro quickshell picker (WallpaperPicker.qml), jeden řádek na tapetu:
-#   cesta \t velký náhled \t image|video \t 1 když je aktuální, jinak 0
-# Náhled nemusí ještě existovat — picker ho zkouší načíst znovu, dokud ho
-# warm_missing_thumbs na pozadí nedogeneruje.
 if [[ "${1:-}" == "--list" ]]; then
   mapfile -d '' files < <(list_wallpapers)
   [[ "${#files[@]}" -gt 0 ]] || exit 0
   mapfile -t sigs < <(stat -c '%Y_%s' -- "${files[@]}")
   current_src="$(current_wallpaper_source)"
-  # Signální soubor pro picker (viz mark_shown ve wallpaper-video-ctl.sh) —
-  # FileView ho umí sledovat, jen když už existuje.
   shown_file="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/wallpaper-shown"
   [[ -e "$shown_file" ]] || : >"$shown_file"
   missing=()
@@ -161,7 +124,6 @@ if [[ "${1:-}" == "--list" ]]; then
     [[ "$file" == "$current_src" ]] && current=1
     printf '%s\t%s\t%s\t%d\n' "$file" "$large" "$kind" "$current"
   done
-  # Dispatcher vyrobí i malý rofi náhled; tady se kvůli rychlosti hlídá jen velký.
   if [[ "${#missing[@]}" -gt 0 ]]; then
     prefix=()
     command -v ionice >/dev/null 2>&1 && prefix+=(ionice -c3)
@@ -171,9 +133,6 @@ if [[ "${1:-}" == "--list" ]]; then
   exit 0
 fi
 
-# Výchozí cesta je quickshell coverflow (WallpaperPicker.qml) — ten po výběru
-# sám spustí apply-wallpaper-theme.sh. Rofi zůstává jako fallback, když qs
-# neběží nebo ještě nemá načtený IPC cíl `wallpaper` (--rofi ho vynutí).
 if [[ "${1:-}" != "--rofi" ]] && "$HOME/.local/bin/rp-shell" wallpaper toggle; then
   exit 0
 fi
@@ -216,11 +175,6 @@ pick_wallpaper() {
       fi
     done
     warm_missing_thumbs "${files[@]}"
-    # Jen z cache, bez volání make_thumb — název je vždy hned k dispozici,
-    # náhled se přidá jen když je už hotový (viz warm_missing_thumbs výš).
-    # Musí jít přímo rourou do rofi, ne přes proměnnou — $(...) v bashi tiše
-    # zahazuje NUL byty, takže by se ztratil oddělovač name\0icon\x1fpath a
-    # rofi by celý řádek (včetně "iconpath") vypsal jako holý text.
     build_entries() {
       local file base thumb
       for file in "${files[@]}"; do

@@ -5,20 +5,13 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Klávesové zkratky niri: přehled všech bindů z config.kdl s hledáním,
-// přemapování (klik na klávesu → stiskni novou), vypnutí a přidání nových.
-// Backend `rp-keys` upravuje přímo řádek v config.kdl (bind z include by
-// starou klávesu neuměl odebrat) a každou změnu ověří `niri validate`.
-//
-// Při zachytávání nové klávesy běží ShortcutInhibitor — jinak by niri
-// obsazené kombinace (Mod+T…) spustilo samo a okno by je vůbec nedostalo.
 Item {
     id: page
     required property var host
 
     property var binds: []
     property string query: ""
-    property string capturing: ""      // klávesa bindu, který se přemapovává; "+" = nový bind
+    property string capturing: ""
     property string newKey: ""
     property string newAction: "spawn"
     property string newArgs: ""
@@ -48,7 +41,6 @@ Item {
         enabled: page.capturing !== ""
     }
 
-    // Skupina podle akce — pro přehlednost dlouhého seznamu
     function category(b) {
         const a = b.action
         if (a === "spawn" || a === "spawn-sh") return "Apps & scripts"
@@ -81,7 +73,6 @@ Item {
         return order.filter(k => g[k]).map(k => ({ title: k, items: g[k] }))
     }
 
-    // Qt klávesa → XKB název, jak ho chce niri
     function keyName(e) {
         const k = e.key
         if (k >= Qt.Key_A && k <= Qt.Key_Z) return String.fromCharCode(k)
@@ -105,7 +96,6 @@ Item {
     }
 
     function captured(e) {
-        // Samotný modifikátor ještě není zkratka
         if ([Qt.Key_Meta, Qt.Key_Super_L, Qt.Key_Super_R, Qt.Key_Control, Qt.Key_Shift, Qt.Key_Alt, Qt.Key_AltGr].includes(e.key)) return
         const name = keyName(e)
         if (e.key === Qt.Key_Escape && e.modifiers === Qt.NoModifier) { capturing = ""; return }
@@ -122,14 +112,12 @@ Item {
         else if (key !== target) keys(["remap", target, key], "Shortcut " + target + " → " + key)
     }
 
-    // Zachytávání kláves: neviditelný prvek s fokusem, jen když se čeká na klávesu
     Item {
         id: catcher
         Keys.onPressed: e => { page.captured(e); e.accepted = true }
     }
     onCapturingChanged: if (capturing !== "") catcher.forceActiveFocus(); else page.host.contentItem.forceActiveFocus()
 
-    // Klávesa jako „odznak“ (Mod + Shift + K)
     component KeyBadge: Rectangle {
         id: kb
         property string keyText
@@ -207,7 +195,6 @@ Item {
             width: flick.width - 12
             spacing: 2
 
-            // ── Nový bind
             SHeading { text: "ADD A SHORTCUT" }
             Item {
                 width: parent.width
@@ -253,7 +240,6 @@ Item {
                 }
             }
 
-            // ── Seznam po skupinách
             Repeater {
                 model: page.groups
                 Column {

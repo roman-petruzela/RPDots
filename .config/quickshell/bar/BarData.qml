@@ -5,20 +5,9 @@ import Quickshell.Services.UPower
 import Quickshell.Services.Mpris
 import QtQuick
 
-// Data pro horní panel — jedna instance pro všechny monitory, ať se skripty
-// nespouští dvakrát. Zdroje jsou schválně stejné jako u waybaru, aby panel
-// ukazoval 1:1 totéž:
-//   síť, VPN, GPU  → waybar-network.sh / waybar-vpn.sh / waybar-gpu.sh (JSON)
-//   cava           → waybar-cava-stream.sh (řádek = sloupce ▁▂▃…)
-//   CPU, paměť     → /proc/stat, /proc/meminfo (jako waybar cpu/memory)
-//   teplota        → /sys/class/thermal/thermal_zone0 (výchozí zóna waybaru)
-//   hlasitost      → PipeWire výchozí výstup (rp-audio ho drží stejný všude)
-//   baterie        → UPower, jas → brightnessctl
-//   přehrávač      → Mpris (bez proxy playerctld, stejně jako MediaWidget)
 Item {
     id: root
     visible: false
-    // false = žádný qs panel nesvítí (panelem je waybar) → nic nepollovat
     property bool active: true
 
     property var network: ({ text: "", tooltip: "", class: [] })
@@ -26,29 +15,24 @@ Item {
     property var gpu: ({ text: "", tooltip: "" })
     property string cava: ""
     property int cpu: 0
-    property var cores: []           // využití jednotlivých jader v %
+    property var cores: []
     property string load: ""
     property int mem: 0
     property int temp: 0
     property int brightness: 0
     property bool hasBacklight: false
 
-    // ── Zvuk
     readonly property PwNode sink: Pipewire.defaultAudioSink
     PwObjectTracker { objects: root.sink ? [root.sink] : [] }
     readonly property int volume: sink && sink.audio ? Math.round(sink.audio.volume * 100) : 0
     readonly property bool muted: sink && sink.audio ? sink.audio.muted : false
     readonly property string sinkName: sink ? (sink.description || sink.nickname || sink.name) : ""
 
-    // ── Baterie
     readonly property var battery: UPower.displayDevice
     readonly property bool hasBattery: battery && battery.isLaptopBattery && battery.isPresent
     readonly property int batteryPct: hasBattery ? Math.round(battery.percentage * 100) : 0
-    // Jen skutečné nabíjení (jako waybar format-charging); „nabito / nenabíjí se" ne
     readonly property bool charging: hasBattery && battery.state === UPowerDeviceState.Charging
 
-    // Přehrávač: hrající má přednost. playerctld se vynechává úplně — po
-    // zavření přehrávače na něm visí poslední stopa (viz README, Dashboard)
     readonly property var players: Mpris.players.values.filter(
         p => (p.dbusName || "").indexOf("playerctld") < 0)
     readonly property var player: {
@@ -60,7 +44,6 @@ Item {
 
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
 
-    // Skript s JSON výstupem (waybar return-type json), opakovaně po intervalu
     component JsonPoll: Item {
         id: jp
         property var command
@@ -84,7 +67,6 @@ Item {
     JsonPoll { command: [root.bin + "waybar-vpn.sh"]; interval: 5000; onResult: o => root.vpn = o }
     JsonPoll { command: [root.bin + "waybar-gpu.sh"]; interval: 3000; onResult: o => root.gpu = o }
 
-    // cava běží pořád a posílá řádek za řádkem
     Process {
         id: cavaProc
         running: root.active
@@ -93,7 +75,6 @@ Item {
     }
     Timer { interval: 3000; running: root.active && !cavaProc.running; repeat: true; onTriggered: cavaProc.running = true }
 
-    // CPU z rozdílu /proc/stat mezi dvěma čteními, paměť jako waybar (1 − avail/total)
     property var lastCpu: null
     FileView { id: statFile; path: "/proc/stat" }
     FileView { id: loadFile; path: "/proc/loadavg" }
@@ -103,7 +84,6 @@ Item {
         interval: 2000; running: root.active; repeat: true; triggeredOnStart: true
         onTriggered: {
             statFile.reload(); memFile.reload(); tempFile.reload(); loadFile.reload()
-            // řádek "cpu" = celkem, "cpuN" = jádra; využití z rozdílu proti minulému čtení
             const rows = statFile.text().split("\n").filter(l => /^cpu\d* /.test(l))
                 .map(l => { const f = l.trim().split(/\s+/).slice(1).map(Number)
                             return { idle: f[3] + f[4], total: f.reduce((a, b) => a + b, 0) } })
@@ -125,7 +105,6 @@ Item {
         }
     }
 
-    // Jas: brightnessctl -m → "dev,class,cur,pct%,max"; OSD kláves ho obnoví hned
     Process {
         id: blProc
         command: ["brightnessctl", "--class=backlight", "-m"]

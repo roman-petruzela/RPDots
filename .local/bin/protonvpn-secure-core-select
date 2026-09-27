@@ -29,12 +29,8 @@ TOR_BIT = 1 << 1
 STATUS_ONLINE = 1
 PAID_TIER = 2
 
-# Default startup exit country. Switzerland ("CH", ISO 3166-1 alpha-2 -
-# Confoederatio Helvetica; not to be confused with "CN" China).
 PREFERRED_COUNTRY = "CH"
 
-# Discord-blocked NAT egress IPs, keyed by the declared ExitIP shared by every
-# server behind that gateway (see module docstring). Confirmed 2026-08-31.
 BLOCKED_EXIT_IPS = {"149.102.235.33"}
 
 DEFAULT_APP_CONFIG = {
@@ -42,7 +38,6 @@ DEFAULT_APP_CONFIG = {
     "connect_at_app_startup": None,
     "start_app_minimized": False,
 }
-
 
 def pick_fastest_regular_server():
     with SERVER_LIST.open() as f:
@@ -59,17 +54,12 @@ def pick_fastest_regular_server():
     if not candidates:
         return None
 
-    # Stick to the preferred country when it has an online candidate; only
-    # spill over to other countries if it's entirely down.
     preferred = [s for s in candidates if s.get("ExitCountry") == PREFERRED_COUNTRY]
     pool = preferred or candidates
 
-    # Prefer paid-tier servers; free ones are crowded. Fall back if there
-    # are none, so a downgraded subscription still gets a server.
     paid = [s for s in pool if s.get("Tier", 0) >= PAID_TIER]
 
     return min(paid or pool, key=lambda s: s["Score"])["Name"]
-
 
 def main():
     if not SERVER_LIST.exists():
@@ -94,7 +84,6 @@ def main():
 
     print(f"connect_at_app_startup set to {server_name}")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

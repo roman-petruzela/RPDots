@@ -1,52 +1,12 @@
 #!/usr/bin/env bash
-# rp-sys — systémové stránky okna Settings (O systému, aktualizace, balíčky, firewall).
-#
-# Čtení (JSON na stdout, bez roota):
-#   rp-sys info                 O systému: OS, HW, paměť, disky, displeje, verze
-#   rp-sys updates              dostupné aktualizace: repo, AUR, flatpak
-#   rp-sys packages             nainstalované balíčky (pacman + flatpak)
-#   rp-sys pkginfo <jméno>      detail balíčku (pacman -Qi / -Si)
-#   rp-sys search <dotaz>       hledání v repozitářích a AUR
-#   rp-sys firewall             stav firewalld (zóna, služby, porty)
-#   rp-sys fw-services          seznam známých služeb firewalld
-#
-# Akce (streamují log na stdout; root přes polkit, dialog na heslo ukáže agent):
-#   rp-sys upgrade              pacman -Syu
-#   rp-sys upgrade-aur          paru -Sua (paru volá pacman přes pkexec)
-#   rp-sys upgrade-flatpak      flatpak update
-#   rp-sys install <pkg…>       pacman -S (AUR balíčky přes paru)
-#   rp-sys remove <pkg…>        pacman -Rns
-#   rp-sys remove-orphans       pacman -Rns $(pacman -Qdtq)
-#   rp-sys keep <pkg…>          pacman -D --asexplicit (už ne sirotek, remove-orphans ho mine)
-#   rp-sys clean-cache          pacman -Sc
-#   rp-sys fw <akce> [arg]      firewalld: add-service, remove-service,
-#                               add-port, remove-port, panic-on, panic-off, restart
-#
-# Další systémové stránky (Storage, Date & time, Language, Account, Privacy,
-# Gaming, Printers, Backup):
-#   rp-sys storage | storage-home          obsazení disků, co jde uklidit / obsah ~
-#   rp-sys clean <co> [arg]                trash, cache-dir <jméno>, pacman, coredumps,
-#                                          journal, flatpak, smart (zdraví disků)
-#   rp-sys time | set-timezone <tz> | set-ntp true|false | set-clock <formát waybaru>
-#   rp-sys locale | set-locale <jazyk> [formáty]   (chybějící locale vygeneruje)
-#   rp-sys account | privacy | privacy-clear recent|thumbs|launcher
-#   rp-sys gaming | mango-set <klíč> <hodnota|on|off> | mango-everywhere on|off
-#   rp-sys printers | printer default|test|cancel <tiskárna>
-#   rp-sys backup | snapshot list|create <config> [popis] | settings-export [soubor] | settings-import <soubor>
-#
-# Kontrola repo aktualizací nepotřebuje roota ani nesahá na systémovou databázi:
-# stejně jako `checkupdates` synchronizuje kopii do dočasné dbpath přes fakeroot.
-# Částečný `pacman -Sy` do systémové databáze by jinak rozbil příští instalaci.
 set -uo pipefail
 export LC_ALL=C
 
 die() { echo "rp-sys: $*" >&2; exit 1; }
 has() { command -v "$1" >/dev/null 2>&1; }
 
-# Pacman bez barev a progress barů — výstup jde do logu v okně, ne do terminálu
 PACMAN_FLAGS=(--noconfirm --noprogressbar --color never)
 
-# --------------------------------------------------------------- info
 info() {
     local os kernel host up cpu cores gpu mem swap disks outputs
     os=$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-Linux}")
@@ -98,20 +58,14 @@ info() {
        packages: { pacman: ($pkgs | tonumber), aur: ($aur | tonumber), flatpak: ($flat | tonumber) } }'
 }
 
-# --------------------------------------------------------------- aktualizace
 repo_updates() {
     local db="${TMPDIR:-/tmp}/rp-sys-db-$UID"
     local sysdb; sysdb=$(pacman-conf DBPath 2>/dev/null || echo /var/lib/pacman/)
     mkdir -p "$db"
-    # Dvě kontroly naráz (stránka otevřená dvakrát rychle po sobě) by si sáhly
-    # na stejný db.lck a druhá by skončila chybou — seřadit je za sebe
     exec 8>"$db.flock"
     flock -w 60 8 || return 1
     ln -sfn "${sysdb%/}/local" "$db/local"
-    # --disable-sandbox: pacman 7 jinak stahuje pod uživatelem alpm, na což
-    # fakeroot nestačí (stejně to dělá checkupdates)
     fakeroot -- pacman -Sy --disable-sandbox --dbpath "$db" --logfile /dev/null >/dev/null 2>&1 || return 1
-    # grep bez shody (žádné aktualizace) vrací 1 — to není chyba synchronizace
     pacman -Qu --dbpath "$db" 2>/dev/null | grep -v '\[ignored\]' || true
 }
 
@@ -127,7 +81,6 @@ updates() {
           error: $err, checked: $checked }'
 }
 
-# --------------------------------------------------------------- balíčky
 packages() {
     local foreign; foreign=$(pacman -Qqm 2>/dev/null | paste -sd' ' -)
     local orphans; orphans=$(pacman -Qqdt 2>/dev/null | paste -sd' ' -)
@@ -154,7 +107,6 @@ pkginfo() {
     local out
     out=$(pacman -Qi "$1" 2>/dev/null || pacman -Si "$1" 2>/dev/null || (has paru && paru -Si "$1" 2>/dev/null))
     [[ -n "$out" ]] || die "package not found: $1"
-    # "Klíč : hodnota" + pokračovací řádky odsazené mezerami
     awk '
         /^[A-Za-z][A-Za-z ]*[A-Za-z] +: / { if (k != "") print k "\t" v; split($0, a, / +: /); k = a[1]; v = substr($0, index($0, ": ") + 2); next }
         /^ +/ { sub(/^ +/, ""); v = v "  " $0; next }
@@ -174,15 +126,6 @@ search() {
         ($repo | parse("repo")) + ($aur | parse("aur"))'
 }
 
-# --------------------------------------------------------------- firewall
-# Čtení bez polkitu. `firewall-cmd` si při startu vyžádá autorizaci pro vše
-# (authorizeAll), a s politikou `server` (Arch ji má jako výchozí symlink
-# org.fedoraproject.FirewallD1.policy) tak i `--state` otevřel dialog na heslo.
-# Když ho pak shodil timeout, PAM to započítal jako neúspěšné přihlášení
-# a po třech takových faillock zamkl účet na 10 minut.
-# Proto: stav, zóny a panic mode přes D-Bus metody s akcí `info` (povolené
-# bez hesla), služby a porty ze souborů zóny (čitelné pro všechny; zápisy
-# níž jdou do runtime i --permanent, takže se shodují).
 FWBUS=(busctl --system --json=short call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1)
 
 fwbus() { timeout 4 "${FWBUS[@]}" "$@" 2>/dev/null | jq -c '.data[0]'; }
@@ -236,8 +179,6 @@ fw_services() {
     done | sed -n 's/\.xml$//p' | sort -u | jq -R -s 'split("\n") | map(select(length > 0))'
 }
 
-# Zápis: jeden pkexec = jeden dialog na heslo. Jako root firewall-cmd polkit
-# obchází; bez timeoutu, ať se dialog nezavře, zatímco píšeš heslo.
 fw() {
     local act=$1 arg=${2:-} zone
     case "$act" in
@@ -257,20 +198,15 @@ fw() {
         *) die "unknown firewall action: $act" ;;
     esac
     echo ":: firewall-cmd --zone=$zone --$act=$arg (runtime + permanent)"
-    # runtime i permanent v jednom pkexec, ať je to jediný dialog
     exec pkexec sh -c 'firewall-cmd --zone="$1" --"$2"="$3" && firewall-cmd --permanent --zone="$1" --"$2"="$3"' \
         sh "$zone" "$act" "$arg"
 }
 
-# --------------------------------------------------------------- akce
 valid_pkgs() {
     local p
     for p in "$@"; do [[ "$p" =~ ^[a-zA-Z0-9@._+-]+$ ]] || die "invalid package name: $p"; done
 }
 
-# --------------------------------------------------------------- úložiště
-# Velikosti v bajtech; du na ~/.cache trvá u 19 GB pár sekund, proto zvlášť
-# `storage` (rychlé) a `storage-home` (obsah domovské složky, pomalé).
 dsize() { du -sb "$1" 2>/dev/null | awk '{ print $1 + 0 }'; }
 
 storage() {
@@ -314,7 +250,6 @@ clean() {
             find "$HOME/.local/share/Trash/files" "$HOME/.local/share/Trash/info" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>&1
             echo "done" ;;
         cache-dir)
-            # Jen přímá podsložka ~/.cache, žádné ../
             [[ "$arg" =~ ^[A-Za-z0-9._@+-]+$ && -d "$cache/$arg" ]] || die "invalid cache folder: $arg"
             echo ":: clearing ~/.cache/$arg"
             find "$cache/$arg" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>&1
@@ -331,7 +266,6 @@ clean() {
     esac
 }
 
-# --------------------------------------------------------------- čas a jazyk
 timeinfo() {
     local fmt; fmt=$(grep -A2 '"clock"' "$HOME/.config/waybar/config.jsonc" 2>/dev/null | grep -oP '"format":\s*"\K[^"]*' | head -1)
     timedatectl show 2>/dev/null | jq -R -s --arg fmt "$fmt" --arg zones "$(timedatectl list-timezones 2>/dev/null)" '
@@ -356,7 +290,6 @@ localeinfo() {
 set_locale() {
     local lang=$1 formats=$2 l
     for l in "$lang" "$formats"; do [[ "$l" =~ ^[A-Za-z_]+(\.UTF-8)?$ ]] || die "invalid locale: $l"; done
-    # Chybějící locale nejdřív vygenerovat (odkomentovat v /etc/locale.gen + locale-gen) — jeden pkexec
     echo ":: LANG=$lang, formats $formats (applies after you log in again)"
     exec pkexec sh -c '
         for l in "$1" "$2"; do
@@ -370,8 +303,6 @@ set_locale() {
     ' sh "$lang" "$formats" 2>&1
 }
 
-# Formát hodin ve waybaru — upraví "format" v bloku "clock" (živý config, a repo
-# když má stejný řádek); waybar watchdog změnu configu pozná a waybar restartuje
 set_clock() {
     local fmt=$1 f
     [[ "$fmt" =~ ^[^\"\\]+$ ]] || die "invalid clock format"
@@ -389,7 +320,6 @@ PY
     systemctl --user restart waybar.service 2>/dev/null
 }
 
-# --------------------------------------------------------------- účet
 account() {
     local ent; ent=$(getent passwd "$USER")
     jq -n --arg ent "$ent" --arg groups "$(id -nG)" --arg last "$(last -n 6 -F "$USER" 2>/dev/null | grep -v '^$\|^wtmp' | head -6)" \
@@ -402,7 +332,6 @@ account() {
             keyring: $keyring, seahorse: ($seahorse == "yes") }'
 }
 
-# --------------------------------------------------------------- soukromí
 privacy() {
     local mic cam screen
     mic=$(pactl -f json list source-outputs 2>/dev/null | jq -c --argjson mon "$(pactl -f json list sources 2>/dev/null | jq '[.[] | select(.monitor_source != "" and .monitor_source != null) | .index]')" \
@@ -430,7 +359,6 @@ privacy_clear() {
     esac
 }
 
-# --------------------------------------------------------------- hraní
 MANGO="$HOME/.config/MangoHud/MangoHud.conf"
 GAMING_ENV="$HOME/.config/environment.d/rp-gaming.conf"
 
@@ -444,7 +372,6 @@ gaming() {
           mangoEverywhere: ($env | test("MANGOHUD=1")), tools: ($tools | split("\n") | map(select(length > 0))) }'
 }
 
-# Jedna volba v MangoHud.conf (klíč=hodnota, „on" = holý klíč, „off" = smazat)
 mango_set() {
     local k=$1 v=$2
     [[ "$k" =~ ^[a-z_]+$ ]] || die "invalid MangoHud key"
@@ -480,7 +407,6 @@ mango_everywhere() {
     fi
 }
 
-# --------------------------------------------------------------- tiskárny
 printers() {
     local def; def=$(lpstat -d 2>/dev/null | sed -n 's/^system default destination: //p')
     jq -n --arg p "$(lpstat -p 2>/dev/null)" --arg jobs "$(lpstat -o 2>/dev/null)" --arg def "$def" \
@@ -503,7 +429,6 @@ printer_action() {
     esac
 }
 
-# --------------------------------------------------------------- zálohy
 backup() {
     jq -n --arg configs "$(snapper --csvout list-configs 2>/dev/null | tail -n +2)" \
           --arg fs "$(findmnt -no FSTYPE /)" \
@@ -528,7 +453,6 @@ snapshot() {
     esac
 }
 
-# Export/import nastavení okna Settings (settings.json, displays.json, modules.conf)
 settings_export() {
     local out="${1:-$HOME/rprice-settings-$(date +%Y%m%d-%H%M).tar.gz}"
     tar -czf "$out" -C "$HOME/.config/niri-rice" $(cd "$HOME/.config/niri-rice" && ls settings.json displays.json modules.conf 2>/dev/null) && echo "$out"
@@ -577,7 +501,6 @@ case "${1:-}" in
         fi ;;
     remove)
         shift; [[ $# -gt 0 ]] || die "usage: rp-sys remove <pkg…>"; valid_pkgs "$@"
-        # Flatpak aplikace mají v id tečky a v pacmanu nejsou
         pac=(); flat=()
         for p in "$@"; do
             if pacman -Qq "$p" >/dev/null 2>&1; then pac+=("$p"); else flat+=("$p"); fi

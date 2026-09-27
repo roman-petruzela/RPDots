@@ -7,14 +7,11 @@ Item {
     implicitWidth: row.implicitWidth + 8
     implicitHeight: parent ? parent.height : 40
 
-    // Fed externally by Bar.qml from event-stream / poll
     property var  workspaces: []
     property string screenOutput: ""
 
-    // Use ListModel so Repeater reliably detects changes
     ListModel { id: wsModel }
 
-    // Rebuild ListModel whenever input changes
     function rebuild() {
         wsModel.clear()
         var src = workspaces.slice()

@@ -4,12 +4,10 @@ import Quickshell.Bluetooth
 import QtQuick
 import "../Colors.js" as Colors
 
-// Mřížka rychlých přepínačů 4×2. Stav se čte jedním skriptem při otevření
-// dashboardu a po každém kliknutí; Bluetooth a caffeine jsou živé vlastnosti.
 Item {
     id: root
-    property var caffeine            // Caffeine ze shell.qml
-    property bool polling: false     // dashboard je otevřený
+    property var caffeine
+    property bool polling: false
 
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
     readonly property var adapter: Bluetooth.defaultAdapter

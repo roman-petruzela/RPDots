@@ -2,21 +2,17 @@ import Quickshell.Io
 import QtQuick
 import "Colors.js" as Colors
 
-// Síťové okno — stav připojení, seznam wifi a připojení včetně hesla.
-// Data i připojování obstarává rp-net, QML jen konzumuje JSON.
 Flyout {
     id: root
 
     heading: "Network"
     cardWidth: 400
 
-    // Kompletní tvar hned od začátku — než dorazí první status, jinak by se
-    // undefined propsalo do bindingů (a do textu jako "undefined").
     property var data: ({
         networks: [], wifiEnabled: false, wifiDevice: "",
         routeDevice: "", routeIp: "", ethernet: null, wifi: null,
     })
-    property string pendingSsid: ""     // síť, u které se ptáme na heslo
+    property string pendingSsid: ""
     property string message: ""
     property bool busy: false
 
@@ -41,7 +37,6 @@ Flyout {
         onExited: { root.busy = false; statusProc.reload() }
     }
 
-    // Připojení běží zvlášť — jako jediné potřebuje stdin (heslo) a vrací JSON
     Process {
         id: connectProc
         command: ["bash", "-c", "true"]
@@ -75,7 +70,6 @@ Flyout {
         connectProc.command = ["bash", "-c",
             "$HOME/.local/bin/rp-net connect " + JSON.stringify(ssid)]
         connectProc.running = true
-        // Heslo jde do stdin, ne do argumentů — v argv ho vidí každý proces.
         if (password !== "") connectProc.write(password + "\n")
         connectProc.stdinEnabled = false
     }
@@ -83,7 +77,6 @@ Flyout {
     function activate(net) {
         if (net.active) return
         if (net.secured && !net.saved) {
-            // neznámá zabezpečená síť — nejdřív heslo
             root.pendingSsid = (root.pendingSsid === net.ssid) ? "" : net.ssid
             root.message = ""
             return
@@ -114,7 +107,6 @@ Flyout {
         onTriggered: statusProc.reload()
     }
 
-    // ── Aktivní připojení ──────────────────────────────────────────────────
     Rectangle {
         width: root.cardWidth - 32
         height: 50
@@ -174,7 +166,6 @@ Flyout {
 
     Item { width: 1; height: 10 }
 
-    // ── Wi-Fi přepínač ─────────────────────────────────────────────────────
     Row {
         width: root.cardWidth - 32
         height: 24
@@ -198,7 +189,6 @@ Flyout {
             color: Colors.outline
         }
 
-        // Přepínač ve stylu Material
         Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: 40; height: 22; radius: 11
@@ -227,14 +217,12 @@ Flyout {
 
     Item { width: 1; height: 6 }
 
-    // ── Seznam sítí ────────────────────────────────────────────────────────
     Column {
         width: root.cardWidth - 32
         spacing: 0
         visible: root.data.wifiEnabled
 
         Repeater {
-            // dlouhý seznam by kartu protáhl přes celou obrazovku
             model: root.networks.slice(0, 7)
 
             Column {
@@ -307,7 +295,6 @@ Flyout {
                     }
                 }
 
-                // Pole na heslo vyjede jen pod tou sítí, na kterou jsi klikl
                 Row {
                     width: parent.width
                     height: visible ? 36 : 0
@@ -389,7 +376,6 @@ Flyout {
         }
     }
 
-    // ── Hláška o chybě ─────────────────────────────────────────────────────
     Text {
         width: root.cardWidth - 32
         text: root.message
@@ -405,7 +391,6 @@ Flyout {
     Divider { width: root.cardWidth - 32 }
     Item { width: 1; height: 10 }
 
-    // ── Akce ───────────────────────────────────────────────────────────────
     Row {
         width: root.cardWidth - 32
         spacing: 8

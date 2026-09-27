@@ -1,13 +1,3 @@
-/* Povrchy se počítají stejnými výrazy jako v gtk3-dark.css a zed-theme.json —
- * z primary_container se napevno určí světlost a sytost a z tapety se bere jen
- * odstín. M3 povrchy (surface_container_*) jsou v tmavém schématu skoro
- * neutrální, takže Spotify vycházelo téměř černé, zatímco zbytek rice byl
- * probarvený. Dvojice set_lightness / set_saturation musí zůstat shodné se
- * zbylými dvěma šablonami — když se mění, mění se na všech třech místech.
- *
- * Tóny jsou tady plné, bez alfy. Průhlednost Spotify nedělá CSS, ale kompozitor
- * (`opacity` ve window-rule v niri) — proč to jinak nejde, viz komentář tamtéž.
- */
 :root {
   --spice-text:              {{colors.on_surface.dark.hex}};
   --spice-subtext:           {{colors.on_surface_variant.dark.hex}};

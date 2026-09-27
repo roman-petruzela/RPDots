@@ -1,4 +1,3 @@
-# Co stow nemá linkovat do $HOME (nahrazuje výchozí seznam, proto i .git)
 \.git
 \.gitignore
 \.stow-local-ignore

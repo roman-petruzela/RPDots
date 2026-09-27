@@ -4,9 +4,6 @@ After=graphical-session.target
 
 [Service]
 Type=oneshot
-# Stejný důvod jako v niri-rice-power-sync.service: healthcheck umí přes
-# wallpaper-video-ctl.sh nahodit mpvpaper (-f, na pozadí), a bez tohohle by
-# ho systemd zabil spolu s dokončeným oneshotem.
 KillMode=process
 ExecStart=%h/.local/bin/wallpaper-daemon-healthcheck.sh
 StandardOutput=journal

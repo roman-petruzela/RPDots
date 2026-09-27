@@ -9,7 +9,6 @@ Item {
     visible: UPower.onBattery || (UPower.displayDevice && UPower.displayDevice.percentage < 1.0)
 
     property var bat: UPower.displayDevice
-    // percentage is 0.0–1.0 in QS UPower binding
     property int pct: bat ? Math.round(bat.percentage * 100) : 0
     property string state: bat ? bat.state : "Unknown"
     property bool charging: state === "Charging" || state === "FullyCharged" || state === "PendingCharge"

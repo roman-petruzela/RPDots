@@ -10,7 +10,6 @@ Item {
     property int  vol: 0
     property bool muted: false
 
-    // Poll via wpctl — reliable regardless of PW binding state
     Process {
         id: volProc
         command: ["bash", "-c", "wpctl get-volume @DEFAULT_AUDIO_SINK@"]
@@ -29,7 +28,6 @@ Item {
         onTriggered: { volProc.running = false; volProc.running = true }
     }
 
-    // Hlasitost jde přes rp-audio, aby se měnila na všech výstupech naráz.
     Process { id: volUpProc;   command: ["bash", "-c", "$HOME/.local/bin/rp-audio volume up"] }
     Process { id: volDownProc; command: ["bash", "-c", "$HOME/.local/bin/rp-audio volume down"] }
     Process { id: muteProc;    command: ["bash", "-c", "$HOME/.local/bin/rp-audio mute toggle"] }
@@ -57,7 +55,6 @@ Item {
         switcherProc.running = true
     }
 
-    // Scroll anywhere on widget → volume
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.NoButton
@@ -71,7 +68,6 @@ Item {
         anchors.leftMargin: 4
         spacing: 4
 
-        // Icon — click to mute/unmute
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: root.muted ? "󰝟" : root.vol >= 60 ? "󰕾" : root.vol >= 20 ? "󰖀" : "󰕿"
@@ -88,7 +84,6 @@ Item {
             }
         }
 
-        // Value — click to open the output switcher
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: root.muted ? "–" : root.vol + "%"

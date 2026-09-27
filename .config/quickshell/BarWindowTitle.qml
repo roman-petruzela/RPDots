@@ -6,7 +6,6 @@ Item {
     implicitWidth: lbl.visible ? Math.min(lbl.implicitWidth + 8, 280) : 0
     implicitHeight: parent ? parent.height : 40
 
-    // Fed externally by Bar.qml
     property string title: ""
 
     Text {

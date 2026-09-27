@@ -2,10 +2,6 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 
-// Caffeine: dokud je zapnutý, obrazovka nezhasne a swayidle nezamkne.
-// idle-inhibit protokol potřebuje namapovaný povrch, proto drží neviditelné
-// 1×1 okno na spodní vrstvě (bez vstupu, nezabírá místo). Stav přežije
-// reload quickshellu, ne restart.
 Scope {
     id: root
     property alias on: persist.on

@@ -2,8 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Řádek nastavení: popis vlevo, ovládací prvek vpravo, obojí svisle na středu.
-// Tečka za popisem = hodnota se liší od výchozí; kliknutí ji vrátí.
 Item {
     id: row
     property string label

@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# priority: 5
 
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"
 THUMB_DIR="$CACHE_DIR/wallpaper-thumbs"
 WAL_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/wal"
-MAX_BYTES=$((1024 * 1024 * 512)) # 512 MB
+MAX_BYTES=$((1024 * 1024 * 512))
 MAX_AGE_DAYS=21
 
 mkdir -p "$THUMB_DIR"

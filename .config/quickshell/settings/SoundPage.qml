@@ -5,13 +5,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Zvuk: hlavní hlasitost, výstupy, vstupy, hlasitost jednotlivých aplikací,
-// nahrávání, profily karet a blacklist. Všechno přes `rp-audio` — hlavní
-// hlasitost jde na všechny výstupy najednou (stejně jako klávesy), aby
-// přepnutí výstupu nebylo slyšet jako skok.
-//
-// `pactl subscribe` hlásí každou změnu (i z kláves, pavucontrolu nebo nově
-// spuštěné aplikace); stránka se podle něj s krátkou prodlevou obnoví.
 Item {
     id: page
     required property var host
@@ -44,7 +37,6 @@ Item {
         }
     }
 
-    // Živé změny: každá událost odloží obnovu o 150 ms (přijdou jich desítky naráz)
     Process {
         running: true
         command: ["pactl", "subscribe"]
@@ -70,7 +62,6 @@ Item {
         return "󰓃"
     }
 
-    // Řádek zařízení k výběru (výstup/vstup): ikona, název, tečka u výchozího
     component DeviceRow: Rectangle {
         id: dr
         property var dev
@@ -149,7 +140,6 @@ Item {
             spacing: 2
             topPadding: 8
 
-            // ── Hlavní hlasitost
             SCard {
                 width: parent.width
                 height: 96
@@ -195,7 +185,6 @@ Item {
                 text: "Volume is the same on every output, so switching never jumps. Apps below can be set on their own."
             }
 
-            // ── Výstupy
             SHeading { text: "OUTPUT" }
             Repeater {
                 model: page.outputs
@@ -213,7 +202,6 @@ Item {
                 }
             }
 
-            // ── Vstupy
             SHeading { text: "INPUT" }
             Repeater {
                 model: page.inputs
@@ -242,7 +230,6 @@ Item {
                 }
             }
 
-            // ── Aplikace
             SHeading { text: "APPLICATIONS" }
             SHint {
                 visible: (page.st?.streams.length ?? 0) === 0
@@ -293,7 +280,6 @@ Item {
                             text: ""
                             onClicked: page.audio(["stream-mute", String(sr.modelData.id), "toggle"])
                         }
-                        // Přesměrování jedné aplikace na jiný výstup
                         SDropdown {
                             anchors.verticalCenter: parent.verticalCenter
                             width: 170
@@ -306,7 +292,6 @@ Item {
                 }
             }
 
-            // ── Nahrávání
             SHeading {
                 visible: (page.st?.recording.length ?? 0) > 0
                 text: "USING THE MICROPHONE"
@@ -327,7 +312,6 @@ Item {
                 }
             }
 
-            // ── Karty
             SHeading { text: "DEVICES" }
             SHint {
                 width: parent.width
@@ -349,7 +333,6 @@ Item {
                 }
             }
 
-            // ── Pokročilé
             SHeading { text: "ADVANCED" }
             SRow {
                 label: "Apps that keep their own output"

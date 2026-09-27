@@ -2,8 +2,6 @@ import Quickshell.Widgets
 import QtQuick
 import "Colors.js" as Colors
 
-// Vykreslí dlaždice z NiriState.minimap(). Zvýrazněná dlaždice (`hl`) má
-// barvu primary; `icons` vypíná ikony u malých map (karty oken v Alt+Tab).
 Item {
     id: root
 

@@ -6,16 +6,6 @@ import QtQuick
 import QtQuick.Effects
 import "Colors.js" as Colors
 
-// Přihlašovací obrazovka (greetd + niri + quickshell), ve stylu pickeru tapet:
-// rozmazaná tapeta, nahoře hodiny, uprostřed jen pole na heslo, dole vypnutí.
-// Žádný avatar ani výběr uživatele — uživatel je jeden (RP_GREETER_USER,
-// doplní install.sh do niri.kdl).
-//
-// Běží pod uživatelem `greeter`, který nevidí do /home — tapetu a Colors.js
-// sem kopíruje rp-lightdm-sync-apply při každé změně tématu.
-//
-// Náhled v běžné session: ~/.local/share/rp-greeter/preview.sh
-// (RP_GREETER_TEST=1: bez greetd, heslo „test“ projde, cokoli jiného selže).
 ShellRoot {
     id: root
 
@@ -26,8 +16,6 @@ ShellRoot {
         || "/usr/share/backgrounds/rprice-current.jpg"
     readonly property string fontFamily: "JetBrainsMono Nerd Font"
 
-    // Heslo drží ShellRoot, ne TextInput: okno je na každém monitoru a psát
-    // se dá do kteréhokoli z nich
     property string password: ""
     property bool busy: false
     property string message: ""
@@ -82,8 +70,6 @@ ShellRoot {
             root.fail("Wrong password")
         }
         function onReadyToLaunch() {
-            // quit=true: quickshell skončí a niri.kdl pak ukončí i greeterové niri,
-            // teprve potom greetd spustí session
             Greetd.launch(["niri-session"], [], true)
         }
         function onError(error) {
@@ -91,7 +77,6 @@ ShellRoot {
         }
     }
 
-    // Aktuální rozložení klávesnice (cz/us) — u hesla na tom záleží
     Process {
         running: true
         command: ["niri", "msg", "--json", "event-stream"]
@@ -194,8 +179,6 @@ ShellRoot {
                     event.accepted = true
                 }
 
-                // ----------------------------------------------------- top
-
                 Column {
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: Math.round(parent.height * 0.12)
@@ -230,8 +213,6 @@ ShellRoot {
                     }
                 }
 
-                // -------------------------------------------------- center
-
                 Column {
                     anchors.centerIn: parent
                     anchors.verticalCenterOffset: 30
@@ -257,7 +238,6 @@ ShellRoot {
                         border.color: root.message !== "" ? Colors.errorColor
                             : root.busy ? Qt.alpha(Colors.primary, 0.5) : Colors.primary
 
-                        // Zatřesení po špatném heslu
                         property real shake: 0
                         transform: Translate { x: field.shake }
                         SequentialAnimation {
@@ -287,7 +267,6 @@ ShellRoot {
                                 ? Qt.alpha(Colors.onSurfaceVariant, 0.7) : Colors.onSurface
                         }
 
-                        // Rozložení klávesnice; klik přepne (jako Alt+Shift)
                         Rectangle {
                             id: layoutChip
                             visible: root.layout !== ""
@@ -322,8 +301,6 @@ ShellRoot {
                     }
                 }
 
-                // -------------------------------------------------- bottom
-
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.bottom
@@ -331,7 +308,6 @@ ShellRoot {
                     spacing: 12
 
                     Repeater {
-                        // Glyfy FontAwesome z Nerd Fontu: moon-o, refresh, power-off
                         model: [["", "Suspend", "suspend"],
                                 ["", "Restart", "reboot"],
                                 ["", "Shut down", "poweroff"]]

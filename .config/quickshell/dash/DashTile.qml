@@ -1,8 +1,6 @@
 import QtQuick
 import "../Colors.js" as Colors
 
-// Dlaždice přepínače v dashboardu: ikona a pod ní krátký popisek.
-// Zapnutá má primaryContainer — stejný jazyk jako vybraná položka ve flyoutech.
 Rectangle {
     id: tile
     property string icon: ""

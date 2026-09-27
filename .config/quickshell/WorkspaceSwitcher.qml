@@ -4,18 +4,6 @@ import Quickshell.Widgets
 import QtQuick
 import "Colors.js" as Colors
 
-// Mod+Tab: „Alt+Tab pro workspacy“. Drž Mod, Tab listuje (Shift+Tab zpět),
-// puštění Mod přepne. Karty jsou v pevném pořadí (monitor, pak číslo), výběr
-// ale začíná na naposledy použitém workspace — rychlé Mod+Tab tak pořád
-// skáče tam a zpátky mezi dvěma posledními.
-//
-// Tab při drženém Mod zpracuje niri (bind → `rp-shell workspaces next`), ne
-// tohle okno — dostane jen puštění Mod. Když Mod pustíš dřív, než okno
-// stihne získat klávesnici (extrémně rychlé ťuknutí), zůstane otevřené:
-// pak Enter přepne, Esc zavře.
-//
-// Karta workspace je jeho minimapa: sloupce scrollovacího layoutu niri ve
-// skutečném poměru šířek, s ikonou aplikace, na pozadí aktuální tapety.
 PanelWindow {
     id: root
 
@@ -26,12 +14,10 @@ PanelWindow {
     readonly property int screenH: Math.round(cardW * 9 / 16)
     readonly property int cardH: screenH + 46
     readonly property int gap: 12
-    // Mřížka max 7×3 jako Alt+Tab (WindowSwitcher); víc se posouvá po řádcích
     readonly property int cols: Math.max(1, Math.min(7, items.length,
         Math.floor(((screen?.width ?? 1920) * 0.9 - 36 + gap) / (cardW + gap))))
     readonly property int rows: Math.min(3, Math.ceil(items.length / cols))
     readonly property bool overflow: items.length > cols * rows
-    // Zmenšená tapeta, kterou apply-wallpaper-theme.sh stejně dělá pro matugen
     readonly property string wallThumb: "file://" + Quickshell.env("HOME") + "/.cache/niri-rice/wal-matugen.png"
 
     property var items: []
@@ -59,14 +45,11 @@ PanelWindow {
         if (!pop.shown) {
             build()
             if (items.length === 0) return
-            // Začít na naposledy použitém workspace (ne na vedlejší kartě),
-            // takže rychlé Mod+Tab pořád skáče tam a zpátky
             const prev = items.indexOf(items.filter(i => !i.ws.is_focused)
                 .reduce((a, b) => (b.recent > (a?.recent ?? -1) ? b : a), null))
             selected = prev >= 0 ? prev : 0
             const fw = niri.focusedWorkspace()
             const scr = fw ? Quickshell.screens.find(s => s.name === fw.output) : null
-            // Otevření během doznívajícího zavírání: okno už na obrazovce je
             if (!pop.cancelClose()) {
                 if (scr) screen = scr
                 visible = true
@@ -90,8 +73,6 @@ PanelWindow {
             Quickshell.execDetached(["niri", "msg", "action", "focus-workspace", String(it.ws.idx)])
     }
 
-    // Snímek stavu při otevření — během listování se pořadí nemění, i když
-    // mezitím niri pošle změny.
     function build() {
         const wins = Object.values(niri.windows)
         const byWs = {}
@@ -102,7 +83,6 @@ PanelWindow {
         const out = []
         for (const ws of Object.values(niri.workspaces)) {
             const ww = byWs[ws.id] || []
-            // Prázdné workspacy (niri má vždy jeden na konci) nejsou kam přepnout
             if (ww.length === 0 && !ws.is_focused) continue
             const active = ww.find(w => w.id === ws.active_window_id)
             out.push({
@@ -115,12 +95,9 @@ PanelWindow {
                 tiles: niri.minimap(ww, ws.active_window_id, ws.output, root.cardW, root.screenH)
             })
         }
-        // Pevné pořadí jako v niri: monitor, na kterém jsi, první, pak ostatní;
-        // v rámci monitoru podle čísla. Karty tak mají pořád stejné místo.
         const outRank = o => o === focusedOutput ? "" : o
         out.sort((a, b) => outRank(a.outputName).localeCompare(outRank(b.outputName))
             || a.ws.idx - b.ws.idx)
-        // Název monitoru jen na první kartě každého monitoru
         out.forEach((it, i) => {
             if (i > 0 && out[i - 1].outputName === it.outputName) it.output = ""
         })
@@ -129,7 +106,6 @@ PanelWindow {
 
     Rectangle {
         id: panel
-        // Buňky mřížky v sobě mají mezeru i za posledním sloupcem/řádkem
         width: grid.width - root.gap + 36 + (root.overflow ? 12 : 0)
         height: grid.height - root.gap + 36 + (root.overflow ? 16 : 0)
         radius: 22
@@ -230,7 +206,6 @@ PanelWindow {
                     anchors { top: scr.bottom; topMargin: 10; left: parent.left; right: parent.right }
                     spacing: 8
 
-                    // Tečka = workspace, na kterém právě jsi
                     Rectangle {
                         visible: card.modelData.ws.is_focused
                         anchors.verticalCenter: num.verticalCenter
@@ -267,7 +242,6 @@ PanelWindow {
             }
         }
 
-        // Posuvník a počitadlo jen když se workspacy nevejdou do 7×3
         Rectangle {
             visible: root.overflow
             x: grid.x + grid.width - root.gap + 8

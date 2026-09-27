@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# Pins the kitty background to a fixed darkness and lifts any ANSI colour that
-# would be unreadable against it.
 set -euo pipefail
 
 THEME="$HOME/.config/kitty/current-theme.conf"
 [[ -f "$THEME" ]] || exit 0
 
-# Target HSV value for the background, the ceiling on its HSV saturation, and
-# the minimum WCAG contrast ratio an ANSI colour has to reach against it.
 KITTY_BG_VALUE="${KITTY_BG_VALUE:-0.23}" \
 KITTY_BG_MAX_SAT="${KITTY_BG_MAX_SAT:-0.35}" \
 KITTY_MIN_CONTRAST="${KITTY_MIN_CONTRAST:-2.5}" \

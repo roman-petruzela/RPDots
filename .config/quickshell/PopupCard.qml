@@ -1,14 +1,6 @@
 import QtQuick
 import "Colors.js" as Colors
 
-// Společný vzhled vyskakovacích karet z panelu (tooltipy, kalendář, menu
-// v tray) a session menu — převzatý z flyoutů (napájení, zvuk, síť), ať
-// vypadá všechno jako ony: stejná barva, zaoblení, rámeček a animace
-// (sjetí shora + prolnutí).
-//
-//     PopupCard { shown: pop.open; … obsah … }
-//
-// Okno, které kartu drží, se má skrýt až po `closeDuration`.
 Rectangle {
     id: card
 

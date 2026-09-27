@@ -3,17 +3,11 @@ import Quickshell.Wayland
 import QtQuick
 import "Colors.js" as Colors
 
-// Menu vypnutí (Mod+Shift+E): zamknout, uspat, odhlásit, restart, vypnout.
-// Celá obrazovka jako u pickeru tapet — okna pod ním rozmazává niri (layer-rule
-// rp-overlay, xray false), uprostřed karta s řadou dlaždic (PopupCard — stejný
-// vzhled a animace jako ostatní vyskakovací okna). Šipky + Enter, písmena jako
-// zkratky, Esc nebo klik vedle zavře.
 PanelWindow {
     id: root
 
     readonly property string fontFamily: "JetBrainsMono Nerd Font"
 
-    // Glyfy jsou FontAwesome z Nerd Fontu: lock, moon-o, sign-out, refresh, power-off
     readonly property var actions: [
         { key: "L", label: "Lock",      glyph: "", cmd: ["swaylock"] },
         { key: "S", label: "Suspend",   glyph: "", cmd: ["systemctl", "suspend"] },
@@ -36,7 +30,6 @@ PanelWindow {
 
     FocusedOutput { id: opener; window: root }
 
-    // Otevření/zavření s animací karty; okno se skryje až po ní
     property bool shown: false
     onVisibleChanged: if (visible) shown = true; else shown = false
     function dismiss() { shown = false; hideTimer.restart() }
@@ -102,7 +95,6 @@ PanelWindow {
             height: content.height + 48
             shown: root.shown
 
-            // Klik do karty nesmí zavřít menu (zavírací MouseArea je pod ní)
             MouseArea { anchors.fill: parent }
 
             Column {
@@ -152,7 +144,6 @@ PanelWindow {
                                 color: Colors.onSurface
                             }
 
-                            // Klávesová zkratka v rohu
                             Text {
                                 anchors { top: parent.top; right: parent.right; margins: 12 }
                                 text: tile.modelData.key

@@ -1,25 +1,6 @@
 import Quickshell
 import QtQuick
 
-// Objevení a zmizení ve stylu macOS (Spotlight, Cmd+Tab): karta se při
-// otevření rozplyne z 94 % velikosti do plné, při zavření se lehce zmenší
-// a zmizí. Okno se skryje až po doběhnutí animace.
-//
-//     PopAnim { id: pop; window: root; target: panel }
-//     BackgroundEffect.blurRegion: Region {
-//         x: pop.blurX; y: pop.blurY; width: pop.blurW; height: pop.blurH
-//         radius: pop.blurRadius
-//     }
-//     function hide() { pop.dismiss() }         // místo visible = false
-//     keyboardFocus: pop.shown ? … : None       // během zavírání už ne
-//
-// Otevírá se dál přes `visible = true` (nebo FocusedOutput) — to spustí
-// animaci samo. `visible = false` zvenku (openFlyout) okno zavře okamžitě.
-//
-// Blur kreslí niri přes ext-background-effect podle oblasti, kterou si okno
-// řekne. Layer-rule `blur true` by rozmazal celý povrch naplno od prvního
-// snímku, takže by za zmenšenou průhlednou kartou byl vidět ostrý obdélník.
-// Oblast tady sleduje zmenšenou kartu a naskočí až od třetiny průhlednosti.
 Item {
     id: root
 
@@ -31,12 +12,10 @@ Item {
     property int openDuration: 220
     property int closeDuration: 140
 
-    // 0 = schované, 1 = celé
     property real t: 0
     property bool closing: false
     readonly property bool shown: window.visible && !closing
 
-    // Oblast pro BackgroundEffect.blurRegion — karta po zmenšení kolem středu
     readonly property real s: target.scale
     readonly property bool blurOn: t > 0.3
     readonly property int blurX: blurOn ? Math.round(target.x + target.width * (1 - s) / 2) : 0
@@ -76,20 +55,16 @@ Item {
         anim.stop()
         anim.to = v
         anim.duration = v > 0 ? openDuration : closeDuration
-        // OutQuint: rychlý nástup a dlouhé dojetí; zavírání zrychluje ven
         anim.easing.type = v > 0 ? Easing.OutQuint : Easing.InQuad
         anim.start()
     }
 
-    // Zavřít s animací
     function dismiss() {
         if (!window.visible || closing) return
         closing = true
         animateTo(0)
     }
 
-    // Otevření během doznívajícího zavírání: vrátit animaci zpátky.
-    // Vrací true, když okno pořád viselo na obrazovce.
     function cancelClose() {
         if (!closing) return false
         closing = false

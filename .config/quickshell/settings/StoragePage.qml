@@ -4,10 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Úložiště: obsazení disků, co jde uklidit (koš, cache balíčků, cache
-// aplikací po složkách, crash dumpy, logy, nepoužívané Flatpak runtime),
-// největší složky v ~ a zdraví disků (SMART). Úklid jde přes sdílený job —
-// root části přes polkit, uživatelské rovnou. Mazání se ptá dvakrát.
 Item {
     id: page
     required property var host
@@ -53,7 +49,6 @@ Item {
 
     readonly property real reclaimable: st ? st.items.reduce((a, i) => a + i.size, 0) : 0
 
-    // Řádek „něco zabírá X“ s tlačítkem úklidu
     component CleanRow: SRow {
         id: crow
         property string what
@@ -85,7 +80,6 @@ Item {
             spacing: 2
             topPadding: 8
 
-            // ── Disky
             Repeater {
                 model: page.st?.disks ?? []
                 SCard {
@@ -123,7 +117,6 @@ Item {
             }
             Item { width: 1; height: 6 }
 
-            // ── Úklid
             SHeading { text: "CLEAN UP  ·  " + page.human(page.reclaimable) + " RECLAIMABLE" }
             Repeater {
                 model: (page.st?.items ?? []).filter(i => i.id !== "cache")
@@ -155,7 +148,6 @@ Item {
                 }
             }
 
-            // ── Domovská složka
             Item {
                 width: parent.width
                 height: 50
@@ -206,7 +198,6 @@ Item {
                 }
             }
 
-            // ── Zdraví disků
             SHeading { text: "DISK HEALTH" }
             SRow {
                 label: "SMART status"

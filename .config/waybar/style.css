@@ -14,7 +14,6 @@ window#waybar {
     color: @on_surface;
 }
 
-/* ── Shared pill base ─────────────────────────────────────── */
 #workspaces,
 #window,
 #clock,
@@ -42,7 +41,6 @@ window#waybar {
     min-width: 0;
 }
 
-/* ── Workspaces ───────────────────────────────────────────── */
 #workspaces {
     padding: 0 4px;
     background: alpha(@surface_container, 0.60);
@@ -70,7 +68,6 @@ window#waybar {
     background: alpha(@primary, 0.12);
 }
 
-/* ── Clock ────────────────────────────────────────────────── */
 #clock {
     color: @on_primary_container;
     font-weight: 700;
@@ -80,7 +77,6 @@ window#waybar {
     letter-spacing: 0.5px;
 }
 
-/* ── Power button ─────────────────────────────────────────── */
 #custom-power {
     color: @error;
     font-size: 15px;
@@ -93,7 +89,6 @@ window#waybar {
     border-color: alpha(@error, 0.65);
 }
 
-/* ── Start / settings buttons ─────────────────────────────── */
 #custom-start-menu,
 #custom-niri-settings {
     color: @secondary;
@@ -108,7 +103,6 @@ window#waybar {
     border-color: alpha(@secondary, 0.60);
 }
 
-/* ── Network / VPN ────────────────────────────────────────── */
 #custom-network,
 #custom-vpn {
     font-size: 12px;
@@ -119,7 +113,6 @@ window#waybar {
 #custom-vpn            { color: alpha(@tertiary, 0.40); }
 #custom-vpn.active     { color: @tertiary; }
 
-/* ── Media player ─────────────────────────────────────────── */
 #custom-cava-music,
 #custom-player {
     font-size: 12px;
@@ -127,7 +120,6 @@ window#waybar {
     color: @primary;
 }
 
-/* ── System stats ─────────────────────────────────────────── */
 #cpu,
 #memory,
 #custom-gpu {
@@ -146,7 +138,6 @@ window#waybar {
 }
 #temperature.critical { color: @error; }
 
-/* ── Audio / backlight ────────────────────────────────────── */
 #pulseaudio,
 #backlight {
     background: transparent;
@@ -157,7 +148,6 @@ window#waybar {
 }
 #pulseaudio.muted { color: alpha(@on_surface_variant, 0.35); }
 
-/* ── Battery ──────────────────────────────────────────────── */
 #battery {
     background: transparent;
     border: none;
@@ -177,10 +167,8 @@ window#waybar {
 
 @keyframes blink { 50% { opacity: 0.4; } }
 
-/* ── Tray ─────────────────────────────────────────────────── */
 #tray { padding: 0 8px; }
 
-/* ── Tooltip ──────────────────────────────────────────────── */
 tooltip {
     background: @surface_container_high;
     border: 1px solid alpha(@primary, 0.40);

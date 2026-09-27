@@ -1,7 +1,5 @@
 #version 330
 
-// this shader was stolen from shadertoy user ChunderFPV
-
 #define SCALE 8.0
 #define PI radians(180.0)
 #define TAU (PI * 2.0)
@@ -20,14 +18,12 @@ uniform int bar_spacing;   // space between bars (configurable)
 
 uniform vec3 u_resolution; // window resolution
 
-// colors, configurable in cava config file (r,g,b) (0.0 - 1.0)
 uniform vec3 bg_color; // background color
 uniform vec3 fg_color; // foreground color
 
 uniform int gradient_count;
 uniform vec3 gradient_colors[8]; // gradient colors
 
-// gradient map ( color, equation, time, width, shadow, reciprocal )
 vec3 gm(vec3 c, float n, float t, float w, float d, bool i) {
   float g = min(abs(n), 1.0 / abs(n));
   float s = abs(sin(n * PI - t));
@@ -36,8 +32,6 @@ vec3 gm(vec3 c, float n, float t, float w, float d, bool i) {
   return (1.0 - pow(abs(s), w)) * c * pow(g, d) * 6.0;
 }
 
-// denominator spiral, use 1/n for numerator
-// ( screen xy, spiral exponent, decimal, line width, hardness, rotation )
 float ds(vec2 u, float e, float n, float w, float h, float ro) {
   float ur = length(u);          // unit radius
   float sr = pow(ur, e);         // spiral radius

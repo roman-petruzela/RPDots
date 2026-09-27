@@ -1,8 +1,3 @@
-// niri for the rp-greeter login screen (greetd → niri → quickshell).
-// install.sh copies this to /usr/share/rp-greeter/niri.kdl, fills in @USER@ and
-// replaces the @OUTPUTS@ line with the output blocks from the user's niri config.
-//
-// No binds on purpose: nothing can be launched from the login screen.
 hotkey-overlay {
     skip-at-startup
 }
@@ -10,7 +5,6 @@ prefer-no-csd
 
 input {
     keyboard {
-        // Same layouts as the session, otherwise the password gets typed wrong
         xkb {
             layout "cz,us"
             options "grp:alt_shift_toggle"
@@ -30,7 +24,6 @@ cursor {
 
 environment {
     RP_GREETER_USER "@USER@"
-    // The greeter user's home is /, quickshell needs somewhere writable
     XDG_CACHE_HOME "/var/lib/rp-greeter/cache"
     XDG_STATE_HOME "/var/lib/rp-greeter/state"
     QT_QPA_PLATFORM "wayland"
@@ -40,10 +33,6 @@ layout {
     background-color "#000000"
 }
 
-// @OUTPUTS@
-
-// quickshell exits after greetd accepts the login (Greetd.launch quit=true);
-// niri then quits too, and only then does greetd start the real session.
 spawn-sh-at-startup "qs -p /usr/share/rp-greeter/greeter; niri msg action quit --skip-confirmation"
 
 binds {

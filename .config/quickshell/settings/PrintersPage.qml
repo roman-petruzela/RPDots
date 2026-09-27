@@ -4,9 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Tiskárny (CUPS): seznam, výchozí tiskárna, zkušební stránka, fronta úloh.
-// Přidání a pokročilé nastavení tiskárny nechává na system-config-printer
-// nebo webovém rozhraní CUPS.
 Item {
     id: page
     required property var host

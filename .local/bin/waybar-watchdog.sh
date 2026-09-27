@@ -10,8 +10,6 @@ CONFIG_HASH_FILE="$STATE_DIR/waybar-config.sha"
 
 mkdir -p "$STATE_DIR"
 
-# Panelem je quickshell (rp-bar use quickshell) — waybar nespouštět, a kdyby
-# běžel, zastavit ho
 if [[ "$(cat "$HOME/.config/niri-rice/bar" 2>/dev/null)" == quickshell ]]; then
   systemctl --user stop waybar.service 2>/dev/null || true
   exit 0
@@ -53,9 +51,6 @@ if pgrep -x waybar >/dev/null 2>&1; then
   exit 0
 fi
 
-# waybar.service is a persistent unit (Restart=on-failure); starting it here
-# keeps the process under systemd instead of forking it from this oneshot's
-# own cgroup, which systemd would otherwise reap the moment this script exits.
 systemctl --user start waybar.service
 if [[ -f "$COLORS_FILE" ]]; then
   sha256sum "$COLORS_FILE" | awk '{print $1}' > "$HASH_FILE"

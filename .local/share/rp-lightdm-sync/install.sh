@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# rp-lightdm-sync — instaluje privilegovaného pomocníka, který zrcadlí
-# aktuální GTK3 téma + wallpaper do LightDM greeteru. Spustit jednou:
-#
-#   sudo ~/.local/share/rp-lightdm-sync/install.sh
-#
-# Poté theme-modules/84-lightdm.sh volá helpera automaticky při každé
-# změně tapety, přes sudoers pravidlo scoped jen na tenhle jeden binary.
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 

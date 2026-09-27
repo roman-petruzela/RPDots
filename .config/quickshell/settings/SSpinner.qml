@@ -1,7 +1,6 @@
 import QtQuick
 import "../Colors.js" as Colors
 
-// Točící se kolečko pro načítání (čtvrtkruh na slabém kruhu)
 Item {
     id: sp
     property bool running: true

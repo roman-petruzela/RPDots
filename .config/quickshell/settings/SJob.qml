@@ -4,29 +4,12 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Panel s živým logem akce (aktualizace, instalace, firewall). Vyjede zespodu
-// přes obsah stránky. Root akce jdou přes polkit — heslo si řekne agent
-// (polkit-gnome) vlastním dialogem, sem teče jen výstup pacmanu.
-//
-//     job.start("Updating system", ["rp-sys", "upgrade"],
-//               ["kitty", "--hold", "-e", "sudo", "pacman", "-Syu"], code => reload())
-//
-// Za běhu nejde zavřít ani zrušit: přerušený pacman uprostřed transakce by
-// nechal systém napůl aktualizovaný. Tlačítko Terminal ukáže tutéž běžící
-// akci v kitty (její log), nespouští ji znovu.
-//
-// Akce neběží jako potomek tohohle okna: spouští je `rp-job` přes setsid
-// a panel jen čte jejich log (`tail -F`). Reload quickshellu (nová tapeta,
-// téma, nasazení QML) okno i s potomky zabije — dřív tím umřel i rozběhnutý
-// pacman/paru. Po reloadu se panel k běžící akci znovu připojí (rp-job status);
-// jen callback onDone z původní stránky se ztratí.
 Rectangle {
     id: job
 
     property string title: ""
     property var terminalCommand: []
     property bool open: false
-    // Sbalený na hlavičku: běží dál, jen nezabírá půl okna. Nová akce ho rozbalí.
     property bool minimized: false
     property real fullHeight: 420
     property int exitCode: -1
@@ -38,24 +21,18 @@ Rectangle {
     signal finished(int code)
 
     color: Qt.alpha(Colors.surfaceContainer, 0.97)
-    // Přidokovaný ke spodní hraně okna: zaoblené jen horní rohy, bez rámečku
-    // (spodní hrana splývá s oknem); nahoře jen tenká linka
     topLeftRadius: 16
     topRightRadius: 16
     bottomLeftRadius: 0
     bottomRightRadius: 0
     clip: true
 
-    // Spodní hrana stojí, pohybuje se jen horní: výška se animuje sama a y z ní
-    // jen počítá. `slide` (0–1) je vysunutí zespodu. Dřív se animovalo y i výška
-    // zvlášť a sbalení se cukalo.
     property real slide: open ? 1 : 0
     Behavior on slide { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
     height: minimized ? header.height : fullHeight
     Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
     y: parent.height - height * slide
     visible: slide > 0
-    // Kolik místa zespodu panel právě zabírá (obsah stránky podle toho končí)
     readonly property real occupied: height * slide
 
     Rectangle {
@@ -72,7 +49,6 @@ Rectangle {
         job.exitCode = -1
         job.minimized = false
         lines.clear()
-        // Příkazy z ~/.local/bin (rp-sys) nemusí být v PATH quickshellu
         const cmd = command.slice()
         if (!cmd[0].startsWith("/")) cmd[0] = Quickshell.env("HOME") + "/.local/bin/" + cmd[0]
         startProc.command = [rpJob, "start", title, JSON.stringify(job.terminalCommand), "--"].concat(cmd)
@@ -82,7 +58,6 @@ Rectangle {
         return true
     }
 
-    // Po zavření panelu dokončenou akci zapomenout (jinak by se po reloadu ukázala znovu)
     onOpenChanged: if (!open && started && !running) {
         Quickshell.execDetached([rpJob, "dismiss"])
         started = false
@@ -94,7 +69,6 @@ Rectangle {
         tailProc.running = true
     }
 
-    // Po (re)loadu: běží, nebo nedávno doběhla akce? Připojit se k jejímu logu.
     Component.onCompleted: statusProc.running = true
     Process {
         id: statusProc
@@ -131,9 +105,6 @@ Rectangle {
     function statusText() {
         if (running) return "Running…"
         if (exitCode === 0) return "Done"
-        // pkexec: 126 = dialog zrušen / heslo špatně, 127 = bez oprávnění
-        // Po 3 chybných heslech (i zrušených dialozích) zamkne faillock účet
-        // na 10 minut — pak selže i správné heslo, proto to říct rovnou
         if (exitCode === 126 || exitCode === 127)
             return "Authentication cancelled or failed — after 3 failed attempts the account is locked for 10 minutes"
         return exitCode < 0 ? "" : "Failed (exit code " + exitCode + ")"
@@ -141,7 +112,6 @@ Rectangle {
 
     ListModel { id: lines }
 
-    // `tail -F` na log; řádek `── exit N ──` od rp-job znamená konec
     Process {
         id: tailProc
         stdout: SplitParser {
@@ -159,7 +129,6 @@ Rectangle {
         }
     }
 
-    // Kliknutí do panelu nepropadne na stránku pod ním
     MouseArea { anchors.fill: parent }
 
     Item {
@@ -167,7 +136,6 @@ Rectangle {
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: 54
 
-        // Klik na sbalenou hlavičku ji zase rozbalí
         TapHandler { enabled: job.minimized; onTapped: job.minimized = false }
         HoverHandler { enabled: job.minimized; cursorShape: Qt.PointingHandCursor }
 
@@ -197,8 +165,6 @@ Rectangle {
             id: buttons
             anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
             spacing: 8
-            // Tatáž běžící akce v kitty (ne nové spuštění): výstup od začátku
-            // a dál živě, `tail --pid` skončí s akcí
             SButton {
                 visible: job.started
                 icon: "󰆍"; text: "Terminal"

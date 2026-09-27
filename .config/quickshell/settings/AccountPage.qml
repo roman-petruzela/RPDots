@@ -4,9 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Účet: jméno, skupiny, shell, poslední přihlášení, klíčenka. Změna hesla,
-// jména a shellu se ptá na heslo a potřebuje terminál (passwd/chfn/chsh jsou
-// interaktivní), proto jdou do kitty. Avatar záměrně ne.
 Item {
     id: page
     required property var host

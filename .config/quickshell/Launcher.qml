@@ -5,25 +5,9 @@ import Quickshell.Widgets
 import QtQuick
 import "Colors.js" as Colors
 
-// Spouštěč aplikací (Mod+D), náhrada fuzzelu a schválně skoro jako on: malé
-// okno uprostřed, 12 řádků, zvýrazněná shoda, stejné barvy.
-// Prázdné pole ukáže naposledy spuštěné aplikace; psaní filtruje podle názvu,
-// obecného názvu, klíčových slov a popisu. Příklad jako `12*7+3` se spočítá
-// a Enter výsledek zkopíruje.
-//
-// Je to plovoucí okno (xdg toplevel) jako Settings, ne vrstva: otevření
-// a zavření animuje niri stejně jako u Mod+S. Dřív to byla vrstva s vlastní
-// animací (PopAnim) a blur za ní naskakoval skokem — za kartou problikl.
-// Okno se při každém otevření vytvoří (LazyLoader) a při zavření zahodí, ať
-// se niri zavírací animace přehraje a zavření přes Mod+Q ho nerozbije (viz
-// Settings). Zavře se i kliknutím jinam (ztráta fokusu), jako fuzzel.
-// window-rule v config.kdl (titulek „RPLauncher") ho otevře plovoucí.
-//
-// Pořadí posledních spuštění se ukládá do ~/.cache/niri-rice/launcher-recent.json.
 Scope {
     id: outer
 
-    // Stejné rozhraní jako dřív (shell.qml: visible = false, toggle(), hide())
     property bool visible: false
     function open()   { visible = true }
     function hide()   { visible = false }
@@ -40,7 +24,7 @@ Scope {
             readonly property int maxRows: 12
             readonly property int pad: 12
 
-            property var recent: []          // id aplikací, nejnovější první
+            property var recent: []
             property var results: []
             property string query: ""
             property int selected: 0
@@ -48,8 +32,6 @@ Scope {
             title: "RPLauncher"
             visible: true
             color: "transparent"
-            // Pevná velikost (jako fuzzel `lines=12`); okno tak při psaní nemění
-            // rozměry ani neposkakuje. Na střed ho dá niri (plovoucí okno).
             implicitWidth: 540
             implicitHeight: panel.height
             minimumSize: Qt.size(540, panel.height)
@@ -62,8 +44,6 @@ Scope {
 
             Component.onCompleted: refresh()
 
-            // Klik jinam (okno ztratí fokus) zavře launcher, jako fuzzel.
-            // Window.active je attached vlastnost Qt Quick, quickshell ji sám nehlásí.
             Item {
                 readonly property bool winActive: Window.active
                 property bool wasActive: false
@@ -76,18 +56,13 @@ Scope {
             FileView {
                 id: recentFile
                 path: Quickshell.env("HOME") + "/.cache/niri-rice/launcher-recent.json"
-                // Před prvním spuštěním aplikace soubor ještě neexistuje
                 printErrors: false
                 onLoaded: {
                     try { root.recent = JSON.parse(text()) } catch (e) { root.recent = [] }
-                    // Soubor se načte až po prvním sestavení seznamu (okno je nové při
-                    // každém otevření) — přepočítat, ať jsou poslední spuštěné nahoře
                     root.refresh()
                 }
             }
 
-            // Seznam aplikací se načítá asynchronně (a mění se po instalaci) — když
-            // je launcher otevřený dřív, než je hotový, doplní se výsledky dodatečně
             Connections {
                 target: DesktopEntries.applications
                 function onValuesChanged() {
@@ -95,9 +70,6 @@ Scope {
                 }
             }
 
-            // --------------------------------------------------------------- search
-
-            // Jednoduchá kalkulačka: jen čísla a operátory, takže eval je bezpečný
             function calc(q) {
                 const expr = q.replace(/,/g, ".").replace(/\^/g, "**").replace(/×/g, "*")
                 if (!/^[\d\s.+\-*/()%]+$/.test(expr) || !/\d\s*[-+*/%]/.test(expr)) return null
@@ -119,7 +91,6 @@ Scope {
                 if (generic.includes(q)) return 45
                 if ((app.keywords || []).some(k => k.toLowerCase().startsWith(q))) return 40
                 if ((app.comment || "").toLowerCase().includes(q)) return 20
-                // Písmena ve správném pořadí ("ffx" → Firefox)
                 let i = 0
                 for (const c of name) if (c === q[i]) i++
                 return i === q.length ? 10 : 0
@@ -158,8 +129,6 @@ Scope {
                 list.positionViewAtBeginning()
             }
 
-            // iconPath(name, fallback) náhradu nepoužije, když ikona v tématu jen chybí
-            // (vykreslí šachovnici) — check=true vrátí pro chybějící prázdný řetězec
             function appIcon(name) {
                 return (name ? Quickshell.iconPath(name, true) : "")
                     || Quickshell.iconPath("application-x-executable")
@@ -180,7 +149,6 @@ Scope {
                 recentFile.setText(JSON.stringify(recent))
             }
 
-            // Název s obarvenou shodou (souvislý úsek, jinak jednotlivá písmena po řadě)
             function highlight(name, q) {
                 const esc = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
                 const mark = t => "<font color=\"" + Colors.primary + "\">" + esc(t) + "</font>"
@@ -200,8 +168,6 @@ Scope {
                 selected = Math.max(0, Math.min(results.length - 1, selected + delta))
                 list.positionViewAtIndex(selected, ListView.Contain)
             }
-
-            // ------------------------------------------------------------------- ui
 
             Rectangle {
                 id: panel

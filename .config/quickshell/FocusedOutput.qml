@@ -1,12 +1,6 @@
 import Quickshell
 import Quickshell.Io
 
-// Zjistí, na kterém výstupu niri právě pracuje, nastaví ho oknu a teprve pak
-// ho zobrazí. Kdyby se obrazovka měnila až po zobrazení, okno by při každém
-// otevření viditelně poskočilo na jiný monitor.
-//
-//     FocusedOutput { id: opener; window: root }
-//     function open() { opener.show() }
 Process {
     id: root
 
@@ -21,7 +15,6 @@ Process {
                 const match = Quickshell.screens.find(s => s.name === name)
                 if (match) root.window.screen = match
             } catch (e) {
-                // niri neodpovědělo — zůstaneme na výchozí obrazovce
             }
             root.window.visible = true
         }

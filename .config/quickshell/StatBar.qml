@@ -1,9 +1,6 @@
 import QtQuick
 import "Colors.js" as Colors
 
-// Řádek statistiky: název, doplňující údaj, proužek a procenta.
-// `detail` nese to, co samotné procento neřekne — teplota, zaplněné GiB,
-// zbývající čas baterie.
 Item {
     property string label:    ""
     property string detail:   ""

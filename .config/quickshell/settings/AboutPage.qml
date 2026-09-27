@@ -4,8 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// O systému: hlavička se jménem stroje a karty se systémem, hardwarem,
-// úložištěm, displeji a balíčky. Data z `rp-sys info` (jeden JSON).
 Item {
     id: page
     required property var host
@@ -34,7 +32,6 @@ Item {
 
     function gib(b) { return (b / 1073741824).toFixed(1) + " GiB" }
 
-    // Text pro schránku — stejné údaje jako na stránce
     function summary() {
         const i = info
         if (!i) return ""
@@ -53,7 +50,6 @@ Item {
         return out.join("\n")
     }
 
-    // Klíč → hodnota v kartě
     component Field: Item {
         property string label
         property string value
@@ -75,7 +71,6 @@ Item {
         }
     }
 
-    // Využití (paměť, disk) jako proužek s popisem
     component Usage: Column {
         property string label
         property real used: 0
@@ -108,7 +103,6 @@ Item {
         }
     }
 
-    // Karta s nadpisem a obsahem ve sloupci
     component Card: SCard {
         id: card
         property string title
@@ -157,7 +151,6 @@ Item {
             spacing: 14
             topPadding: 8
 
-            // ── Hlavička
             SCard {
                 width: parent.width
                 height: 108
@@ -165,7 +158,7 @@ Item {
                 Text {
                     id: logo
                     anchors { left: parent.left; leftMargin: 26; verticalCenter: parent.verticalCenter }
-                    text: ""      // Arch logo (nerd font)
+                    text: ""
                     font.family: "JetBrainsMono Nerd Font"
                     font.pixelSize: 52
                     color: Colors.primary
@@ -194,7 +187,6 @@ Item {
                 }
             }
 
-            // ── Karty ve dvou sloupcích
             Row {
                 width: parent.width
                 spacing: 14

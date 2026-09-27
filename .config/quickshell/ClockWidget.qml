@@ -29,7 +29,6 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 8
 
-        // HH:mm + :ss on one baseline
         Item {
             anchors.horizontalCenter: parent.horizontalCenter
             implicitWidth: timeLabel.implicitWidth + secLabel.implicitWidth + 4

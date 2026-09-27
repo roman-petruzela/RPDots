@@ -4,10 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Firewall (firewalld): stav, výchozí zóna, povolené služby a porty, panic
-// mode. Změny jdou přes `rp-sys fw …` — firewalld si heslo řekne sám přes
-// polkit a zapisuje se do runtime i --permanent. Když démon běží, ale na
-// D-Bus neodpovídá, nabídne restart.
 Item {
     id: page
     required property var host
@@ -53,7 +49,6 @@ Item {
         : !fw.responding ? "stuck"
         : fw.panic ? "panic" : "ok"
 
-    // Seznam položek (služby, porty) s odebráním
     component TagList: Flow {
         id: tl
         property var items: []

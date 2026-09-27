@@ -24,9 +24,8 @@ Item {
 
     property bool dropOpen: false
     property var  screen: null
-    property real popupLeftMargin: 4   // set from Bar.qml: rightSection.x + barNet.x
+    property real popupLeftMargin: 4
 
-    // ── Network info (5 s) ────────────────────────────────────────
     Process {
         id: netProc
         command: ["bash", "-c",
@@ -54,7 +53,6 @@ Item {
         }
     }
 
-    // ── Bandwidth (2 s) ───────────────────────────────────────────
     Process {
         id: bwProc
         command: ["bash", "-c",
@@ -90,7 +88,6 @@ Item {
         return (bps / 1048576).toFixed(1) + "M"
     }
 
-    // ── Bar row ───────────────────────────────────────────────────
     Row {
         id: netRow
         anchors.verticalCenter: parent.verticalCenter
@@ -98,7 +95,6 @@ Item {
         anchors.leftMargin: 4
         spacing: 5
 
-        // VPN chip
         Rectangle {
             visible: root.hasVpn
             height: 18
@@ -117,7 +113,6 @@ Item {
             }
         }
 
-        // Connection icon
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: !root.connected ? "󰤬" : root.wifi ? "" : "󰌗"
@@ -127,7 +122,6 @@ Item {
                 : Qt.rgba(Qt.color(Colors.onSurface).r, Qt.color(Colors.onSurface).g, Qt.color(Colors.onSurface).b, 0.3)
         }
 
-        // Download
         Row {
             visible: root.connected
             anchors.verticalCenter: parent.verticalCenter
@@ -146,7 +140,6 @@ Item {
             }
         }
 
-        // Upload
         Row {
             visible: root.connected
             anchors.verticalCenter: parent.verticalCenter
@@ -166,14 +159,12 @@ Item {
         }
     }
 
-    // ── Click toggle ──────────────────────────────────────────────
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         onClicked: root.dropOpen = !root.dropOpen
     }
 
-    // ── Dropdown as overlay PanelWindow (escapes 40px bar clip) ───
     PanelWindow {
         id: netDropWin
         visible: root.dropOpen
@@ -206,7 +197,6 @@ Item {
                                   Qt.color(Colors.outlineVariant).b, 0.55)
             border.width: 1
 
-            // Close dropdown when clicking inside card area
             MouseArea {
                 anchors.fill: parent
                 onClicked: root.dropOpen = false

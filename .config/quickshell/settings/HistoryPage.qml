@@ -5,8 +5,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Historie: zavřené notifikace (mako), schránka (cliphist, i s náhledy
-// obrázků) a příkazy terminálu (zsh). Backend `rp-history`.
 Item {
     id: page
     required property var host
@@ -16,7 +14,7 @@ Item {
     property var clips: []
     property var commands: []
     property string query: ""
-    property var thumbs: ({})         // id položky schránky → cesta k náhledu
+    property var thumbs: ({})
     property bool confirmClear: false
 
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/rp-history"
@@ -46,7 +44,6 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 try { page.clips = JSON.parse(text) } catch (e) { return }
-                // Náhledy obrázků jeden po druhém (cliphist decode do cache)
                 page.thumbQueue = page.clips.filter(c => c.image && !page.thumbs[c.id]).map(c => c.id).slice(0, 24)
                 page.nextThumb()
             }
@@ -134,7 +131,6 @@ Item {
         }
     }
 
-    // ── Notifikace
     SWheel { flick: notifList }
     ListView {
         id: notifList
@@ -189,7 +185,6 @@ Item {
                     icon: "󰆏"; text: ""
                     onClicked: Quickshell.execDetached(["wl-copy", nr.modelData.summary + (nr.modelData.body ? "\n" + nr.modelData.body : "")])
                 }
-                // Znovu ukázat (nová notifikace se stejným obsahem)
                 SButton {
                     flat: true
                     icon: "󰑐"; text: ""
@@ -204,7 +199,6 @@ Item {
         }
     }
 
-    // ── Schránka
     SWheel { flick: clipList }
     ListView {
         id: clipList
@@ -265,7 +259,6 @@ Item {
         SHint { anchors.centerIn: parent; visible: clipList.count === 0; text: "Clipboard history is empty." }
     }
 
-    // ── Terminál
     SWheel { flick: shellList }
     ListView {
         id: shellList

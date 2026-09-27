@@ -1,30 +1,8 @@
 #!/usr/bin/env bash
-# rp-net — podklady pro síťové okno v quickshellu.
-#
-#   rp-net status          stav sítě jako JSON
-#   rp-net wifi on|off     zapne/vypne wifi rádio
-#   rp-net connect <ssid>  připojí uloženou nebo otevřenou síť
-#   rp-net disconnect      odpojí wifi
-#   rp-net rescan          vynutí sken okolních sítí
-#   rp-net details         všechna rozhraní (IP, brána, DNS, MAC, Wi-Fi link),
-#                          uložená připojení, VPN, rfkill — pro Settings
-#   rp-net up|down <jméno>  zapne/vypne uložené připojení (VPN, ethernet, Wi-Fi)
-#   rp-net forget <jméno>  smaže uložené připojení
-#   rp-net autoconnect <jméno> yes|no
-#   rp-net airplane on|off režim letadlo (rfkill: Wi-Fi, Bluetooth, WWAN)
-#   rp-net publicip        veřejná IP a lokace (Cloudflare trace) — jen na požádání
-#   rp-net speedtest       latence, download, upload proti speed.cloudflare.com;
-#                          průběžně vypisuje JSON řádky {phase, …}
-#
-# Parsování drží stranou od QML — okno jen konzumuje JSON.
 set -uo pipefail
 
 command -v nmcli >/dev/null 2>&1 || { echo '{"error":"nmcli není k dispozici"}'; exit 0; }
 
-# nmcli -t odděluje pole dvojtečkou a ty ve jménech escapuje zpětným lomítkem.
-# Prohodí se za \x01, rozsekají pole a vrátí zpátky — jinak by se SSID
-# s dvojtečkou rozpadlo na dva sloupce.
-# Pozn.: tr nezná \xNN, jen osmičkové \NNN — s '\x01' by nahrazovalo znaky x, 0 a 1.
 detabify() { sed 's/\\:/\x01/g'; }
 retabify() { tr '\001' ':'; }
 
@@ -62,7 +40,6 @@ cmd_status() {
                         signal:   ((.[2] | tonumber?) // 0),
                         secured:  ((.[3] // "") | length > 0),
                         saved:    (. as $r | $saved | index($r[1]) != null) })
-                # stejné SSID vysílá víc AP — nechat to s nejlepším signálem
                 | group_by(.ssid) | map(max_by(.signal))
                 | sort_by(-.signal)'
         )
@@ -70,7 +47,6 @@ cmd_status() {
         networks='[]'
     fi
 
-    # IP se bere z výchozí trasy, ať sedí s tím, co ukazuje waybar
     local route_dev route_ip
     route_dev=$(ip route show default 2>/dev/null | awk '{print $5; exit}')
     route_ip=$(ip -brief addr show "$route_dev" 2>/dev/null | awk '{print $3; exit}')
@@ -92,9 +68,6 @@ cmd_status() {
         }'
 }
 
-# Heslo se čte ze stdin a předává nmcli přes jeho vlastní dotaz (--ask), takže
-# se nikdy neobjeví v argv, kam vidí každý přes /proc. Se správným heslem se
-# připojí napoprvé; při špatném se nmcli ptá pořád dokola, proto ten timeout.
 cmd_connect() {
     local ssid="$1" out rc
     if [[ -t 0 ]]; then
@@ -106,7 +79,6 @@ cmd_connect() {
     if (( rc == 0 )); then
         jq -n --arg ssid "$ssid" '{ ok: true, ssid: $ssid, message: "connected" }'
     else
-        # z nmcli chodí i řádky s dotazem na heslo, ty do hlášky nepatří
         local msg
         msg=$(printf '%s' "$out" | grep -viE '^password|encryption keys are required' |
               tail -n1 | sed 's/^Error: //')
@@ -116,7 +88,6 @@ cmd_connect() {
     fi
 }
 
-# Jedno rozhraní z `nmcli device show` (klíč:hodnota) + sysfs/iw doplňky
 device_json() {
     local dev=$1 info
     info=$(nmcli -t -f GENERAL.DEVICE,GENERAL.TYPE,GENERAL.STATE,GENERAL.CONNECTION,GENERAL.HWADDR,IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,IP6.ADDRESS,IP6.GATEWAY \
@@ -151,7 +122,6 @@ device_json() {
 
 cmd_details() {
     local devs=() d
-    # Jen skutečná rozhraní; loopback, docker a leak-protection dummy ne
     while IFS=: read -r d t; do
         case "$t" in ethernet|wifi|wireguard|tun|vpn|gsm|bt) devs+=("$d") ;; esac
     done < <(nmcli -t -f DEVICE,TYPE device status 2>/dev/null)
@@ -190,8 +160,6 @@ cmd_publicip() {
         | { ip, country: .loc, datacenter: .colo, warp }'
 }
 
-# Měření proti Cloudflare (jako speed.cloudflare.com): latence = medián TTFB
-# prázdných požadavků, download 25 MB, upload 10 MB. Mbit/s z bajtů za sekundu.
 cmd_speedtest() {
     local base="https://speed.cloudflare.com" i t lat=() mbps
     for i in 1 2 3 4 5; do

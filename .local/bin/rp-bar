@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# rp-bar — který horní panel běží: waybar, nebo quickshell (bar/TopBar.qml).
-#
-#   rp-bar                      aktuální volba
-#   rp-bar use waybar           waybar (výchozí)
-#   rp-bar use quickshell       qs panel na všech monitorech, waybar se zastaví
-#   rp-bar test <výstup>        qs panel jen na jednom monitoru vedle waybaru
-#
-# Volbu drží ~/.config/niri-rice/bar; shell.qml ho sleduje (FileView) a
-# waybar-watchdog.sh podle něj waybar nespouští, když je panelem quickshell.
 set -euo pipefail
 FLAG="$HOME/.config/niri-rice/bar"
 mkdir -p "$(dirname "$FLAG")"

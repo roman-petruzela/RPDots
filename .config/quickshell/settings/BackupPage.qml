@@ -4,10 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Zálohy a obnova: snímky btrfs přes snapper (seznam a ruční snímek přes
-// polkit — snapper bez roota nic nevypíše), stav automatických snímků
-// (timeline, snap-pac před každou transakcí pacmanu) a export/import
-// nastavení z tohoto okna.
 Item {
     id: page
     required property var host

@@ -4,10 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Bluetooth přímo přes Quickshell.Bluetooth (BlueZ na D-Bus): zapnutí,
-// hledání, viditelnost, spárovaná zařízení (připojit, odpojit, důvěřovat,
-// zapomenout, baterie) a nová zařízení k spárování. Žádný skript — BlueZ
-// posílá změny sám, stránka je tak pořád aktuální.
 Item {
     id: page
     required property var host
@@ -16,11 +12,9 @@ Item {
     readonly property var devices: adapter ? adapter.devices.values : []
     readonly property var paired: devices.filter(d => d.paired || d.bonded)
         .sort((a, b) => (b.connected - a.connected) || a.name.localeCompare(b.name))
-    // Nová zařízení: jen s rozumným jménem (bez jména je to většinou šum okolí)
     readonly property var found: devices.filter(d => !d.paired && !d.bonded && d.deviceName !== "")
         .sort((a, b) => a.name.localeCompare(b.name))
 
-    // Hledání se po odchodu ze stránky zastaví — běžící scan žere baterii
     Component.onDestruction: if (adapter && adapter.discovering) adapter.discovering = false
 
     function deviceIcon(d) {
@@ -46,7 +40,6 @@ Item {
         return d.paired ? "Paired" : "Not paired"
     }
 
-    // Řádek zařízení
     component DeviceRow: Rectangle {
         id: dr
         property var dev
@@ -99,7 +92,6 @@ Item {
                 busy: dr.busy
                 onClicked: dr.dev.connected ? dr.dev.disconnect() : dr.dev.connect()
             }
-            // Důvěryhodné zařízení se po zapnutí připojí samo
             SButton {
                 visible: dr.isPaired
                 anchors.verticalCenter: parent.verticalCenter

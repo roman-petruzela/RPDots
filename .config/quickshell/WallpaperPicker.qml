@@ -5,15 +5,6 @@ import Quickshell.Widgets
 import QtQuick
 import "Colors.js" as Colors
 
-// Výběr tapety (Mod+Shift+W) jako 3D coverflow přes celou obrazovku.
-// Picker je průhledný: okna pod ním rozmazává niri a vybraná tapeta se hned
-// ukazuje za nimi na všech monitorech (WallpaperPreview), takže ještě před
-// potvrzením je vidět, jak bude plocha vypadat.
-//
-// Seznam i náhledy dodává `pick-wallpaper.sh --list` (stejná cache jako rofi
-// fallback). Chybějící náhledy se generují na pozadí; karty je zkoušejí
-// načíst znovu, dokud se neobjeví. Po výběru se spouští
-// apply-wallpaper-theme.sh — nikdy ne matugen přímo (viz README).
 PanelWindow {
     id: root
 
@@ -24,19 +15,13 @@ PanelWindow {
     property string filter: ""
     property bool applying: false
     property bool videoAllowed: true
-    // Index, na kterém se listování zastavilo — až na něm se rozehraje video.
     property int settledIndex: -1
-    // Při otevření se má skočit rovnou na aktuální tapetu, ne k ní dojet.
     property bool instantMove: false
     property int thumbEpoch: 0
-    // Cesty+náhledy posledního výpisu. Když se nezmění, model se nepřestavuje —
-    // karty i načtené náhledy přežijí zavření a picker se otevře hned hotový.
     property string listSig: ""
     property string currentPath: ""
-    // Sekvence po výběru: zoom doběhl / tapeta je opravdu na ploše
     property bool zoomDone: false
     property bool wallpaperShown: false
-    // Čte je WallpaperPreview (jeden na monitor, pod okny) — viz shell.qml
     property bool previewActive: false
     property url previewSource: ""
 
@@ -53,7 +38,6 @@ PanelWindow {
 
     FocusedOutput { id: opener; window: root }
 
-    // Otevírá se bez animace — picker má reagovat stejně rychle jako fuzzel.
     function open() {
         applying = false
         filter = ""
@@ -77,11 +61,8 @@ PanelWindow {
     onVisibleChanged: {
         if (visible) return
         settledIndex = -1
-        // Po výběru náhled pod okny zůstává, dokud není tapeta na ploše
         if (!applying) previewActive = false
     }
-
-    // ---------------------------------------------------------------- data
 
     Process {
         id: lister
@@ -111,19 +92,15 @@ PanelWindow {
                     root.currentPath = curPath
                     root.rebuild(curPath)
                 } else if (curPath !== root.currentPath) {
-                    // Tapetu mezitím změnilo něco jiného než picker
                     root.markCurrent(curPath)
                     root.focusPath(curPath)
                 }
-                // --list soubor se signálem založil; znovu nastavená cesta
-                // zajistí, že ho FileView opravdu sleduje.
                 shownSignal.path = ""
                 shownSignal.path = root.shownFile
             }
         }
     }
 
-    // rp-power (battery/gaming) potlačuje video tapety — pak nehraje ani náhled.
     Process {
         id: inhibitCheck
         command: ["test", "-e", root.home + "/.cache/niri-rice/video-inhibit"]
@@ -173,7 +150,6 @@ PanelWindow {
         return shown.count > 0 && view.currentIndex >= 0 ? shown.get(view.currentIndex) : null
     }
 
-    // "lone-tree-crescent-moon-3840x2160-7701.jpg" → "Lone tree crescent moon"
     function prettyName(path) {
         const file = path.split("/").pop()
         let n = file.replace(/\.[^.]+$/, "")
@@ -190,10 +166,6 @@ PanelWindow {
         view.currentIndex = ((view.currentIndex + delta) % shown.count + shown.count) % shown.count
     }
 
-    // Přechod dělá picker sám (zoom karty), awww proto dostane "none" a jen
-    // tapetu okamžitě vymění. Náhled zůstane přes obrazovku, dokud
-    // wallpaper-video-ctl.sh nezapíše wallpaper-shown (awww hotový, staré
-    // video pryč) — teprve pak se rozpustí, takže přepnutí působí okamžitě.
     readonly property string shownFile: home + "/.cache/niri-rice/wallpaper-shown"
 
     function apply() {
@@ -211,8 +183,6 @@ PanelWindow {
         revealTimeout.restart()
     }
 
-    // Picker už zmizel (zoomDone), náhled pod okny drží novou tapetu, dokud
-    // ji awww skutečně nezobrazí — pak se náhled rozpustí do identického obrazu.
     function maybeReveal() {
         if (!applying || !zoomDone || !wallpaperShown) return
         revealTimeout.stop()
@@ -230,7 +200,6 @@ PanelWindow {
         }
     }
 
-    // Pojistka, kdyby signál nepřišel (např. chybí mpvpaper skript)
     Timer {
         id: revealTimeout
         interval: 2500
@@ -253,11 +222,6 @@ PanelWindow {
         onTriggered: root.thumbEpoch++
     }
 
-    // ------------------------------------------------------------ backdrop
-
-    // Picker nemá vlastní pozadí: okna pod ním rozmazává niri (layer-rule
-    // `rp-wallpaper-picker`, xray false) a tapetu za nimi mění WallpaperPreview.
-    // Obrázek se do náhledu posílá v plném rozlišení; u videa jen jeho náhled.
     Timer {
         id: previewTimer
         interval: 110
@@ -267,7 +231,6 @@ PanelWindow {
         }
     }
 
-    // Závoj jen kvůli čitelnosti popisků nad rozmazanými okny
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
@@ -277,7 +240,6 @@ PanelWindow {
         }
     }
 
-    // Kliknutí mimo karty zavírá
     MouseArea {
         anchors.fill: parent
         onClicked: if (!root.applying) root.visible = false
@@ -290,8 +252,6 @@ PanelWindow {
         }
         property real wheelAccum: 0
     }
-
-    // ------------------------------------------------------------ carousel
 
     Item {
         id: stage
@@ -362,13 +322,8 @@ PanelWindow {
             }
 
             readonly property real mid: height / 2
-            // Vzdálenost prvního bočního páru od středu. Pod prostřední kartu
-            // zajíždí jen kousek — jako listy knihy, ne jako naskládané karty.
             readonly property real knee: stage.cardW * 0.62
 
-            // Prostředek dráhy je roztažený (střed ↔ první soused), okraje
-            // stlačené — boční karty se tak vrství, zatímco vybraná má kolem
-            // sebe místo. Soused sedí přesně v „koleni“ (0.5 ± 1/7).
             path: Path {
                 startX: -stage.cardW * 0.15; startY: view.mid
                 PathAttribute { name: "angle"; value: 64 }
@@ -491,7 +446,6 @@ PanelWindow {
                     border.color: card.focused ? Colors.primary : Qt.alpha(Colors.onSurface, 0.14)
                 }
 
-                // Značka videa, aby šla v bočních kartách rozeznat i bez popisku
                 Rectangle {
                     visible: card.video
                     anchors { left: parent.left; bottom: parent.bottom; margins: 12 }
@@ -516,8 +470,6 @@ PanelWindow {
                 }
             }
         }
-
-        // ------------------------------------------------------------ caption
 
         Column {
             id: caption
@@ -590,7 +542,6 @@ PanelWindow {
             color: Colors.onSurface
         }
 
-        // Stavový řádek dole: buď nápověda kláves, nebo aktivní filtr
         Row {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
@@ -632,10 +583,6 @@ PanelWindow {
         }
     }
 
-    // -------------------------------------------------------------- launch
-
-    // Po potvrzení karta vyletí k okrajům obrazovky a cestou se rozplyne; pak
-    // picker zmizí a okna jsou zase ostrá. Nová tapeta za nimi už je (náhled).
     ClippingRectangle {
         id: launch
         visible: false

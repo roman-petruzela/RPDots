@@ -1,11 +1,5 @@
 import QtQuick
 
-// Kolečko myši pro Flickable/ListView jako v ostatních aplikacích: jeden zub
-// posune o ~3 řádky (Qt sám posouvá jen o pár pixelů, stránky se pak táhly)
-// a krátce plynule dojede. Touchpad (pixelDelta) jde 1:1 bez animace.
-//
-//     Flickable { id: flick … }
-//     SWheel { flick: flick }        // sourozenec, ne dítě Flickable
 Item {
     id: w
     required property Flickable flick
@@ -34,7 +28,6 @@ Item {
                 anim.stop()
                 w.flick.contentY = w.clamp(w.flick.contentY - event.pixelDelta.y)
             } else {
-                // Další zub během animace navazuje na cíl, ne na aktuální pozici
                 const base = anim.running ? anim.to : w.flick.contentY
                 anim.stop()
                 anim.to = w.clamp(base - event.angleDelta.y / 120 * w.notch)

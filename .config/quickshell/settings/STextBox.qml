@@ -1,14 +1,11 @@
 import QtQuick
 import "../Colors.js" as Colors
 
-// Textové pole. `committed` po Enteru nebo opuštění pole (nastavení),
-// `edited` při každé změně (hledání). `icon` = ikona vlevo.
 Rectangle {
     id: tb
     property string value
     property string placeholder: ""
     property string icon: ""
-    // false: jen Enter (pole, kde by odchod kliknutím nechtěně spustil akci)
     property bool commitOnBlur: true
     property bool password: false
     property alias text: input.text

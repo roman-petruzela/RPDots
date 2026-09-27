@@ -1,7 +1,6 @@
 import QtQuick
 import "../Colors.js" as Colors
 
-// Posuvník; zapisuje až po puštění (moved), ať se niri config nepřepisuje při tažení
 Item {
     id: sl
     property real from: 0

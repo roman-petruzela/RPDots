@@ -4,12 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Aktualizace: repo (pacman), AUR (paru) a flatpak zvlášť. Kontrola přes
-// `rp-sys updates` (nesahá na systémovou databázi, viz rp-sys), aktualizace
-// přes polkit s logem v SJob, nebo celé `paru` interaktivně v kitty.
-//
-// Výsledek poslední kontroly drží host (okno), takže přepnutí stránky
-// nespouští dalších ~15 s kontroly.
 Item {
     id: page
     required property var host
@@ -42,7 +36,6 @@ Item {
 
     readonly property var terminalAll: ["kitty", "--hold", "-e", "paru"]
 
-    // Seznam aktualizací jedné skupiny
     component Group: Column {
         id: grp
         property string title

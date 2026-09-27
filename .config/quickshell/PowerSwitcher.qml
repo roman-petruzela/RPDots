@@ -2,8 +2,6 @@ import Quickshell.Io
 import QtQuick
 import "Colors.js" as Colors
 
-// Přepínač power režimů — obdoba přepínače zvuku, jen nad rp-power.
-// Stav se čte z `rp-power status`, dokud je okno otevřené.
 Flyout {
     id: root
 
@@ -25,7 +23,6 @@ Flyout {
 
     Process {
         id: applyProc
-        // rp-power sahá na sudo helper, proto přes shell s absolutní cestou
         command: ["bash", "-c", "$HOME/.local/bin/rp-power balanced"]
         onExited: statusProc.reload()
     }
@@ -34,7 +31,6 @@ Flyout {
         id: statusProc
         command: ["bash", "-c", "$HOME/.local/bin/rp-power status"]
         stdout: StdioCollector {
-            // rp-power vypisuje česky, okno je anglicky
             readonly property var dict: ({
                 "síť": "AC", "baterie": "Battery",
                 "uspaná": "suspended", "přehrává se": "playing", "žádná": "none",
@@ -42,7 +38,6 @@ Flyout {
             })
 
             onStreamFinished: {
-                // formát: "klíč:   hodnota"
                 const field = key => {
                     const line = text.split("\n").find(l => l.startsWith(key))
                     if (!line) return ""
@@ -70,8 +65,6 @@ Flyout {
         applyProc.running = true
     }
 
-    // Čerstvý stav při otevření, pak průběžně — přepnutí režimu chvíli trvá
-    // a dGPU se mění i bez našeho přičinění.
     onOpened: statusProc.reload()
 
     Timer {
@@ -81,7 +74,6 @@ Flyout {
         onTriggered: statusProc.reload()
     }
 
-    // ── Režimy ─────────────────────────────────────────────────────────────
     Repeater {
         model: root.modes
 
@@ -158,7 +150,6 @@ Flyout {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                // Okno zůstává otevřené, ať je vidět, jak se stav dole srovnal.
                 onClicked: root.setMode(modelData.id)
             }
         }
@@ -168,7 +159,6 @@ Flyout {
     Divider { width: root.cardWidth - 32 }
     Item { width: 1; height: 10 }
 
-    // ── Stav ───────────────────────────────────────────────────────────────
     Column {
         width: root.cardWidth - 32
         spacing: 6

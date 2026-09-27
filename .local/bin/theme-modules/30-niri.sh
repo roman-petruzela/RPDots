@@ -31,10 +31,6 @@ layout {
 }
 EOF
 
-# config.kdl includes this file, so a bad value here takes the *whole* niri config
-# down, not just the colors — `niri validate` then refuses to load anything and the
-# desktop keeps running on the last good config with no way to reload. Check the
-# candidate against the real config before it replaces the current one.
 if command -v niri >/dev/null 2>&1 && [[ -f "$TARGET" ]]; then
     BACKUP="$(mktemp "${TARGET}.bak.XXXXXX")"
     cp -a "$TARGET" "$BACKUP"

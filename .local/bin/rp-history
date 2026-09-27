@@ -27,15 +27,12 @@ HOME = os.path.expanduser("~")
 ZSH_HIST = os.environ.get("HISTFILE", f"{HOME}/.zsh_history")
 THUMBS = os.path.join(os.environ.get("XDG_CACHE_HOME", f"{HOME}/.cache"), "niri-rice", "clip-thumbs")
 
-
 def die(msg):
     print(f"rp-history: {msg}", file=sys.stderr)
     sys.exit(1)
 
-
 def run(args, **kw):
     return subprocess.run(args, capture_output=True, text=True, **kw)
-
 
 def notifications():
     r = run(["busctl", "--user", "--json=short", "call", "org.freedesktop.Notifications",
@@ -54,7 +51,6 @@ def notifications():
         })
     print(json.dumps(out, ensure_ascii=False))
 
-
 def clipboard():
     r = run(["cliphist", "list"])
     out = []
@@ -66,7 +62,6 @@ def clipboard():
                     "width": int(m.group(3)) if m else 0, "height": int(m.group(4)) if m else 0})
     print(json.dumps(out, ensure_ascii=False))
 
-
 def clip_line(cid):
     if not cid.isdigit():
         die("bad id")
@@ -75,17 +70,14 @@ def clip_line(cid):
             return line
     die(f"no clipboard item {cid}")
 
-
 def clip_copy(cid):
     line = clip_line(cid)
     dec = subprocess.run(["cliphist", "decode"], input=line.encode(), capture_output=True)
     subprocess.run(["wl-copy"], input=dec.stdout)
 
-
 def clip_delete(cid):
     line = clip_line(cid)
     subprocess.run(["cliphist", "delete"], input=line.encode())
-
 
 def clip_thumb(cid):
     line = clip_line(cid)
@@ -97,14 +89,12 @@ def clip_thumb(cid):
             f.write(dec.stdout)
     print(path)
 
-
 def read_zsh():
     """[(čas, příkaz)] v pořadí souboru; zsh píše metafikované bajty, dekódovat opatrně."""
     try:
         raw = open(ZSH_HIST, "rb").read()
     except OSError:
         return []
-    # zsh "metafy": 0x83 + (bajt ^ 0x20)
     buf, i = bytearray(), 0
     while i < len(raw):
         if raw[i] == 0x83 and i + 1 < len(raw):
@@ -131,7 +121,6 @@ def read_zsh():
         entries.append(cur)
     return entries
 
-
 def shell(n):
     seen, out = set(), []
     for ts, cmd in reversed(read_zsh()):
@@ -143,7 +132,6 @@ def shell(n):
         if len(out) >= n:
             break
     print(json.dumps(out, ensure_ascii=False))
-
 
 def rewrite_zsh(keep):
     """Zapíše zpět jen položky, pro které keep(cmd) platí. Metafikace se zachová."""
@@ -168,7 +156,6 @@ def rewrite_zsh(keep):
         f.write(b"\n".join(out))
     os.chmod(tmp, 0o600)
     os.replace(tmp, ZSH_HIST)
-
 
 def main():
     a = sys.argv[1:] or ["notifications"]
@@ -195,7 +182,6 @@ def main():
     else:
         print(__doc__, file=sys.stderr)
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

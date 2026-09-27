@@ -1,33 +1,5 @@
 #!/usr/bin/env bash
-# rp-settings — backend okna Settings v quickshellu (Settings.qml).
-#
-#   rp-settings dump               všechna nastavení jako JSON (hodnota, výchozí, rozsah)
-#   rp-settings get <klíč>         jedna hodnota (výchozí, když není nastavená)
-#   rp-settings set <klíč> <hod>   ověří, uloží a hned aplikuje
-#   rp-settings reset [<klíč>]     vrátí klíč (bez klíče všechny) na výchozí
-#   rp-settings apply              přegeneruje všechny výstupy (niri, kitty, mako, idle)
-#   rp-settings idle               (re)startuje swayidle s aktuálními časy
-#   rp-settings nightlight         (re)startuje wlsunset (noční světlo), nebo ho zastaví
-#   rp-settings modules            theme moduly z modules.conf jako JSON
-#   rp-settings module <jméno> on|off
-#
-# Uložené hodnoty jsou v ~/.config/niri-rice/settings.json — jen ty, které se
-# liší od výchozích. Z nich se generuje:
-#
-#   ~/.config/niri/settings.kdl    niri (include na konci config.kdl), vždy přes
-#                                  `niri validate` s návratem při chybě
-#   ~/.config/kitty/rp-settings.conf   průhlednost a písmo terminálu
-#   ~/.config/mako/rp-settings     pozice a timeout notifikací (include v šabloně)
-#
-# Ostatní klíče čtou skripty samy přes `rp-settings get` (theme.* bere
-# apply-wallpaper-theme.sh).
-#
-# settings.kdl vždycky obsahuje *všechny* spravované niri klíče, ne jen změněné.
-# Flagy jako `tap` nebo `natural-scroll` totiž include v niri umí jen zapnout,
-# `natural-scroll false` neprojde parserem — proto nejsou v config.kdl a jediný
-# zdroj je tenhle soubor. Když chybí, dogeneruje ho start-rice-services.sh.
 set -uo pipefail
-# printf %.2f by v české locale psal desetinnou čárku
 export LC_ALL=C
 
 CFG_DIR="$HOME/.config/niri-rice"
@@ -39,15 +11,6 @@ MAKO_CONF="$HOME/.config/mako/rp-settings"
 PID_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/pids"
 LOCK="${XDG_RUNTIME_DIR:-/tmp}/rp-settings.lock"
 
-# ---------------------------------------------------------------- schéma
-# klíč|typ|výchozí|a|b
-#   int, float: a = min, b = max
-#   enum:       a = volby oddělené čárkou (@cursors = nainstalovaná témata kurzoru)
-#   string:     a = regex, kterým hodnota musí projít
-#   bool:       nic
-# Výchozí hodnoty odpovídají stavu před zavedením okna (config.kdl, kitty.conf,
-# šablona mako, swayidle ve start-rice-services.sh), takže prázdný
-# settings.json nic nemění.
 SCHEMA='
 niri.gaps|int|16|0|48
 niri.corner_radius|int|0|0|24
@@ -163,7 +126,6 @@ store_json() {
     fi
 }
 
-# Efektivní hodnoty všech klíčů do pole V (jedno volání jq místo desítek)
 declare -A V
 load() {
     local k
@@ -173,7 +135,6 @@ load() {
     done < <(store_json | jq -r 'to_entries[] | "\(.key)\t\(.value | tostring)"')
 }
 
-# Ověří hodnotu podle schématu a vypíše ji v normalizovaném tvaru
 validate() {
     local key=$1 val=$2
     case "${TYPE[$key]}" in
@@ -196,8 +157,6 @@ validate() {
             [[ ",$(options "$key")," == *",$val,"* ]] || die "$key: allowed values are $(options "$key")"
             echo "$val" ;;
         string)
-            # regex smí obsahovat |, který je v SCHEMA oddělovač — read dá zbytek
-            # řádku do posledního pole, tady se zase spojí
             local re="${A[$key]}"
             [[ -n "${B[$key]}" ]] && re+="|${B[$key]}"
             [[ "$val" =~ $re ]] || die "$key: invalid value '$val'"
@@ -213,7 +172,6 @@ write_store() {
 
 on() { [[ "${V[$1]}" == true ]]; }
 
-# --------------------------------------------------------------- niri KDL
 render_kdl() {
     local opts=() ms
     [[ ${V[input.kb_switch]} != none ]] && opts+=("grp:${V[input.kb_switch]}")
@@ -281,7 +239,6 @@ render_kdl() {
     echo "        spread ${V[niri.shadow_spread]}"
     echo "        offset x=0 y=${V[niri.shadow_offset]}"
     echo "    }"
-    # Barvy rámečku dodává theme-colors.kdl (30-niri.sh), tady jen zapnutí a šířka
     if on niri.border; then
         echo "    border { on; width ${V[niri.border_width]}; }"
     else
@@ -296,7 +253,6 @@ render_kdl() {
     on niri.insert_hint && echo "    insert-hint { on; }" || echo "    insert-hint { off; }"
     echo "    struts { left ${V[niri.struts_h]}; right ${V[niri.struts_h]}; top ${V[niri.struts_v]}; bottom ${V[niri.struts_v]}; }"
     echo "}"
-    # Flagy: v config.kdl nejsou, include by je neuměl vypnout
     on niri.prefer_no_csd && echo "prefer-no-csd"
     on niri.hotkey_overlay || echo "hotkey-overlay { skip-at-startup; }"
 
@@ -307,7 +263,6 @@ render_kdl() {
     echo "    saturation ${V[niri.blur_saturation]}"
     echo "}"
 
-    # Po power-mode.kdl (rp-power), takže rychlost a vypnutí animací platí vždy
     echo "animations {"
     on niri.animations && echo "    on" || echo "    off"
     echo "    slowdown ${V[niri.anim_slowdown]}"
@@ -342,15 +297,12 @@ render_kdl() {
         echo "    opacity ${V[niri.inactive_opacity]}"
         echo "}"
     fi
-    # Až za pravidlem neaktivních oken — pozdější pravidlo vyhrává a Spotify si
-    # má držet svou průhlednost i nezaostřené (viz komentář v config.kdl)
     echo "window-rule {"
     echo "    match app-id=\"(?i)^spotify\$\""
     echo "    opacity ${V[theme.spotify_opacity]}"
     echo "}"
 }
 
-# Zapíše settings.kdl jen tehdy, když s ním niri config projde validací
 apply_kdl() {
     local tmp backup had=0 err
     tmp=$(mktemp); backup=$(mktemp)
@@ -369,7 +321,6 @@ apply_kdl() {
     rm -f "$tmp" "$backup"
 }
 
-# ------------------------------------------------------- ostatní výstupy
 write_if_changed() {
     local dst=$1 tmp; tmp=$(mktemp)
     cat > "$tmp"
@@ -384,7 +335,6 @@ apply_kitty() {
 background_opacity ${V[theme.terminal_opacity]}
 font_size ${V[theme.terminal_font]}
 EOF
-    # Běžící kitty: přes remote control (kitty.conf má listen_on /tmp/kitty-{pid})
     local s
     for s in /tmp/kitty-*; do
         [[ -S "$s" ]] || continue
@@ -413,7 +363,6 @@ EOF
     return 0
 }
 
-# GTK a X aplikace kurzor z niri neberou — gsettings, settings.ini a index.theme
 apply_cursor() {
     local t=${V[cursor.theme]} s=${V[cursor.size]} f
     if command -v gsettings >/dev/null 2>&1; then
@@ -427,13 +376,9 @@ apply_cursor() {
     done
     f="$HOME/.local/share/icons/default/index.theme"
     [[ -f "$f" ]] && sed -i "s/^Inherits=.*/Inherits=$t/" "$f"
-    # niri si XCURSOR_* nastaví jen sobě a tomu, co spustí potom. Služby
-    # (quickshell, D-Bus aktivované aplikace) mají prostředí ze systemd — to
-    # je potřeba srovnat, jinak si při příštím startu načtou staré téma.
     systemctl --user set-environment XCURSOR_THEME="$t" XCURSOR_SIZE="$s" 2>/dev/null
     command -v dbus-update-activation-environment >/dev/null 2>&1 &&
         XCURSOR_THEME="$t" XCURSOR_SIZE="$s" dbus-update-activation-environment XCURSOR_THEME XCURSOR_SIZE 2>/dev/null
-    # waybar (systemd unit) si kurzor načte jen při startu — restart s novým prostředím
     systemctl --user try-restart waybar.service >/dev/null 2>&1 &
     return 0
 }
@@ -450,14 +395,10 @@ start_idle() {
         resume 'niri msg action power-on-monitors; systemctl --user restart gamemoded >/dev/null 2>&1 || true')
     on idle.lock_on_sleep && args+=(before-sleep 'swaylock -f')
     mkdir -p "$PID_DIR"
-    # 9>&- : jinak by swayidle zdědil deskriptor zámku a další rp-settings by
-    # na flocku visel napořád
     setsid swayidle "${args[@]}" >/dev/null 2>&1 < /dev/null 9>&- &
     echo $! > "$pidfile"
 }
 
-# Noční světlo: wlsunset přes wlr-gamma-control (niri ho podporuje, samo gamma
-# neumí). Režimy: plán (od–do), podle slunce (souřadnice), pořád.
 start_nightlight() {
     pkill -x wlsunset 2>/dev/null
     on nightlight.enabled || return 0
@@ -467,13 +408,11 @@ start_nightlight() {
     case ${V[nightlight.mode]} in
         schedule) args+=(-s "${V[nightlight.start]}" -S "${V[nightlight.end]}" -d 1800) ;;
         sun)      args+=(-l "${V[nightlight.lat]}" -L "${V[nightlight.lon]}") ;;
-        # „Pořád": západ v 00:00, východ v 23:59 → celý den je noc
         always)   args+=(-s 00:00 -S 23:59 -d 60) ;;
     esac
     setsid wlsunset "${args[@]}" >/dev/null 2>&1 < /dev/null 9>&- &
 }
 
-# Co se má po změně klíče přegenerovat
 apply_for() {
     case "$1" in
         niri.*|input.*|theme.spotify_opacity) apply_kdl ;;
@@ -482,7 +421,6 @@ apply_for() {
         notify.*) apply_mako ;;
         idle.*) start_idle ;;
         nightlight.*) start_nightlight ;;
-        # GTK (3 i 4) čte na Waylandu text-scaling-factor z gsettings, i za běhu
         a11y.text_scale) gsettings set org.gnome.desktop.interface text-scaling-factor "${V[a11y.text_scale]}" 2>/dev/null ;;
         *) return 0 ;;   # theme.scheme/contrast/mono_mode čte apply-wallpaper-theme.sh
     esac
@@ -494,7 +432,6 @@ apply_all() {
     apply_mako
 }
 
-# --------------------------------------------------------------- moduly
 modules_json() {
     [[ -f "$MODULES" ]] || { echo '[]'; return; }
     grep -v '^\s*#' "$MODULES" | grep -v '^\s*$' |
@@ -531,7 +468,6 @@ dump() {
         | { settings: ., modules: $m }'
 }
 
-# ---------------------------------------------------------------- main
 exec 9>"$LOCK"
 flock 9
 load
@@ -547,7 +483,6 @@ case "${1:-dump}" in
         [[ -n "${TYPE[$2]:-}" ]] || die "unknown key: $2"
         val=$(validate "$2" "$3") || exit 1
         prev=$(store_json)
-        # Výchozí hodnota se neukládá, ať settings.json drží jen skutečné změny
         if [[ "$val" == "${DEF[$2]}" ]]; then
             jq --arg k "$2" 'del(.[$k])' <<<"$prev" | write_store
         else

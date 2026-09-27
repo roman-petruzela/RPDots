@@ -4,10 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import "../Colors.js" as Colors
 
-// Noční světlo: teplejší barvy večer (wlsunset přes wlr-gamma-control).
-// Nastavení jsou obyčejné klíče rp-settings (nightlight.*), vykreslené
-// sdíleným rowDelegate okna; tahle stránka navíc hlídá, jestli je wlsunset
-// nainstalovaný, a nabídne instalaci.
 Item {
     id: page
     required property var host

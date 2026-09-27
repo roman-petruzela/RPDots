@@ -8,7 +8,6 @@ PanelWindow {
     id: barWindow
     color: "transparent"
 
-    // Provided by Variants in shell.qml
     property var modelData: null
     screen: modelData
 
@@ -20,11 +19,9 @@ PanelWindow {
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Auto
 
-    // ── Niri state via persistent event-stream ───────────────
     property var  niriWorkspaces: []
     property string niriFocusedTitle: ""
 
-    // Initial workspace fetch so dots show before first WorkspacesChanged
     Process {
         id: wsInit
         command: ["niri", "msg", "--json", "workspaces"]
@@ -70,14 +67,11 @@ PanelWindow {
         }
     }
 
-    // Restart event-stream if it dies
     Timer {
         interval: 3000; repeat: true; running: !eventStream.running
         onTriggered: eventStream.running = true
     }
 
-    // Fallback workspace poll — ensures dots update even if Repeater
-    // doesn't re-render on var array reference change alone
     Timer {
         interval: 800; repeat: true; running: true
         onTriggered: { wsInit.running = false; wsInit.running = true }
@@ -96,7 +90,6 @@ PanelWindow {
             color: Qt.rgba(Qt.color(Colors.primary).r, Qt.color(Colors.primary).g, Qt.color(Colors.primary).b, 0.42)
         }
 
-        // ── LEFT ─────────────────────────────────────────────
         Row {
             id: leftSection
             anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
@@ -128,7 +121,6 @@ PanelWindow {
             }
         }
 
-        // ── CENTER: clock pinned at exact screen midpoint ────
         Rectangle {
             id: clockPill
             height: 28
@@ -147,7 +139,6 @@ PanelWindow {
             }
         }
 
-        // ── CENTER-LEFT: [media] ─── [cava] ─── [clock] ─────
         Row {
             id: centerLeft
             anchors { right: clockPill.left; rightMargin: 16; verticalCenter: parent.verticalCenter }
@@ -165,7 +156,6 @@ PanelWindow {
             }
         }
 
-        // ── RIGHT ────────────────────────────────────────────
         Row {
             id: rightSection
             anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
@@ -176,7 +166,6 @@ PanelWindow {
                 id: barNet
                 anchors.verticalCenter: parent.verticalCenter; height: parent.height
                 screen: barWindow.modelData
-                // leftEdge of BarNetwork in screen coords = rightSection.x + barNet.x (barNet.x=0, first in row)
                 popupLeftMargin: Math.max(4, rightSection.x + barNet.x)
             }
             BarSep {}
@@ -190,7 +179,6 @@ PanelWindow {
                 id: barTray
                 anchors.verticalCenter: parent.verticalCenter; height: parent.height
                 screen: barWindow.modelData
-                // rightEdge of tray button in screen coords; popup anchored right so margin = distance from right edge
                 popupRightMargin: Math.max(4, barBg.width - (rightSection.x + barTray.x + barTray.implicitWidth))
             }
             BarSep {}

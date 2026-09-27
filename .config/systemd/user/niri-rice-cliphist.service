@@ -5,7 +5,6 @@ After=graphical-session.target
 ConditionPathExists=/usr/bin/cliphist
 
 [Service]
-# Stores every new selection, text and images alike
 ExecStart=/usr/bin/wl-paste --watch /usr/bin/cliphist store
 Restart=on-failure
 RestartSec=3

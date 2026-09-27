@@ -52,27 +52,14 @@
     "format-muted": " ",
     "format-icons": { "default": ["", "", ""] },
     "tooltip-format": "{desc}\n{volume} %",
-    // levý = přepínač výstupů, pravý = Settings → Sound, prostřední = ztlumit
     "on-click": "~/.local/bin/rp-shell audio toggle",
     "on-click-right": "~/.local/bin/rp-shell settings sound",
     "on-click-middle": "~/.local/bin/rp-audio mute",
-    // kolečko mění hlasitost na všech výstupech naráz
     "on-scroll-up": "~/.local/bin/rp-audio volume up",
     "on-scroll-down": "~/.local/bin/rp-audio volume down",
   },
   "backlight": { "format": "󰃟 {percent}%" },
   "custom/network": {
-    // The built-in "network" module, without "interface" set, auto-selects
-    // by lowest default-route metric across IPv4 and IPv6 combined (the
-    // netlink route dump goes out as AF_UNSPEC and nothing filters by
-    // family afterwards - a waybar bug, see Alexays/Waybar
-    // src/modules/network.cpp). ProtonVPN's IPv6 leak protection keeps a
-    // default IPv6 route on the dummy ipv6leakintrf0 interface with a lower
-    // metric than the real IPv4 default route, so after connecting the VPN
-    // the module sometimes latched onto it and showed
-    // "ipv6leakintrf0 (no IP)" instead of the real ethernet/wifi. This
-    // script only looks at the IPv4 default route instead, so that
-    // IP-less dummy interface can never win - see waybar-network.sh.
     "exec": "~/.local/bin/waybar-network.sh",
     "interval": 2,
     "return-type": "json",
@@ -91,7 +78,6 @@
   },
   "battery": {
     "states": { "warning": 30, "critical": 15 },
-    // levý klik = přepínač power režimů (rp-power)
     "on-click": "~/.local/bin/rp-shell power toggle",
     "tooltip-format": "{capacity} % {time}\nClick to switch power mode",
     "format": "{icon} {capacity}%",
