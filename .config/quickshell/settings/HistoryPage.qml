@@ -144,7 +144,7 @@ Item {
         header: SHint {
             width: notifList.width
             leftPadding: 14; bottomPadding: 8
-            text: "Notifications you dismissed since mako started (it keeps them in memory only)."
+            text: "The last 200 notifications."
         }
         delegate: Rectangle {
             id: nr

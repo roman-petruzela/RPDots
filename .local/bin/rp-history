@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """rp-history — historie pro okno Settings (stránka History).
 
-  rp-history notifications          zavřené notifikace z mako (JSON, nejnovější první)
+  rp-history notifications          přijaté notifikace (JSON, nejnovější první)
   rp-history clipboard              historie schránky z cliphist (JSON)
   rp-history clip-copy <id>         zkopírovat položku zpět do schránky
   rp-history clip-delete <id>       smazat položku
@@ -11,8 +11,7 @@
   rp-history shell-delete <příkaz>  smazat příkaz z ~/.zsh_history (všechny výskyty)
   rp-history shell-clear            vyprázdnit ~/.zsh_history
 
-mako drží historii jen v paměti (ListHistory na D-Bus, víc než `makoctl history`
-— i tělo zprávy a ikonu). zsh zapisuje ve formátu EXTENDED_HISTORY
+zsh zapisuje ve formátu EXTENDED_HISTORY
 (`: <čas>:<trvání>;<příkaz>`), víceřádkové příkazy pokračují po `\\`.
 """
 import hashlib
@@ -35,21 +34,13 @@ def run(args, **kw):
     return subprocess.run(args, capture_output=True, text=True, **kw)
 
 def notifications():
-    r = run(["busctl", "--user", "--json=short", "call", "org.freedesktop.Notifications",
-             "/fr/emersion/Mako", "fr.emersion.Mako", "ListHistory"])
-    if r.returncode != 0:
-        print("[]")
-        return
-    items = json.loads(r.stdout)["data"][0]
-    out = []
-    for n in items:
-        v = {k: x.get("data") for k, x in n.items()}
-        out.append({
-            "id": v.get("id"), "app": v.get("app-name", ""), "summary": v.get("summary", ""),
-            "body": re.sub(r"<[^>]+>", "", v.get("body", "")), "icon": v.get("app-icon", ""),
-            "urgency": v.get("urgency", 1), "desktop": v.get("desktop-entry", ""),
-        })
-    print(json.dumps(out, ensure_ascii=False))
+    path = os.path.join(os.environ.get("XDG_CACHE_HOME", f"{HOME}/.cache"), "niri-rice", "notify-history.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            items = json.load(f)
+    except (OSError, ValueError):
+        items = []
+    print(json.dumps(items, ensure_ascii=False))
 
 def clipboard():
     r = run(["cliphist", "list"])

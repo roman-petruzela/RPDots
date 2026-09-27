@@ -7,7 +7,7 @@ STORE="$CFG_DIR/settings.json"
 MODULES="$CFG_DIR/modules.conf"
 NIRI_KDL="$HOME/.config/niri/settings.kdl"
 KITTY_CONF="$HOME/.config/kitty/rp-settings.conf"
-MAKO_CONF="$HOME/.config/mako/rp-settings"
+NOTIFY_CONF="$HOME/.config/niri-rice/notify.json"
 PID_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/pids"
 LOCK="${XDG_RUNTIME_DIR:-/tmp}/rp-settings.lock"
 
@@ -344,22 +344,13 @@ EOF
     return 0
 }
 
-apply_mako() {
-    local ms=$(( ${V[notify.timeout]} * 1000 ))
-    write_if_changed "$MAKO_CONF" <<EOF || true
-# Generováno skriptem rp-settings (okno Settings) — needitovat ručně.
-# Načítá ho šablona .config/matugen/templates/mako.ini přes include=.
-anchor=${V[notify.position]}
-default-timeout=$ms
-max-visible=${V[notify.max_visible]}
+apply_notify() {
+    local dnd=false
+    on notify.dnd && dnd=true
+    mkdir -p "${NOTIFY_CONF%/*}"
+    write_if_changed "$NOTIFY_CONF" <<EOF || true
+{"position": "${V[notify.position]}", "timeout": ${V[notify.timeout]}, "max_visible": ${V[notify.max_visible]}, "dnd": $dnd}
 EOF
-    command -v makoctl >/dev/null 2>&1 || return 0
-    makoctl reload >/dev/null 2>&1
-    if on notify.dnd; then
-        makoctl mode -a do-not-disturb >/dev/null 2>&1
-    else
-        makoctl mode -r do-not-disturb >/dev/null 2>&1
-    fi
     return 0
 }
 
@@ -389,11 +380,11 @@ start_idle() {
     pid=$(cat "$pidfile" 2>/dev/null)
     [[ -n "$pid" ]] && kill "$pid" 2>/dev/null
     pkill -x swayidle 2>/dev/null
-    (( ${V[idle.lock_min]} > 0 )) && args+=(timeout $(( ${V[idle.lock_min]} * 60 )) 'swaylock -f')
+    (( ${V[idle.lock_min]} > 0 )) && args+=(timeout $(( ${V[idle.lock_min]} * 60 )) "$HOME/.local/bin/rp-lock")
     (( ${V[idle.screen_off_min]} > 0 )) && args+=(timeout $(( ${V[idle.screen_off_min]} * 60 )) \
         'niri msg action power-off-monitors' \
         resume 'niri msg action power-on-monitors; systemctl --user restart gamemoded >/dev/null 2>&1 || true')
-    on idle.lock_on_sleep && args+=(before-sleep 'swaylock -f')
+    on idle.lock_on_sleep && args+=(before-sleep "$HOME/.local/bin/rp-lock")
     mkdir -p "$PID_DIR"
     setsid swayidle "${args[@]}" >/dev/null 2>&1 < /dev/null 9>&- &
     echo $! > "$pidfile"
@@ -418,7 +409,7 @@ apply_for() {
         niri.*|input.*|theme.spotify_opacity) apply_kdl ;;
         cursor.*) apply_kdl && apply_cursor ;;
         theme.terminal_*) apply_kitty ;;
-        notify.*) apply_mako ;;
+        notify.*) apply_notify ;;
         idle.*) start_idle ;;
         nightlight.*) start_nightlight ;;
         a11y.text_scale) gsettings set org.gnome.desktop.interface text-scaling-factor "${V[a11y.text_scale]}" 2>/dev/null ;;
@@ -429,7 +420,7 @@ apply_for() {
 apply_all() {
     apply_kdl || return 1
     apply_kitty
-    apply_mako
+    apply_notify
 }
 
 modules_json() {
