@@ -93,7 +93,7 @@ PopupWindow {
     visible: false
 
     // ── Rozměry
-    readonly property int rowH: 36
+    readonly property int rowH: 28
     readonly property int fontSize: 12
     readonly property var entries: opener.children.values
     readonly property bool hasLead: entries.some(e => !e.isSeparator && e.icon !== "")
@@ -101,9 +101,9 @@ PopupWindow {
     readonly property real textW: Math.max(0, ...entries.filter(e => !e.isSeparator).map(e => fm.advanceWidth(clean(e.text))))
     readonly property bool hasCheck: entries.some(e => e.buttonType !== QsMenuButtonType.None)
     readonly property real headW: heading !== "" ? fm.advanceWidth(heading) : 0
-    implicitWidth: Math.ceil(Math.max(200, Math.min(460, Math.max(headW, textW + (hasLead ? 34 : 12)
-                                        + (hasSub || hasCheck ? 28 : 0) + 12) + 32)))
-    implicitHeight: col.implicitHeight + 28
+    implicitWidth: Math.ceil(Math.max(180, Math.min(420, Math.max(headW, textW + (hasLead ? 30 : 10)
+                                        + (hasSub || hasCheck ? 26 : 0) + 10) + 16)))
+    implicitHeight: col.implicitHeight + 16
     function clean(t) { return (t || "").replace(/_(?=[^_])/g, "") }      // mnemonic podtržítka pryč
 
     FontMetrics { id: fm; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: menu.fontSize }
@@ -143,8 +143,8 @@ PopupWindow {
 
         Column {
             id: col
-            x: 16; y: 14
-            width: menu.implicitWidth - 32
+            x: 8; y: 8
+            width: menu.implicitWidth - 16
 
             // Nadpis jako u flyoutů (Power mode, Audio output…)
             Text {
@@ -152,11 +152,13 @@ PopupWindow {
                 width: parent.width
                 text: menu.heading
                 elide: Text.ElideRight
-                font.pixelSize: 12
+                font.pixelSize: 11
                 font.weight: Font.Medium
                 font.family: "JetBrainsMono Nerd Font"
-                color: Colors.onSurfaceVariant
-                bottomPadding: 6
+                color: Colors.primary
+                leftPadding: 10
+                topPadding: 2
+                bottomPadding: 4
             }
 
             Repeater {
@@ -174,7 +176,7 @@ PopupWindow {
                         }
                     }
                     width: col.width
-                    height: e.isSeparator ? 9 : menu.rowH
+                    height: e.isSeparator ? 7 : menu.rowH
                     readonly property bool checked: e.buttonType !== QsMenuButtonType.None && e.checkState === Qt.Checked
 
                     Rectangle {
@@ -187,18 +189,17 @@ PopupWindow {
                     Rectangle {
                         visible: !row.e.isSeparator
                         anchors.fill: parent
-                        // Jako řádky v menu napájení: zaškrtnutá volba zvýrazněná akcentem,
-                        // najetí jen zesvětlí
-                        radius: 12
-                        color: row.checked ? Qt.alpha(Colors.primary, 0.18)
-                            : (rowHover.hovered || row.subOpen) && row.e.enabled ? Colors.surfaceContainerHigh
+                        // Zaškrtnutí nese jen ✓ a tučnější text — podbarvení zaškrtnutých
+                        // řádků splývalo s najetím. Najetí je jediné podbarvení (akcent).
+                        radius: 8
+                        color: (rowHover.hovered || row.subOpen) && row.e.enabled ? Qt.alpha(Colors.primary, 0.16)
                             : "transparent"
                         Behavior on color { ColorAnimation { duration: 120 } }
 
                         // Zaškrtávátko / přepínač, jinak ikona položky
                         Item {
                             id: lead
-                            anchors { left: parent.left; leftMargin: menu.hasLead ? 12 : 0; verticalCenter: parent.verticalCenter }
+                            anchors { left: parent.left; leftMargin: menu.hasLead ? 10 : 0; verticalCenter: parent.verticalCenter }
                             visible: menu.hasLead
                             width: menu.hasLead ? 16 : 0; height: 16
                             IconImage {
@@ -208,23 +209,24 @@ PopupWindow {
                             }
                         }
                         Text {
-                            anchors { left: lead.right; leftMargin: menu.hasLead ? 10 : 12; right: arrow.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
+                            anchors { left: lead.right; leftMargin: menu.hasLead ? 8 : 10; right: arrow.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
                             text: menu.clean(row.e.text)
                             elide: Text.ElideRight
                             font.family: "JetBrainsMono Nerd Font"
-                            font.pixelSize: menu.fontSize
-                            font.weight: row.checked ? Font.Medium : Font.Normal
-                            color: !row.e.enabled ? Qt.alpha(Colors.onSurface, 0.38)
-                                : row.checked ? Colors.onSurface : Colors.onSurfaceVariant
+                            // Neaktivní položky jsou v nm-applet nadpisy sekcí („Wi-Fi Networks“)
+                            font.pixelSize: row.e.enabled ? menu.fontSize : 11
+                            font.weight: row.checked ? Font.DemiBold : Font.Normal
+                            color: !row.e.enabled ? Qt.alpha(Colors.onSurfaceVariant, 0.6)
+                                : (rowHover.hovered || row.subOpen || row.checked) ? Colors.primary : Colors.onSurface
                         }
                         Text {
                             id: arrow
                             // Vpravo: šipka podmenu, nebo ✓ u zaškrtnuté volby (jako v menu napájení)
                             visible: menu.isSub(row.e) || row.checked
-                            anchors { right: parent.right; rightMargin: 12; verticalCenter: parent.verticalCenter }
+                            anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
                             text: String.fromCodePoint(menu.isSub(row.e) ? 0xf0141 : 0xf012c)
                             font.family: "JetBrainsMono Nerd Font"
-                            font.pixelSize: 14
+                            font.pixelSize: 13
                             color: row.subOpen || row.checked ? Colors.primary : Colors.onSurfaceVariant
                         }
 
