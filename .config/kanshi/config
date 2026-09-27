@@ -1,4 +1,0 @@
-profile {
-  output "eDP-1" mode 1920x1080@120.212997 position 1920,0
-  output "HDMI-A-1" mode 1920x1080@165.003006 position 0,0
-}

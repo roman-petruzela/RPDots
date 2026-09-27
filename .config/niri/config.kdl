@@ -16,16 +16,8 @@ input {
     trackpoint {
     }
 }
-output "Acer Technologies XZ240Q TQVEE0018511" {
-    mode "1920x1080@165.003"
-    scale 1
-    transform "normal"
-}
-output "eDP-1" {
-    mode "1920x1080@120.213"
-    scale 1
-    transform "normal"
-}
+// Monitory (režim, měřítko, pozice) jsou v displays.kdl, který píše
+// Settings → Displays (rp-display) — tady nic, ať config sedí na každý stroj
 layout {
     gaps 16
     center-focused-column "never"

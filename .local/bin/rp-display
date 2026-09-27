@@ -83,7 +83,10 @@ apply_kdl() {
 
 # Profil kanshi pro aktuálně připojenou sadu výstupů: přepsat, nebo přidat
 sync_kanshi() {
-    [[ -f "$KANSHI" ]] || return 0
+    # Na novém stroji config ještě není — vznikne s prvním profilem
+    # (start-rice-services.sh pouští kanshi, jen když existuje)
+    mkdir -p "$(dirname "$KANSHI")"
+    [[ -f "$KANSHI" ]] || : > "$KANSHI"
     local cur; cur=$(list)
     python3 - "$KANSHI" "$cur" <<'PY'
 import json, re, sys

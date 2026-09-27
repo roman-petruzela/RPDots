@@ -124,7 +124,8 @@ if command -v xwayland-satellite >/dev/null 2>&1; then
   ensure_pidfile_running "$PID_DIR/xwayland-satellite.pid" xwayland-satellite xwayland-satellite
 fi
 
-if command -v kanshi >/dev/null 2>&1; then
+# Config píše až rp-display (Settings → Displays); bez něj kanshi hned spadne
+if command -v kanshi >/dev/null 2>&1 && [[ -f "$HOME/.config/kanshi/config" ]]; then
   ensure_pidfile_running "$PID_DIR/kanshi.pid" kanshi kanshi
 fi
 
