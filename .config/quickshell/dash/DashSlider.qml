@@ -14,6 +14,7 @@ Item {
     readonly property bool dragging: drag.pressed
     property int dragValue: 0
     readonly property int shown: dragging ? dragValue : value
+    readonly property real fillWidth: height + (width - height) * Math.max(0, Math.min(100, shown)) / 100
 
     Rectangle {
         id: track
@@ -24,7 +25,7 @@ Item {
 
         Rectangle {
             height: parent.height
-            width: Math.max(track.height, track.width * Math.min(100, s.shown) / 100)
+            width: s.fillWidth
             radius: height / 2
             color: s.dimmed ? Colors.outline : Colors.primary
             Behavior on width { enabled: !s.dragging; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
@@ -36,7 +37,7 @@ Item {
         id: drag
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        function pick(x) { return Math.round(Math.max(0, Math.min(1, x / width)) * 100) }
+        function pick(x) { return Math.round(Math.max(0, Math.min(1, (x - s.height / 2) / (width - s.height))) * 100) }
         onPressed: e => { s.dragValue = pick(e.x); throttle.restart() }
         onPositionChanged: e => { s.dragValue = pick(e.x); if (!throttle.running) throttle.restart() }
         onReleased: { throttle.stop(); s.released(s.dragValue) }
@@ -59,6 +60,6 @@ Item {
         text: s.shown
         font.family: "JetBrainsMono Nerd Font"
         font.pixelSize: 12
-        color: (track.width * s.shown / 100) > track.width - 40 ? Colors.onPrimary : Colors.onSurfaceVariant
+        color: s.fillWidth > s.width - 40 ? Colors.onPrimary : Colors.onSurfaceVariant
     }
 }
