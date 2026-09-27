@@ -859,8 +859,12 @@ cd ~/dotfiles
 ```
 
 Run it as your normal user, not with `sudo`: under sudo `$HOME` is `/root`, so
-the configs would land there, and paru refuses to run as root. The script asks
-for sudo itself where it needs it. It refuses to run as root.
+the configs would land there, and paru refuses to run as root. It refuses to
+run as root. Instead, the options that need root (everything, packages, system
+integration) ask for the sudo password **once** at the start. A background loop
+then refreshes the sudo timestamp every 50 s until the script exits, because an
+AUR build outlasts sudo's 5-minute timeout. After that, pacman, makepkg and paru
+don't ask again. Copying configs, the dry run and stow don't ask at all.
 
 Packages are installed with `pacman -Syu --needed` (a `-Sy` sync first, then
 `-Su`), so **the whole system is upgraded along with them**. Installing new

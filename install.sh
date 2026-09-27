@@ -9,7 +9,7 @@ set -euo pipefail
 # Pod rootem by configy skončily v /root a paru pod rootem nepoběží — sudo si
 # skript řekne sám tam, kde je potřeba
 if [[ $EUID -eq 0 ]]; then
-    echo "Run install.sh as your normal user, not with sudo — it asks for sudo itself where needed." >&2
+    echo "Run install.sh as your normal user, not with sudo — it asks for the password once at the start." >&2
     exit 1
 fi
 
@@ -101,6 +101,18 @@ PKGS=(
 
 # Soubory z repa, které do $HOME nepatří
 NOT_DEPLOYED=(.gitignore .stow-local-ignore README.md install.sh CLAUDE.md)
+
+# Heslo pro sudo jednou na začátku, pak ho smyčka na pozadí drží platné
+# (výchozí timeout sudo je 5 minut, build z AUR trvá déle) — pacman, makepkg
+# i paru se už neptají. Smyčka skončí se skriptem.
+need_sudo() {
+    [[ -n "${SUDO_KEEPALIVE:-}" ]] && return 0
+    echo "Some steps need root — enter your password once, it's kept for the whole run."
+    sudo -v || { echo "sudo failed." >&2; exit 1; }
+    while kill -0 $$ 2>/dev/null; do sudo -n -v 2>/dev/null || true; sleep 50; done &
+    SUDO_KEEPALIVE=$!
+    trap 'kill "$SUDO_KEEPALIVE" 2>/dev/null' EXIT
+}
 
 ask() {
     local reply
@@ -273,7 +285,7 @@ post_deploy() {
 # ------------------------------------------------------- systémové části
 
 system_setup() {
-    echo "== System integration (each step asks for sudo)"
+    echo "== System integration"
     local share="$HOME/.local/share"
 
     if ask "Power modes (rp-power: sudoers rule, udev rule on AC, systemd units)?"; then
@@ -306,14 +318,14 @@ select action in \
     "System integration (sudo helpers, login screen)" \
     "Cancel"; do
     case "$REPLY" in
-        1) install_packages; copy_configs; post_deploy
+        1) need_sudo; install_packages; copy_configs; post_deploy
            echo; ask "Also run the system integration steps?" && system_setup
            break ;;
-        2) install_packages; break ;;
+        2) need_sudo; install_packages; break ;;
         3) copy_configs; post_deploy; break ;;
         4) copy_configs 1; break ;;
         5) stow_configs; post_deploy; break ;;
-        6) system_setup; break ;;
+        6) need_sudo; system_setup; break ;;
         7) exit 0 ;;
         *) echo "Pick a number from the list." ;;
     esac
