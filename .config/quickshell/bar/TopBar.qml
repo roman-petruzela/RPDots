@@ -430,7 +430,7 @@ PanelWindow {
                             if (e.button === Qt.LeftButton && !ti.modelData.onlyMenu) ti.modelData.activate()
                             else if (e.button === Qt.MiddleButton) ti.modelData.secondaryActivate()
                             // vlastní QML menu (display() by chtělo QApplication režim)
-                            else if (ti.modelData.hasMenu) trayMenu.openAt(ti, ti.modelData.menu)
+                            else if (ti.modelData.hasMenu) trayMenu.toggleAt(ti, ti.modelData.menu)
                         }
                         onWheel: e => ti.modelData.scroll(e.angleDelta.y, false)
                     }

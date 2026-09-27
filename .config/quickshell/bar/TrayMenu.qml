@@ -7,16 +7,26 @@ import "../Colors.js" as Colors
 // platformní (Qt Widgets) menu a to v quickshellu jde jen v režimu
 // QApplication (pragma + restart) — a vypadalo by jako cizí okno. Tady:
 // QsMenuOpener přečte položky přes DBusMenu, klik je `entry.triggered()`.
-// Podmenu se otevře na místě (s řádkem Back), klik mimo menu ho zavře
-// (grabFocus = xdg popup grab).
+// Podmenu se otevře na místě (s řádkem Back).
+// Zavření: klik na stejnou ikonu, Esc, nebo samo, když z menu myš odjede
+// a do vteřiny se nevrátí. Klik mimo by měl zavřít grabFocus (xdg popup
+// grab), jenže u popupu z panelu (vrstvy) to niri neudělá.
 PopupWindow {
     id: menu
 
     property var rootMenu: null            // SystemTrayItem.menu
+    property Item owner: null              // ikona, ke které menu patří
     property var stack: []                 // otevřená podmenu (QsMenuEntry)
     readonly property var current: stack.length ? stack[stack.length - 1] : rootMenu
 
+    // Druhý klik na stejnou ikonu menu zavře
+    function toggleAt(item, menuHandle) {
+        if (visible && owner === item) { visible = false; return }
+        openAt(item, menuHandle)
+    }
+
     function openAt(item, menuHandle) {
+        owner = item
         rootMenu = menuHandle
         stack = []
         anchor.item = item
@@ -28,9 +38,21 @@ PopupWindow {
     grabFocus: true
     color: "transparent"
     visible: false
-    implicitWidth: Math.max(120, Math.min(320, col.implicitWidth + 8))
+    // Šířka podle nejdelší položky (změřené fontem), ne ze sloupce — ten ji
+    // bral z položek a ty zpátky ze sloupce, takže skončila na minimu
+    readonly property real textW: Math.max(0, ...opener.children.values
+        .filter(e => !e.isSeparator).map(e => fm.advanceWidth(clean(e.text))))
+    implicitWidth: Math.ceil(Math.max(140, Math.min(460, textW + (hasLead ? 34 : 10) + (hasSub ? 22 : 0) + 30)))
     implicitHeight: col.implicitHeight + 8
-    readonly property int rowH: 24
+    readonly property int rowH: 28
+    readonly property int fontSize: 13
+    readonly property bool hasSub: opener.children.values.some(e => e.hasChildren)
+    function clean(t) { return (t || "").replace(/_(?=[^_])/g, "") }      // mnemonic podtržítka pryč
+
+    FontMetrics { id: fm; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: menu.fontSize }
+
+    // Samo se zavře, když z něj myš odjede a do vteřiny se nevrátí
+    Timer { id: leaveClose; interval: 1000; onTriggered: menu.visible = false }
     // Sloupec pro ikonu / zaškrtávátko jen když ho nějaká položka potřebuje
     readonly property bool hasLead: opener.children.values.some(e => !e.isSeparator
         && (e.icon !== "" || e.buttonType !== QsMenuButtonType.None))
@@ -40,6 +62,11 @@ PopupWindow {
 
     Rectangle {
         anchors.fill: parent
+        focus: true
+        Keys.onEscapePressed: menu.visible = false
+        HoverHandler {
+            onHoveredChanged: if (hovered) leaveClose.stop(); else leaveClose.restart()
+        }
         radius: 10
         color: Qt.alpha(Colors.surfaceContainerHigh, 0.98)
         border.width: 1
@@ -61,7 +88,7 @@ PopupWindow {
                     anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
                     text: String.fromCodePoint(0xf0141) + " Back"
                     font.family: "JetBrainsMono Nerd Font"
-                    font.pixelSize: 12
+                    font.pixelSize: menu.fontSize
                     color: Colors.onSurfaceVariant
                 }
             }
@@ -115,10 +142,10 @@ PopupWindow {
                         Text {
                             id: label
                             anchors { left: lead.right; leftMargin: menu.hasLead ? 8 : 9; right: arrow.left; rightMargin: 6; verticalCenter: parent.verticalCenter }
-                            text: row.e.text.replace(/_(?=[^_])/g, "")       // mnemonic podtržítka pryč
+                            text: menu.clean(row.e.text)
                             elide: Text.ElideRight
                             font.family: "JetBrainsMono Nerd Font"
-                            font.pixelSize: 12
+                            font.pixelSize: menu.fontSize
                             color: row.e.enabled ? Colors.onSurface : Qt.alpha(Colors.onSurface, 0.38)
                         }
                         Text {
