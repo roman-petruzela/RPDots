@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
-# Steam launcher — Wayland + NVIDIA optimized
+# Steam launcher — Wayland, NVIDIA PRIME offload when an NVIDIA GPU is present
 # SDL_VIDEODRIVER se záměrně nenastavuje: Steam si sám nastaví "wayland,x11",
 # což má x11 fallback. Natvrdo "wayland" ten fallback bral a rozbíjelo to
 # overlay u nativních SDL her.
 # PROTON_ENABLE_WAYLAND se unsetuje: Protonův nativní Wayland backend
 # nepodporuje Steam overlay. Jednotlivé hry si ho můžou zapnout v launch options.
+# NVIDIA (PRIME offload na dGPU) jen tam, kde je — bez nvidia_icd.json by
+# VK_DRIVER_FILES nechal Vulkan bez ovladače a hry by nešly spustit
+nv=()
+if [[ -f /usr/share/vulkan/icd.d/nvidia_icd.json ]]; then
+    nv=(__GL_SHADER_DISK_CACHE=1
+        __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
+        __NV_PRIME_RENDER_OFFLOAD=1
+        __GLX_VENDOR_LIBRARY_NAME=nvidia
+        __VK_LAYER_NV_optimus=NVIDIA_only
+        VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json)
+fi
 exec env -u PROTON_ENABLE_WAYLAND \
     STEAM_FRAME_FORCE_CLOSE=1 \
     STEAM_DISABLE_BROWSER_SANDBOX=0 \
-    __GL_SHADER_DISK_CACHE=1 \
-    __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 \
-    __NV_PRIME_RENDER_OFFLOAD=1 \
-    __GLX_VENDOR_LIBRARY_NAME=nvidia \
-    __VK_LAYER_NV_optimus=NVIDIA_only \
-    VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json \
+    "${nv[@]}" \
     /usr/bin/steam "$@"
