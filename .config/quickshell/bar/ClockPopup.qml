@@ -7,13 +7,17 @@ BarPopup {
     property bool targetHovered: false
     readonly property bool anyHovered: targetHovered || hovered
     padding: 12
+    grabFocus: true
 
-    Timer { id: openDelay; interval: 300; onTriggered: if (pop.anyHovered) { cal.reset(); pop.show() } }
-    Timer { id: closeDelay; interval: 350; onTriggered: if (!pop.anyHovered) pop.dismiss() }
-    onAnyHoveredChanged: {
-        if (anyHovered) { closeDelay.stop(); if (!open) openDelay.restart() }
-        else { openDelay.stop(); closeDelay.restart() }
+    function toggle() {
+        if (open) { dismiss(); return }
+        cal.reset()
+        show()
+        if (!anyHovered) closeDelay.restart()
     }
+
+    Timer { id: closeDelay; interval: 1200; onTriggered: if (!pop.anyHovered) pop.dismiss() }
+    onAnyHoveredChanged: if (anyHovered) closeDelay.stop(); else if (open) closeDelay.restart()
 
     property var now: new Date()
     Timer { interval: 1000; running: pop.visible; repeat: true; triggeredOnStart: true; onTriggered: pop.now = new Date() }

@@ -135,7 +135,7 @@ PanelWindow {
     }
 
     TrayMenu { id: trayMenu }
-    ClockPopup { target: center; targetHovered: clockHover.hovered }
+    ClockPopup { id: clockPopup; target: center; targetHovered: clockHover.hovered }
 
     Row {
         id: left
@@ -273,6 +273,8 @@ PanelWindow {
         anchors.centerIn: parent
         HoverHandler { id: clockHover }
         pad: 14
+        clickable: true
+        onClicked: clockPopup.toggle()
         Text {
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.StyledText
