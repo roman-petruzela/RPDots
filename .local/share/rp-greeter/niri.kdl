@@ -33,6 +33,8 @@ layout {
     background-color "#000000"
 }
 
+// @OUTPUTS@
+
 spawn-sh-at-startup "qs -p /usr/share/rp-greeter/greeter; niri msg action quit --skip-confirmation"
 
 binds {
