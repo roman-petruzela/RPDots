@@ -67,6 +67,7 @@ PanelWindow {
         property color tint: Colors.surfaceContainerHigh
         property real tintAlpha: 0.9
         property int pad: 10
+        property bool bare: false
         property bool clickable: false
         property int buttons: Qt.LeftButton
         readonly property bool hovered: pillArea.containsMouse
@@ -77,8 +78,8 @@ PanelWindow {
         height: bar.pillHeight
         anchors.verticalCenter: parent ? parent.verticalCenter : undefined
         radius: height / 2
-        color: Qt.alpha(tint, tintAlpha)
-        border.width: 1
+        color: bare ? "transparent" : Qt.alpha(tint, tintAlpha)
+        border.width: bare ? 0 : 1
         border.color: Qt.alpha(Colors.outlineVariant, 0.7)
         MouseArea {
             id: pillArea
@@ -292,6 +293,8 @@ PanelWindow {
         clip: true
 
         Pill {
+            bare: true
+            pad: 4
             Item_ {
                 value: bar.barData.network.text ?? ""
                 tip: bar.barData.network.tooltip ?? ""
