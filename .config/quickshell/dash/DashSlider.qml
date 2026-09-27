@@ -50,7 +50,7 @@ Item {
         x: 0; width: s.height; height: s.height
         horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
         text: s.icon
-        font.family: "JetBrainsMono Nerd Font"
+        font.family: "JetBrainsMono Nerd Font Propo"
         font.pixelSize: 18
         color: s.dimmed ? Colors.surface : Colors.onPrimary
         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: s.iconClicked() }

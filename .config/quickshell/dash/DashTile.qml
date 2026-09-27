@@ -25,7 +25,7 @@ Rectangle {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: tile.icon
-            font.family: "JetBrainsMono Nerd Font"
+            font.family: "JetBrainsMono Nerd Font Propo"
             font.pixelSize: 20
             color: tile.active ? Colors.onPrimaryContainer : Colors.onSurface
         }

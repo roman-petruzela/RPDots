@@ -52,7 +52,7 @@ PanelWindow {
     function setBrightness(v) {
         if (blSet.running) { root.blPending = v; return }
         root.blPending = null
-        blSet.command = ["brightnessctl", "--class=backlight", "-q", "set", Math.max(1, v) + "%"]
+        blSet.command = ["brightnessctl", "--class=backlight", "-q", "set", v + "%"]
         blSet.running = true
     }
     property real slideX: 380
