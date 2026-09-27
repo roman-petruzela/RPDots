@@ -868,7 +868,7 @@ Scope {
                     }
 
                     Loader {
-                        anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: 12 + jobPanel.occupied }
+                        anchors { top: pageTitle.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: jobPanel.occupied > 0 ? jobPanel.occupied : 12 }
                         active: root.query === "" && !!root.page.view
                         sourceComponent: ({ about: aboutC, updates: updatesC, packages: packagesC, firewall: firewallC,
                                             network: networkC, sound: soundC, bluetooth: bluetoothC,

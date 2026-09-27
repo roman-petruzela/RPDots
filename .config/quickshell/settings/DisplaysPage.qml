@@ -10,7 +10,24 @@ Item {
 
     property var outputs: []
     property string selected: ""
-    readonly property var sel: outputs.find(o => o.name === selected) ?? outputs[0] ?? null
+    property var pending: ({})
+    property var revertCmds: []
+    property int countdown: 0
+    readonly property bool dirty: Object.keys(pending).length > 0
+    readonly property var view: outputs.map(o => {
+        const p = pending[o.name]
+        if (!p) return o
+        const v = Object.assign({}, o)
+        if (p.enabled !== undefined) v.enabled = p.enabled === "true"
+        if (p.mode !== undefined) v.mode = p.mode
+        if (p.scale !== undefined) v.scale = Number(p.scale)
+        if (p.transform !== undefined) v.transform = p.transform
+        if (p.vrr !== undefined) v.vrr = p.vrr
+        if (p.position !== undefined) { const xy = p.position.split(","); v.x = Number(xy[0]); v.y = Number(xy[1]) }
+        return v
+    })
+    readonly property var sel: view.find(o => o.name === selected) ?? view[0] ?? null
+    readonly property var keyOrder: ["enabled", "mode", "scale", "transform", "position", "vrr"]
 
     function reload() {
         listProc.running = false
@@ -18,18 +35,86 @@ Item {
     }
 
     function set(key, value, output) {
+        const name = output ?? sel.name
+        const next = Object.assign({}, pending)
+        next[name] = Object.assign({}, next[name] ?? {})
+        next[name][key] = String(value)
+        pending = next
+    }
+
+    function current(o, key) {
+        if (key === "position") return o.x + "," + o.y
+        if (key === "enabled") return o.enabled ? "true" : "false"
+        return String(o[key] ?? "")
+    }
+
+    function q(v) { return "'" + String(v).replace(/'/g, "'\\''") + "'" }
+
+    function commands(changes) {
+        const bin = Quickshell.env("HOME") + "/.local/bin/rp-display"
+        return changes.map(c => [bin, "set", c.name, c.key, c.value].map(q).join(" ")).join(" && ")
+    }
+
+    function apply() {
+        const on = view.filter(o => o.enabled)
+        const x0 = on.length ? Math.min(...on.map(o => o.x)) : 0
+        const y0 = on.length ? Math.min(...on.map(o => o.y)) : 0
+        const staged = Object.assign({}, pending)
+        for (const o of on)
+            if (x0 !== 0 || y0 !== 0 || staged[o.name]?.position !== undefined) {
+                staged[o.name] = Object.assign({}, staged[o.name] ?? {})
+                staged[o.name].position = (o.x - x0) + "," + (o.y - y0)
+            }
+        const forward = [], back = []
+        for (const o of outputs) {
+            const p = staged[o.name]
+            if (!p) continue
+            for (const k of keyOrder)
+                if (p[k] !== undefined && p[k] !== current(o, k)) {
+                    forward.push({ name: o.name, key: k, value: p[k] })
+                    back.unshift({ name: o.name, key: k, value: current(o, k) })
+                }
+        }
+        pending = ({})
+        if (forward.length === 0) return
+        revertCmds = back
+        run(commands(forward), true)
+    }
+
+    function keep() { countdown = 0; tick.stop(); revertCmds = [] }
+    function revert() {
+        countdown = 0
+        tick.stop()
+        const back = revertCmds
+        revertCmds = []
+        if (back.length) run(commands(back), false)
+    }
+
+    function run(script, confirm) {
+        setProc.confirm = confirm
         setProc.running = false
-        setProc.command = [Quickshell.env("HOME") + "/.local/bin/rp-display", "set",
-                           output ?? sel.name, key, String(value)]
+        setProc.command = ["bash", "-c", script]
         setProc.running = true
+    }
+
+    Timer {
+        id: tick
+        interval: 1000
+        repeat: true
+        onTriggered: { if (--page.countdown <= 0) page.revert() }
     }
 
     Process {
         id: setProc
+        property bool confirm: false
         stderr: StdioCollector {
             onStreamFinished: if (text.trim() !== "") page.host.showError(text.trim().replace(/^rp-display: /, ""))
         }
-        onExited: page.reload()
+        onExited: code => {
+            page.reload()
+            if (setProc.confirm && code === 0) { page.countdown = 15; tick.restart() }
+            else if (setProc.confirm) page.revert()
+        }
     }
 
     Component.onCompleted: reload()
@@ -55,7 +140,7 @@ Item {
 
     readonly property var bounds: frozen ?? liveBounds
     readonly property var liveBounds: {
-        const on = outputs.filter(o => o.enabled)
+        const on = view.filter(o => o.enabled)
         if (on.length === 0) return { x: 0, y: 0, w: 1, h: 1 }
         const x0 = Math.min(...on.map(o => o.x)), y0 = Math.min(...on.map(o => o.y))
         const x1 = Math.max(...on.map(o => o.x + o.width)), y1 = Math.max(...on.map(o => o.y + o.height))
@@ -64,7 +149,7 @@ Item {
 
     function snap(o, nx, ny) {
         const T = 140
-        const others = outputs.filter(p => p.enabled && p.name !== o.name)
+        const others = view.filter(p => p.enabled && p.name !== o.name)
         let xs = [0], ys = [0]
         for (const t of others) {
             xs.push(t.x - o.width, t.x + t.width, t.x, t.x + t.width - o.width, t.x + (t.width - o.width) / 2)
@@ -118,7 +203,7 @@ Item {
                 readonly property real oy: (height - 30 - page.bounds.h * k) / 2
 
                 Repeater {
-                    model: page.outputs.filter(o => o.enabled)
+                    model: page.view.filter(o => o.enabled)
                     Rectangle {
                         id: mon
                         required property var modelData
@@ -152,7 +237,7 @@ Item {
                         DragHandler {
                             id: drag
                             target: null
-                            enabled: page.outputs.filter(o => o.enabled).length > 1
+                            enabled: page.view.filter(o => o.enabled).length > 1 && page.countdown === 0
                             onActiveChanged: {
                                 const o = mon.modelData
                                 if (active) {
@@ -193,12 +278,37 @@ Item {
                 }
             }
 
+            SCard {
+                width: parent.width
+                height: 56
+                visible: page.dirty || page.countdown > 0
+                SLabel {
+                    anchors { left: parent.left; leftMargin: 16; verticalCenter: parent.verticalCenter }
+                    text: page.countdown > 0 ? "Keep these display settings? Reverting in " + page.countdown + " s."
+                                             : "Changes aren't applied yet."
+                }
+                Row {
+                    anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
+                    spacing: 8
+                    SButton {
+                        text: page.countdown > 0 ? "Revert" : "Discard"
+                        onClicked: page.countdown > 0 ? page.revert() : (page.pending = ({}))
+                    }
+                    SButton {
+                        icon: "\u{f012c}"
+                        text: page.countdown > 0 ? "Keep" : "Apply"
+                        busy: setProc.running
+                        onClicked: page.countdown > 0 ? page.keep() : page.apply()
+                    }
+                }
+            }
+
             Item { width: 1; height: 8 }
             Row {
                 spacing: 8
                 leftPadding: 14
                 Repeater {
-                    model: page.outputs
+                    model: page.view
                     SChip {
                         required property var modelData
                         text: modelData.name + (modelData.enabled ? "" : " (off)")
@@ -283,7 +393,7 @@ Item {
             SHint {
                 width: parent.width
                 leftPadding: 14; rightPadding: 14; topPadding: 12
-                text: "Changes apply right away and are saved to ~/.config/niri/displays.kdl and the matching kanshi profile."
+                text: "Apply saves to ~/.config/niri/displays.kdl and the matching kanshi profile. Anything you don't keep within 15 s is reverted."
             }
         }
     }

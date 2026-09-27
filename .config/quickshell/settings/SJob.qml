@@ -36,9 +36,13 @@ Rectangle {
     readonly property real occupied: height * slide
 
     Rectangle {
-        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 16; rightMargin: 16 }
-        height: 1
-        color: Qt.alpha(Colors.outlineVariant, 0.8)
+        anchors { left: parent.left; right: parent.right; top: parent.top }
+        height: parent.height + radius
+        radius: 16
+        color: "transparent"
+        border.width: 1
+        border.color: Qt.alpha(Colors.outlineVariant, 0.8)
+        z: 10
     }
 
     function start(title, command, terminalCommand, onDone) {
