@@ -244,5 +244,5 @@ ShellRoot {
         }
     }
 
-    OSD { id: osd }
+    OSD { id: osd; niri: root.niriRef }
 }
