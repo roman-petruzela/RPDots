@@ -3,6 +3,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import QtQuick.Controls
+import "dash"
 import "Colors.js" as Colors
 
 PanelWindow {
@@ -25,6 +26,39 @@ PanelWindow {
     BackgroundEffect.blurRegion: Region { item: panel }
 
     property int barHeight: 36     // výška waybaru
+    property var barData           // BarData ze shell.qml (hlasitost, jas)
+    property var caffeine          // Caffeine ze shell.qml
+    readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
+
+    // Posuvníky: bez OSD (hodnotu ukazuje posuvník sám), jas aspoň 1 %,
+    // ať se displej nedá zhasnout úplně. Když předchozí zápis ještě běží,
+    // pošle se po něm jen poslední hodnota.
+    property var volPending: null
+    property var blPending: null
+    Process {
+        id: volProc
+        environment: ({ RP_AUDIO_NO_OSD: "1" })
+        onExited: if (root.volPending !== null) root.setVolume(root.volPending)
+    }
+    Process {
+        id: blSet
+        onExited: {
+            if (root.blPending !== null) root.setBrightness(root.blPending)
+            else if (root.barData) root.barData.refreshBrightness()
+        }
+    }
+    function setVolume(v) {
+        if (volProc.running) { root.volPending = v; return }
+        root.volPending = null
+        volProc.command = [root.bin + "rp-audio", "volume", "set", String(v)]
+        volProc.running = true
+    }
+    function setBrightness(v) {
+        if (blSet.running) { root.blPending = v; return }
+        root.blPending = null
+        blSet.command = ["brightnessctl", "--class=backlight", "-q", "set", Math.max(1, v) + "%"]
+        blSet.running = true
+    }
     property real slideX: 380
 
     Behavior on slideX {
@@ -78,73 +112,80 @@ PanelWindow {
 
         MouseArea { anchors.fill: parent }
 
-        // Content with fade-in
+        // Obsah: hlavička s tapetou přes celou šířku, pod ní přepínače,
+        // posuvníky, přehrávač (jen když něco hraje) a systém; session
+        // tlačítka drží dno panelu.
         Item {
             anchors.fill: parent
+            anchors.leftMargin: 1
             opacity: 1.0 - (slideX / 380) * 0.4
+            clip: true
+
+            DashHeader {
+                id: header
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+            }
 
             Flickable {
                 id: scroll
                 anchors {
-                    fill: parent
-                    topMargin: 20
-                    bottomMargin: 16
-                    leftMargin: 20
-                    rightMargin: 20
+                    left: parent.left; right: parent.right
+                    top: header.bottom; bottom: quickActions.top
+                    topMargin: 6; bottomMargin: 12
+                    leftMargin: 20; rightMargin: 20
                 }
                 contentHeight: col.implicitHeight
                 clip: true
+                boundsBehavior: Flickable.StopAtBounds
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
                 Column {
                     id: col
                     width: parent.width
-                    spacing: 0
+                    spacing: 16
 
-                    // ── Clock ──────────────────────────────────────
-                    ClockWidget { width: parent.width }
+                    DashToggles {
+                        width: parent.width
+                        caffeine: root.caffeine
+                        polling: root.visible
+                        onRequestClose: root.visible = false
+                    }
 
-                    Item { width: parent.width; height: 12 }
+                    Column {
+                        width: parent.width
+                        spacing: 8
 
-                    // ── Network ────────────────────────────────────
-                    NetworkWidget { width: parent.width }
+                        DashSlider {
+                            width: parent.width
+                            visible: !!root.barData
+                            icon: !root.barData ? "" : root.barData.muted ? "\u{f075f}"
+                                : root.barData.volume < 34 ? "\u{f057f}" : root.barData.volume < 67 ? "\u{f0580}" : "\u{f057e}"
+                            value: root.barData ? root.barData.volume : 0
+                            dimmed: root.barData ? root.barData.muted : false
+                            onMoved: v => root.setVolume(v)
+                            onReleased: v => root.setVolume(v)
+                            onIconClicked: Quickshell.execDetached([root.bin + "rp-audio", "mute", "toggle"])
+                        }
+                        DashSlider {
+                            width: parent.width
+                            visible: !!root.barData && root.barData.hasBacklight
+                            icon: value < 34 ? "\u{f00de}" : value < 67 ? "\u{f00df}" : "\u{f00e0}"
+                            value: root.barData ? root.barData.brightness : 0
+                            onMoved: v => root.setBrightness(v)
+                            onReleased: v => root.setBrightness(v)
+                        }
+                    }
 
-                    Item { width: parent.width; height: 20 }
-                    Divider { width: parent.width }
-                    Item { width: parent.width; height: 16 }
-
-                    // ── System ─────────────────────────────────────
-                    SectionLabel { title: "System" }
-                    Item { width: parent.width; height: 10 }
-                    SystemWidget { width: parent.width }
-
-                    Item { width: parent.width; height: 16 }
-                    Divider { width: parent.width; visible: mediaWidget.visible }
-                    Item { width: parent.width; height: mediaWidget.visible ? 16 : 0; visible: mediaWidget.visible }
-
-                    // ── Media ──────────────────────────────────────
-                    SectionLabel { title: "Now Playing"; visible: mediaWidget.visible }
-                    Item { width: parent.width; height: mediaWidget.visible ? 10 : 0; visible: mediaWidget.visible }
                     MediaWidget { id: mediaWidget; width: parent.width }
 
-                    Item { width: parent.width; height: 16 }
-                    Divider { width: parent.width }
-                    Item { width: parent.width; height: 16 }
-
-                    // ── Calendar ───────────────────────────────────
-                    SectionLabel { title: "Calendar" }
-                    Item { width: parent.width; height: 10 }
-                    CalendarWidget { width: parent.width }
-
-                    Item { width: parent.width; height: 16 }
-                    Divider { width: parent.width }
-                    Item { width: parent.width; height: 14 }
-
-                    // ── Quick Actions ──────────────────────────────
-                    QuickActionsWidget { id: quickActions; width: parent.width }
-
-                    Item { width: parent.width; height: 8 }
+                    SystemWidget { width: parent.width }
                 }
+            }
+
+            QuickActionsWidget {
+                id: quickActions
+                anchors { left: parent.left; right: parent.right; bottom: parent.bottom
+                          leftMargin: 20; rightMargin: 20; bottomMargin: 16 }
             }
         }
     }

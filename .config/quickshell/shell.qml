@@ -26,7 +26,7 @@ ShellRoot {
         : barMode.startsWith("test:") ? Quickshell.screens.filter(s => s.name === barMode.slice(5))
         : []
 
-    BarData { id: barSource; active: root.barScreens.length > 0 }
+    BarData { id: barSource; active: root.barScreens.length > 0 || dashboard.visible }
     // Pod jiným jménem: v delegátu by `niri: niri` ukazovalo samo na sebe
     readonly property var niriRef: niri
 
@@ -190,8 +190,12 @@ ShellRoot {
         delegate: TopBar { barData: barSource; niri: root.niriRef }
     }
 
+    Caffeine { id: caffeine }
+
     Dashboard {
         id: dashboard
+        barData: barSource
+        caffeine: caffeine
     }
 
     AudioSwitcher {

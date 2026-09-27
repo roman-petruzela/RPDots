@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
+import Quickshell.Services.Mpris
 import QtQuick
 
 // Data pro horní panel — jedna instance pro všechny monitory, ať se skripty
@@ -13,6 +14,7 @@ import QtQuick
 //   teplota        → /sys/class/thermal/thermal_zone0 (výchozí zóna waybaru)
 //   hlasitost      → PipeWire výchozí výstup (rp-audio ho drží stejný všude)
 //   baterie        → UPower, jas → brightnessctl
+//   přehrávač      → Mpris (bez proxy playerctld, stejně jako MediaWidget)
 Item {
     id: root
     visible: false
@@ -29,6 +31,7 @@ Item {
     property int mem: 0
     property int temp: 0
     property int brightness: 0
+    property bool hasBacklight: false
 
     // ── Zvuk
     readonly property PwNode sink: Pipewire.defaultAudioSink
@@ -43,6 +46,17 @@ Item {
     readonly property int batteryPct: hasBattery ? Math.round(battery.percentage * 100) : 0
     // Jen skutečné nabíjení (jako waybar format-charging); „nabito / nenabíjí se" ne
     readonly property bool charging: hasBattery && battery.state === UPowerDeviceState.Charging
+
+    // Přehrávač: hrající má přednost. playerctld se vynechává úplně — po
+    // zavření přehrávače na něm visí poslední stopa (viz README, Dashboard)
+    readonly property var players: Mpris.players.values.filter(
+        p => (p.dbusName || "").indexOf("playerctld") < 0)
+    readonly property var player: {
+        for (const p of players)
+            if (p.playbackState === MprisPlaybackState.Playing) return p
+        return players.length > 0 ? players[0] : null
+    }
+    readonly property bool playing: !!player && player.playbackState === MprisPlaybackState.Playing
 
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
 
@@ -119,7 +133,8 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 const p = text.trim().split(",")
-                if (p.length >= 4) root.brightness = parseInt(p[3])
+                root.hasBacklight = p.length >= 4
+                if (root.hasBacklight) root.brightness = parseInt(p[3])
             }
         }
     }
