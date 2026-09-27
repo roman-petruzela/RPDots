@@ -178,7 +178,7 @@ PanelWindow {
 
                     MediaWidget { id: mediaWidget; width: parent.width }
 
-                    SystemWidget { width: parent.width }
+                    SystemWidget { width: parent.width; active: root.visible }
                 }
             }
 

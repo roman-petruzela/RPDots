@@ -8,6 +8,10 @@ Item {
     implicitWidth: 340
     implicitHeight: col.implicitHeight
 
+    // Obnovovat jen při otevřeném dashboardu — pak ale každou sekundu a hned
+    // po otevření, ať neukazuje čísla z doby, kdy byl naposledy vidět
+    property bool active: true
+
     property real cpuUsage: 0
     property real ramUsage: 0
     property real diskUsage: 0
@@ -24,11 +28,18 @@ Item {
 
     Process {
         id: sysProc
-        // Jeden shell na všechno — pět procesů co 3 s by bylo zbytečné.
+        // Jeden shell na všechno — pět procesů každou sekundu by bylo zbytečné.
         command: ["bash", "-c", `
-            prev=$(cat "\${XDG_RUNTIME_DIR:-/tmp}/qs-cpu-prev" 2>/dev/null || echo '0 0 0 0 0 0 0')
+            f="\${XDG_RUNTIME_DIR:-/tmp}/qs-cpu-prev"
+            prev=$(cat "$f" 2>/dev/null || echo '0 0 0 0 0 0 0')
+            # Po delší pauze (dashboard zavřený) by vyšel průměr za celou dobu —
+            # místo toho krátký vzorek teď
+            if [ $(( $(date +%s) - $(stat -c %Y "$f" 2>/dev/null || echo 0) )) -gt 3 ]; then
+                prev=$(awk '/^cpu /{print $2,$3,$4,$5,$6,$7,$8}' /proc/stat)
+                sleep 0.25
+            fi
             cur=$(awk '/^cpu /{print $2,$3,$4,$5,$6,$7,$8}' /proc/stat)
-            echo "$cur" > "\${XDG_RUNTIME_DIR:-/tmp}/qs-cpu-prev"
+            echo "$cur" > "$f"
             cpu=$(awk -v p="$prev" -v c="$cur" 'BEGIN{
                 split(p,P); split(c,C)
                 dt=(C[1]+C[2]+C[3]+C[4]+C[5]+C[6]+C[7])-(P[1]+P[2]+P[3]+P[4]+P[5]+P[6]+P[7])
@@ -80,7 +91,6 @@ Item {
                 "$cpu" "\${temp:-?}" "\${ghz:-?}" "$ram_pct" "$ram_det" \\
                 "$disk_pct" "$disk_det" "\${bat:--}" "$bat_det" "$up" "$load"
         `]
-        running: true
         stdout: SplitParser {
             onRead: line => {
                 const p = line.split("\t")
@@ -100,7 +110,7 @@ Item {
         }
     }
 
-    Timer { interval: 3000; running: true; repeat: true; onTriggered: sysProc.running = true }
+    Timer { interval: 1000; running: active; repeat: true; triggeredOnStart: true; onTriggered: sysProc.running = true }
 
     Column {
         id: col
