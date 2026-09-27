@@ -67,6 +67,8 @@ read_blacklist() {
 # The OSD reads the value from PipeWire itself — `qs ipc call` in 0.3.0
 # can't pass an argument.
 osd() {
+    # The dashboard slider shows the volume itself; the OSD would flash over it
+    [[ -n "${RP_AUDIO_NO_OSD:-}" ]] && return 0
     "$HOME/.local/bin/rp-shell" osd-volume trigger || true
 }
 
