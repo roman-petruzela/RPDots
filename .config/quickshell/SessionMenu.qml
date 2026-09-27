@@ -5,7 +5,8 @@ import "Colors.js" as Colors
 
 // Menu vypnutí (Mod+Shift+E): zamknout, uspat, odhlásit, restart, vypnout.
 // Celá obrazovka jako u pickeru tapet — okna pod ním rozmazává niri (layer-rule
-// rp-overlay, xray false), uprostřed řada dlaždic. Šipky + Enter, písmena jako
+// rp-overlay, xray false), uprostřed karta s řadou dlaždic (PopupCard — stejný
+// vzhled a animace jako ostatní vyskakovací okna). Šipky + Enter, písmena jako
 // zkratky, Esc nebo klik vedle zavře.
 PanelWindow {
     id: root
@@ -35,29 +36,39 @@ PanelWindow {
 
     FocusedOutput { id: opener; window: root }
 
+    // Otevření/zavření s animací karty; okno se skryje až po ní
+    property bool shown: false
+    onVisibleChanged: if (visible) shown = true; else shown = false
+    function dismiss() { shown = false; hideTimer.restart() }
+    Timer { id: hideTimer; interval: card.closeDuration + 20; onTriggered: if (!root.shown) root.visible = false }
+
     function open() {
+        hideTimer.stop()
         selected = 0
+        shown = true
         opener.show()
     }
 
     function toggle() {
-        if (visible) visible = false
+        if (visible && shown) dismiss()
         else open()
     }
 
     function run(i) {
-        visible = false
+        dismiss()
         Quickshell.execDetached(actions[i].cmd)
     }
 
     Rectangle {
         anchors.fill: parent
         color: Qt.alpha(Colors.background, 0.4)
+        opacity: root.shown ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
     }
 
     MouseArea {
         anchors.fill: parent
-        onClicked: root.visible = false
+        onClicked: root.dismiss()
     }
 
     Item {
@@ -74,7 +85,7 @@ PanelWindow {
             case Qt.Key_Return:
             case Qt.Key_Enter:
             case Qt.Key_Space:   root.run(root.selected); break
-            case Qt.Key_Escape:  root.visible = false; break
+            case Qt.Key_Escape:  root.dismiss(); break
             default: {
                 const i = root.actions.findIndex(a => a.key === event.text.toUpperCase())
                 if (i < 0) return
@@ -84,90 +95,105 @@ PanelWindow {
             event.accepted = true
         }
 
-        Row {
+        PopupCard {
+            id: card
             anchors.centerIn: parent
-            spacing: 18
+            width: content.width + 56
+            height: content.height + 48
+            shown: root.shown
 
-            Repeater {
-                model: root.actions
+            // Klik do karty nesmí zavřít menu (zavírací MouseArea je pod ní)
+            MouseArea { anchors.fill: parent }
 
-                Rectangle {
-                    id: tile
-                    required property var modelData
-                    required property int index
-                    readonly property bool sel: index === root.selected
+            Column {
+                id: content
+                anchors.centerIn: parent
+                spacing: 26
 
-                    width: 148
-                    height: 164
-                    radius: 24
-                    color: sel
-                        ? Qt.alpha(Colors.surfaceContainerHighest, 0.92)
-                        : Qt.alpha(Colors.surfaceContainer, 0.62)
-                    border.width: sel ? 2 : 1
-                    border.color: sel ? Colors.primary : Qt.alpha(Colors.onSurface, 0.1)
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 18
 
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        y: 38
-                        text: tile.modelData.glyph
-                        font.family: root.fontFamily
-                        font.pixelSize: 44
-                        color: tile.sel ? Colors.primary : Colors.onSurface
-                    }
+                    Repeater {
+                        model: root.actions
 
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: 26
-                        text: tile.modelData.label
-                        font.family: root.fontFamily
-                        font.pixelSize: 15
-                        font.weight: Font.Medium
-                        color: Colors.onSurface
-                    }
+                        Rectangle {
+                            id: tile
+                            required property var modelData
+                            required property int index
+                            readonly property bool sel: index === root.selected
 
-                    // Klávesová zkratka v rohu
-                    Text {
-                        anchors { top: parent.top; right: parent.right; margins: 12 }
-                        text: tile.modelData.key
-                        font.family: root.fontFamily
-                        font.pixelSize: 12
-                        color: Qt.alpha(Colors.onSurfaceVariant, 0.7)
-                    }
+                            width: 148
+                            height: 164
+                            radius: 24
+                            color: sel
+                                ? Qt.alpha(Colors.surfaceContainerHighest, 0.92)
+                                : Qt.alpha(Colors.surfaceContainer, 0.62)
+                            border.width: sel ? 2 : 1
+                            border.color: sel ? Colors.primary : Qt.alpha(Colors.onSurface, 0.1)
 
-                    HoverSelect {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onMoved: root.selected = tile.index
-                        onClicked: root.run(tile.index)
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                y: 38
+                                text: tile.modelData.glyph
+                                font.family: root.fontFamily
+                                font.pixelSize: 44
+                                color: tile.sel ? Colors.primary : Colors.onSurface
+                            }
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.bottom: parent.bottom
+                                anchors.bottomMargin: 26
+                                text: tile.modelData.label
+                                font.family: root.fontFamily
+                                font.pixelSize: 15
+                                font.weight: Font.Medium
+                                color: Colors.onSurface
+                            }
+
+                            // Klávesová zkratka v rohu
+                            Text {
+                                anchors { top: parent.top; right: parent.right; margins: 12 }
+                                text: tile.modelData.key
+                                font.family: root.fontFamily
+                                font.pixelSize: 12
+                                color: Qt.alpha(Colors.onSurfaceVariant, 0.7)
+                            }
+
+                            HoverSelect {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onMoved: root.selected = tile.index
+                                onClicked: root.run(tile.index)
+                            }
+                        }
                     }
                 }
-            }
-        }
 
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 36
-            spacing: 28
-
-            Repeater {
-                model: [["← →", "choose"], ["Enter", "confirm"], ["Letter", "shortcut"], ["Esc", "close"]]
                 Row {
-                    required property var modelData
-                    spacing: 7
-                    Text {
-                        text: modelData[0]
-                        font.family: root.fontFamily
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                        color: Colors.onSurface
-                    }
-                    Text {
-                        text: modelData[1]
-                        font.family: root.fontFamily
-                        font.pixelSize: 13
-                        color: Colors.onSurfaceVariant
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 28
+
+                    Repeater {
+                        model: [["← →", "choose"], ["Enter", "confirm"], ["Letter", "shortcut"], ["Esc", "close"]]
+                        Row {
+                            required property var modelData
+                            spacing: 7
+                            Text {
+                                text: modelData[0]
+                                font.family: root.fontFamily
+                                font.pixelSize: 13
+                                font.weight: Font.Medium
+                                color: Colors.onSurface
+                            }
+                            Text {
+                                text: modelData[1]
+                                font.family: root.fontFamily
+                                font.pixelSize: 13
+                                color: Colors.onSurfaceVariant
+                            }
+                        }
                     }
                 }
             }

@@ -1,6 +1,5 @@
 import Quickshell
 import Quickshell.Widgets
-import Quickshell.Wayland
 import QtQuick
 import ".."
 import "../Colors.js" as Colors
@@ -22,6 +21,7 @@ PopupWindow {
     property var parentMenu: null          // u podmenu menu, ze kterého vyjelo
     property Item owner: null              // ikona v tray (jen hlavní menu)
     property var subEntry: null            // položka, jejíž podmenu je otevřené
+    property string heading: ""            // nahoře jako u flyoutů: aplikace / položka s podmenu
     // Položky, které podmenu měly (podle textu). nm-applet menu občas přestaví
     // a na chvíli u nich hlásí hasChildren = false — šipka by zmizela, sloupec
     // se zúžil a klik by místo podmenu spustil akci. Platí do dalšího otevření.
@@ -36,11 +36,12 @@ PopupWindow {
         || (sub.item !== null && sub.item.visible && sub.item.treeHovered)
 
     // Druhý klik na stejnou ikonu menu zavře
-    function toggleAt(item, handle) {
+    function toggleAt(item, handle, title) {
         if (visible && open && owner === item) { dismiss(); return }
         owner = item
         subKeys = ({})
         menuHandle = handle
+        heading = title ?? ""
         anchor.item = item
         anchor.rect.x = item.width / 2 - implicitWidth / 2
         anchor.rect.y = item.height + 8
@@ -63,6 +64,7 @@ PopupWindow {
         const m = sub.item
         m.parentMenu = menu
         m.menuHandle = entry
+        m.heading = clean(entry.text)
         // Doleva od položky: tray je u pravého okraje obrazovky a vpravo by se
         // podmenu nevešlo — niri by ho posunul přes hlavní menu. Ukotvit k levé
         // hraně položky a růst doleva a dolů; kdyby nebylo místo ani tam, překlopit.
@@ -91,15 +93,17 @@ PopupWindow {
     visible: false
 
     // ── Rozměry
-    readonly property int rowH: 28
-    readonly property int fontSize: 13
+    readonly property int rowH: 36
+    readonly property int fontSize: 12
     readonly property var entries: opener.children.values
-    readonly property bool hasLead: entries.some(e => !e.isSeparator
-        && (e.icon !== "" || e.buttonType !== QsMenuButtonType.None))
+    readonly property bool hasLead: entries.some(e => !e.isSeparator && e.icon !== "")
     readonly property bool hasSub: entries.some(e => isSub(e))
     readonly property real textW: Math.max(0, ...entries.filter(e => !e.isSeparator).map(e => fm.advanceWidth(clean(e.text))))
-    implicitWidth: Math.ceil(Math.max(140, Math.min(460, textW + (hasLead ? 34 : 10) + (hasSub ? 22 : 0) + 30)))
-    implicitHeight: col.implicitHeight + 8
+    readonly property bool hasCheck: entries.some(e => e.buttonType !== QsMenuButtonType.None)
+    readonly property real headW: heading !== "" ? fm.advanceWidth(heading) : 0
+    implicitWidth: Math.ceil(Math.max(200, Math.min(460, Math.max(headW, textW + (hasLead ? 34 : 12)
+                                        + (hasSub || hasCheck ? 28 : 0) + 12) + 32)))
+    implicitHeight: col.implicitHeight + 28
     function clean(t) { return (t || "").replace(/_(?=[^_])/g, "") }      // mnemonic podtržítka pryč
 
     FontMetrics { id: fm; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: menu.fontSize }
@@ -126,19 +130,10 @@ PopupWindow {
         }
     }
 
-    // Rozmazané pozadí jen pod otevřeným menu (jako BarPopup)
-    BackgroundEffect.blurRegion: Region {
-        width: menu.open ? body.width : 0
-        height: menu.open ? body.height : 0
-        radius: body.radius
-    }
-
-    // Vzhled a animace společné se všemi vyskakovacími kartami (PopupCard)
     PopupCard {
         id: body
         anchors.fill: parent
         shown: menu.open
-        transformOrigin: Item.TopRight
         focus: true
         Keys.onEscapePressed: {
             if (menu.subEntry) menu.closeSub()
@@ -148,8 +143,21 @@ PopupWindow {
 
         Column {
             id: col
-            x: 4; y: 4
-            width: menu.implicitWidth - 8
+            x: 16; y: 14
+            width: menu.implicitWidth - 32
+
+            // Nadpis jako u flyoutů (Power mode, Audio output…)
+            Text {
+                visible: menu.heading !== ""
+                width: parent.width
+                text: menu.heading
+                elide: Text.ElideRight
+                font.pixelSize: 12
+                font.weight: Font.Medium
+                font.family: "JetBrainsMono Nerd Font"
+                color: Colors.onSurfaceVariant
+                bottomPadding: 6
+            }
 
             Repeater {
                 model: opener.children
@@ -166,60 +174,58 @@ PopupWindow {
                         }
                     }
                     width: col.width
-                    height: e.isSeparator ? 7 : menu.rowH
+                    height: e.isSeparator ? 9 : menu.rowH
+                    readonly property bool checked: e.buttonType !== QsMenuButtonType.None && e.checkState === Qt.Checked
 
                     Rectangle {
                         visible: row.e.isSeparator
-                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 6 }
+                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 4 }
                         height: 1
-                        color: Qt.alpha(Colors.outlineVariant, 0.7)
+                        color: Qt.alpha(Colors.outlineVariant, 0.6)
                     }
 
                     Rectangle {
                         visible: !row.e.isSeparator
                         anchors.fill: parent
-                        radius: 6
-                        color: (rowHover.hovered || row.subOpen) && row.e.enabled ? Qt.alpha(Colors.primary, 0.16) : "transparent"
-                        Behavior on color { ColorAnimation { duration: 90 } }
+                        // Jako řádky v menu napájení: zaškrtnutá volba zvýrazněná akcentem,
+                        // najetí jen zesvětlí
+                        radius: 12
+                        color: row.checked ? Qt.alpha(Colors.primary, 0.18)
+                            : (rowHover.hovered || row.subOpen) && row.e.enabled ? Colors.surfaceContainerHigh
+                            : "transparent"
+                        Behavior on color { ColorAnimation { duration: 120 } }
 
                         // Zaškrtávátko / přepínač, jinak ikona položky
                         Item {
                             id: lead
-                            anchors { left: parent.left; leftMargin: menu.hasLead ? 6 : 0; verticalCenter: parent.verticalCenter }
+                            anchors { left: parent.left; leftMargin: menu.hasLead ? 12 : 0; verticalCenter: parent.verticalCenter }
                             visible: menu.hasLead
                             width: menu.hasLead ? 16 : 0; height: 16
-                            Text {
-                                visible: row.e.buttonType !== QsMenuButtonType.None
-                                anchors.centerIn: parent
-                                text: row.e.buttonType === QsMenuButtonType.RadioButton
-                                    ? String.fromCodePoint(row.e.checkState === Qt.Checked ? 0xf0134 : 0xf0130)
-                                    : String.fromCodePoint(row.e.checkState === Qt.Checked ? 0xf0132 : 0xf0131)
-                                font.family: "JetBrainsMono Nerd Font"
-                                font.pixelSize: 15
-                                color: row.e.checkState === Qt.Checked ? Colors.primary : Colors.onSurfaceVariant
-                            }
                             IconImage {
-                                visible: row.e.buttonType === QsMenuButtonType.None && row.e.icon !== ""
+                                visible: row.e.icon !== ""
                                 anchors.fill: parent
                                 source: row.e.icon
                             }
                         }
                         Text {
-                            anchors { left: lead.right; leftMargin: menu.hasLead ? 8 : 9; right: arrow.left; rightMargin: 6; verticalCenter: parent.verticalCenter }
+                            anchors { left: lead.right; leftMargin: menu.hasLead ? 10 : 12; right: arrow.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
                             text: menu.clean(row.e.text)
                             elide: Text.ElideRight
                             font.family: "JetBrainsMono Nerd Font"
                             font.pixelSize: menu.fontSize
-                            color: row.e.enabled ? Colors.onSurface : Qt.alpha(Colors.onSurface, 0.38)
+                            font.weight: row.checked ? Font.Medium : Font.Normal
+                            color: !row.e.enabled ? Qt.alpha(Colors.onSurface, 0.38)
+                                : row.checked ? Colors.onSurface : Colors.onSurfaceVariant
                         }
                         Text {
                             id: arrow
-                            visible: menu.isSub(row.e)
-                            anchors { right: parent.right; rightMargin: 6; verticalCenter: parent.verticalCenter }
-                            text: String.fromCodePoint(0xf0141)   // podmenu vyjíždí doleva
+                            // Vpravo: šipka podmenu, nebo ✓ u zaškrtnuté volby (jako v menu napájení)
+                            visible: menu.isSub(row.e) || row.checked
+                            anchors { right: parent.right; rightMargin: 12; verticalCenter: parent.verticalCenter }
+                            text: String.fromCodePoint(menu.isSub(row.e) ? 0xf0141 : 0xf012c)
                             font.family: "JetBrainsMono Nerd Font"
                             font.pixelSize: 14
-                            color: row.subOpen ? Colors.primary : Colors.onSurfaceVariant
+                            color: row.subOpen || row.checked ? Colors.primary : Colors.onSurfaceVariant
                         }
 
                         HoverHandler {

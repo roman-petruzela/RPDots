@@ -1,38 +1,30 @@
 import QtQuick
 import "Colors.js" as Colors
 
-// Společný vzhled všech vyskakovacích karet: flyouty (napájení, zvuk, síť),
-// kalendář, tooltipy a menu v tray z panelu. Jedno místo pro barvu,
-// rámeček, zaoblení a animaci objevení/zmizení — ať nevypadá každé jinak.
+// Společný vzhled vyskakovacích karet z panelu (tooltipy, kalendář, menu
+// v tray) a session menu — převzatý z flyoutů (napájení, zvuk, síť), ať
+// vypadá všechno jako ony: stejná barva, zaoblení, rámeček a animace
+// (sjetí shora + prolnutí).
 //
-//     PopupCard { shown: pop.open; transformOrigin: Item.TopRight; … obsah … }
+//     PopupCard { shown: pop.open; … obsah … }
 //
-// `shown` řídí animaci (fade + lehké zvětšení z 96 % + sjetí o 6 px);
-// okno, které kartu drží, se má skrýt až po `closeDuration`.
+// Okno, které kartu drží, se má skrýt až po `closeDuration`.
 Rectangle {
     id: card
 
     property bool shown: true
-    readonly property int openDuration: 160
-    readonly property int closeDuration: 120
+    readonly property int openDuration: 200
+    readonly property int closeDuration: 140
 
-    radius: 14
-    color: Qt.alpha(Colors.surfaceContainerHigh, 0.96)
+    radius: 16
+    color: Qt.alpha(Colors.surfaceContainer, 0.94)
     border.width: 1
-    border.color: Qt.alpha(Colors.outlineVariant, 0.85)
-    transformOrigin: Item.Top
+    border.color: Colors.outlineVariant
 
     opacity: shown ? 1 : 0
-    scale: shown ? 1 : 0.96
     transform: Translate {
-        y: card.shown ? 0 : -6
+        y: card.shown ? 0 : -20
         Behavior on y { NumberAnimation { duration: card.shown ? card.openDuration : card.closeDuration; easing.type: Easing.OutCubic } }
     }
-    Behavior on opacity { NumberAnimation { duration: card.shown ? card.openDuration : card.closeDuration; easing.type: Easing.OutCubic } }
-    Behavior on scale {
-        NumberAnimation {
-            duration: card.shown ? card.openDuration : card.closeDuration
-            easing.type: card.shown ? Easing.OutQuint : Easing.InQuad
-        }
-    }
+    Behavior on opacity { NumberAnimation { duration: card.shown ? 160 : card.closeDuration } }
 }

@@ -33,10 +33,16 @@ PanelWindow {
         ? WlrKeyboardFocus.OnDemand
         : WlrKeyboardFocus.None
 
-    onVisibleChanged: if (visible) root.opened()
+    property real slideY: -20
 
-    // Rozmazané pozadí pod kartou (jako kalendář, tooltipy a menu z panelu)
-    BackgroundEffect.blurRegion: Region { item: card; radius: card.radius }
+    Behavior on slideY {
+        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+    }
+
+    onVisibleChanged: {
+        slideY = visible ? 0 : -20
+        if (visible) root.opened()
+    }
 
     // U více monitorů má okno vyjet na tom, na kterém zrovna pracuješ.
     FocusedOutput { id: opener; window: root }
@@ -60,18 +66,25 @@ PanelWindow {
         Keys.onEscapePressed: root.visible = false
     }
 
-    // Vzhled a animace společné se všemi vyskakovacími kartami (PopupCard)
-    PopupCard {
+    Rectangle {
         id: card
 
         anchors.right: parent.right
         anchors.rightMargin: 8
-        y: root.barHeight + 8
+        y: root.barHeight + 8 + root.slideY
 
         width: root.cardWidth
         height: col.implicitHeight + 28
-        shown: root.visible
-        transformOrigin: Item.TopRight
+        radius: 16
+
+        opacity: root.visible ? 1.0 : 0.0
+        Behavior on opacity { NumberAnimation { duration: 160 } }
+
+        color: Qt.rgba(Qt.color(Colors.surfaceContainer).r,
+                       Qt.color(Colors.surfaceContainer).g,
+                       Qt.color(Colors.surfaceContainer).b, 0.94)
+        border.color: Colors.outlineVariant
+        border.width: 1
 
         // Kliknutí na kartu nesmí propadnout na zavírací vrstvu pod ní
         MouseArea { anchors.fill: parent }

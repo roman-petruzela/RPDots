@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Wayland
 import QtQuick
 import ".."
 
@@ -35,19 +34,13 @@ PopupWindow {
     color: "transparent"
     visible: false
 
-    // Blur jen pod otevřenou kartou (při zavírání hned pryč, ať nezůstane
-    // rozmazaný obdélník za mizející kartou)
-    BackgroundEffect.blurRegion: Region {
-        width: pop.open ? card.width : 0
-        height: pop.open ? card.height : 0
-        radius: card.radius
-    }
+    // Bez blur: karta je skoro neprůhledná a rozmazání v plné velikosti
+    // naskočilo dřív, než karta doanimovala — za ní to problikávalo
 
     PopupCard {
         id: card
         anchors.fill: parent
         shown: pop.open
-        transformOrigin: pop.alignRight ? Item.TopRight : Item.Top
         focus: true
         Keys.onEscapePressed: pop.dismiss()
         HoverHandler { id: cardHover }
