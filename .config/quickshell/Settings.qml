@@ -296,7 +296,7 @@ Scope {
             readonly property string fontFamily: "JetBrainsMono Nerd Font"
             readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
 
-            title: "RPRice Settings"
+            title: "RPSettings"
             implicitWidth: 980
             implicitHeight: 720
             minimumSize: Qt.size(860, 600)

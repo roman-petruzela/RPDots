@@ -207,13 +207,13 @@ window-rule {
 // Launcher (Mod+D, quickshell Launcher.qml): plovoucí okno jako Settings, ať ho
 // niri otevírá a zavírá stejnou animací; blur si žádá samo
 window-rule {
-    match title="^RPRice Launcher$"
+    match title="^RPLauncher$"
     open-floating true
     geometry-corner-radius 12
     clip-to-geometry true
 }
 window-rule {
-    match title="^RPRice Settings$"
+    match title="^RPSettings$"
     open-floating true
     geometry-corner-radius 16
     clip-to-geometry true

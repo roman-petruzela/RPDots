@@ -17,7 +17,7 @@ import "Colors.js" as Colors
 // Okno se při každém otevření vytvoří (LazyLoader) a při zavření zahodí, ať
 // se niri zavírací animace přehraje a zavření přes Mod+Q ho nerozbije (viz
 // Settings). Zavře se i kliknutím jinam (ztráta fokusu), jako fuzzel.
-// window-rule v config.kdl (titulek „RPRice Launcher") ho otevře plovoucí.
+// window-rule v config.kdl (titulek „RPLauncher") ho otevře plovoucí.
 //
 // Pořadí posledních spuštění se ukládá do ~/.cache/niri-rice/launcher-recent.json.
 Scope {
@@ -45,7 +45,7 @@ Scope {
             property string query: ""
             property int selected: 0
 
-            title: "RPRice Launcher"
+            title: "RPLauncher"
             visible: true
             color: "transparent"
             // Pevná velikost (jako fuzzel `lines=12`); okno tak při psaní nemění

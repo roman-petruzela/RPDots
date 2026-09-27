@@ -467,9 +467,22 @@ when it says `quickshell`. The Nerd Font icons are `\u` escapes in QML: typed as
 literal characters they got lost when edited, which is also how the waybar clock
 lost its icon.
 
+Everything that pops up shares one look. `PopupCard.qml` sets the card's color,
+border, radius and open/close animation (a fade plus a slight grow from 96 %,
+160 ms in and 120 ms out). `bar/BarPopup.qml` is the window around it for
+anything that comes out of the bar: it anchors under the item, blurs behind the
+open card only (no blurred rectangle left behind a closing card) and closes on
+Esc. Tooltips (`BarTooltip`) and the calendar (`ClockPopup`) are `BarPopup`
+with their own content. The tray menu and the flyouts (`Flyout.qml`: power,
+audio, network) keep their own windows but use `PopupCard` for the card, so a
+change in `PopupCard` shows up everywhere at once.
+
 Tray menus are drawn in QML (`bar/TrayMenu.qml`: `QsMenuOpener` over DBusMenu,
-`entry.triggered()` on click, submenus open in place with a Back row, a click
-outside closes it via `grabFocus`). `SystemTrayItem.display()` would need
+`entry.triggered()` on click, submenus fly out beside the entry on hover or
+click, the same component nested through a `Loader`, any depth). It closes on a
+second click on the icon, on Esc, or when the pointer leaves the menu and its
+submenus for a second. The popup grab (`grabFocus`) doesn't close it on an
+outside click for popups of a layer surface under niri. `SystemTrayItem.display()` would need
 quickshell in QApplication mode (a pragma plus a restart) and draws a foreign
 Qt Widgets menu; without it the clicks did nothing and the log said so.
 Symbolic tray icons (Easy Effects) are recolored with `MultiEffect`, since
@@ -488,7 +501,7 @@ children.
 and the audio flyout's "Sound settings" open `sound`). It is in the launcher as
 **RPSettings** (`.local/share/applications/rp-settings.desktop`). It is a normal
 floating toplevel rather than a layer, so it can be moved and niri animates it
-(window-rule on the title `RPRice Settings`).
+(window-rule on the title `RPSettings`).
 
 The sidebar has three groups in a fixed order, each exactly once: **System**
 (About, Displays, Network, Sound, Bluetooth, Power, Storage, Updates, Packages,

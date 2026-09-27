@@ -145,7 +145,7 @@ PanelWindow {
             }
             onWheel: e => it.wheel(e.angleDelta.y > 0 ? 1 : -1)
         }
-        BarTooltip { target: it; text: it.tip; show: area.containsMouse && it.tip !== "" }
+        BarTooltip { target: it; text: it.tip; wanted: area.containsMouse && it.tip !== "" }
     }
 
     TrayMenu { id: trayMenu }
@@ -434,7 +434,7 @@ PanelWindow {
                         }
                         onWheel: e => ti.modelData.scroll(e.angleDelta.y, false)
                     }
-                    BarTooltip { target: ti; text: ti.modelData.tooltipTitle || ti.modelData.title; show: tiArea.containsMouse }
+                    BarTooltip { target: ti; text: ti.modelData.tooltipTitle || ti.modelData.title; wanted: tiArea.containsMouse }
                 }
             }
         }
