@@ -14,7 +14,7 @@ bind z include jde přidat, ale ne odebrat, takže přemapování by starou
 klávesu nechalo pořád aktivní. Upravuje se proto přímo řádek v config.kdl.
 Každá změna projde `niri validate`, při chybě se soubor vrátí.
 
-~/dotfiles je kopie, ne symlink. Když má řádek v repu stejný obsah jako
+Repo s dotfiles (cesta v ~/.config/niri-rice/dotfiles-path) je kopie, ne symlink. Když má řádek v repu stejný obsah jako
 v živém configu, upraví se i tam, ať se změna dá commitnout.
 """
 import json
@@ -26,7 +26,14 @@ import sys
 import tempfile
 
 LIVE = os.path.expanduser("~/.config/niri/config.kdl")
-REPO = os.path.expanduser("~/dotfiles/.config/niri/config.kdl")
+def dotfiles_dir():
+    try:
+        with open(os.path.expanduser("~/.config/niri-rice/dotfiles-path")) as f:
+            return f.read().strip() or os.path.expanduser("~/dotfiles")
+    except OSError:
+        return os.path.expanduser("~/dotfiles")
+
+REPO = os.path.join(dotfiles_dir(), ".config/niri/config.kdl")
 ADDED_MARK = "// rp-keys"   # komentář za bindy přidanými z okna
 
 KEY_RE = re.compile(r"^(?:(?:Mod|Super|Ctrl|Control|Alt|Shift|ISO_Level3_Shift|ISO_Level5_Shift|Win)\+)*[A-Za-z0-9_]+$")

@@ -15,7 +15,6 @@ PKGS=(
     quickshell
     qt6-multimedia
     kitty
-    mako
     fuzzel
     rofi
     swaylock-effects
@@ -199,6 +198,11 @@ repo_files() {
     done
 }
 
+remember_dotfiles() {
+    mkdir -p "$HOME/.config/niri-rice"
+    printf '%s\n' "$DOTFILES" >"$HOME/.config/niri-rice/dotfiles-path"
+}
+
 copy_configs() {
     local dry="${1:-0}" f src dst backup="" changed=0 new=0
     [[ "$dry" == 1 ]] || backup="$STATE_DIR/deploy-backup/$(date +%Y%m%d-%H%M%S)"
@@ -262,7 +266,6 @@ post_deploy() {
         2>/dev/null || true
     systemctl --user start niri-rice-cliphist.service 2>/dev/null || true
     pkill -USR2 -x waybar 2>/dev/null || true
-    command -v makoctl >/dev/null && makoctl reload 2>/dev/null || true
     echo ":: Done"
 }
 
@@ -296,13 +299,13 @@ select action in \
     "System integration" \
     "Quit"; do
     case "$REPLY" in
-        1) choose_extras; need_sudo; install_packages; copy_configs; post_deploy
+        1) choose_extras; need_sudo; install_packages; copy_configs; remember_dotfiles; post_deploy
            echo; ask "Run system integration?" && system_setup
            break ;;
         2) choose_extras; need_sudo; install_packages; break ;;
-        3) copy_configs; post_deploy; break ;;
+        3) copy_configs; remember_dotfiles; post_deploy; break ;;
         4) copy_configs 1; break ;;
-        5) stow_configs; post_deploy; break ;;
+        5) stow_configs; remember_dotfiles; post_deploy; break ;;
         6) need_sudo; system_setup; break ;;
         7) exit 0 ;;
         *) echo "Invalid choice" ;;

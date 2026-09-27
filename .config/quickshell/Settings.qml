@@ -210,7 +210,7 @@ Scope {
             { title: "SYSTEM TOOLS", rows: [ { kind: "tools" } ]},
             { title: "MAINTENANCE", rows: [
                 { kind: "button", action: "reset", label: "Reset everything", hint: "Forget everything set in this window (settings.json).", icon: "󰦛", text: "Reset" },
-                { kind: "button", action: "dotfiles", label: "Open dotfiles", hint: "~/dotfiles in yazi", icon: "󰉋", text: "Open" },
+                { kind: "button", action: "dotfiles", label: "Open dotfiles", hint: "The dotfiles repository in yazi", icon: "󰉋", text: "Open" },
             ]},
         ]},
     ]
@@ -367,13 +367,13 @@ Scope {
                 if (name === "wallpaper") Quickshell.execDetached([bin + "rp-shell", "wallpaper", "open"])
                 else if (name === "theme") applyTheme()
                 else if (name === "reset") run(["rp-settings", "reset"])
-                else if (name === "lock") Quickshell.execDetached(["swaylock", "-f"])
+                else if (name === "lock") Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/rp-lock"])
                 else if (name === "orca") Quickshell.execDetached(["sh", "-c", "pkill orca || exec orca"])
                 else if (name === "test-notify")
                     Quickshell.execDetached(["notify-send", "-a", "Settings", "Test notification",
                                              "This is how notifications look now."])
                 else if (name === "dotfiles")
-                    Quickshell.execDetached(["kitty", "--directory", Quickshell.env("HOME") + "/dotfiles", "yazi"])
+                    Quickshell.execDetached(["bash", "-c", "kitty --directory \"$(cat ~/.config/niri-rice/dotfiles-path 2>/dev/null || echo ~/dotfiles)\" yazi"])
             }
 
             property var queue: []

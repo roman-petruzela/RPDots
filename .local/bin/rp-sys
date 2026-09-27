@@ -306,7 +306,8 @@ set_locale() {
 set_clock() {
     local fmt=$1 f
     [[ "$fmt" =~ ^[^\"\\]+$ ]] || die "invalid clock format"
-    for f in "$HOME/.config/waybar/config.jsonc" "$HOME/dotfiles/.config/waybar/config.jsonc"; do
+    local repo; repo=$(cat "$HOME/.config/niri-rice/dotfiles-path" 2>/dev/null || echo "$HOME/dotfiles")
+    for f in "$HOME/.config/waybar/config.jsonc" "$repo/.config/waybar/config.jsonc"; do
         [[ -f "$f" ]] || continue
         python3 - "$f" "$fmt" <<'PY'
 import re, sys
