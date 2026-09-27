@@ -80,7 +80,7 @@ Item {
         }
     }
 
-    Timer { id: hideTimer; interval: 1600; onTriggered: root.showing = false }
+    Timer { id: hideTimer; interval: 900; onTriggered: root.showing = false }
 
     readonly property string icon: {
         if (osdType === "brightness") return osdValue < 34 ? "\u{f00de}" : osdValue < 67 ? "\u{f00df}" : "\u{f00e0}"
