@@ -108,7 +108,7 @@ Item {
                 width: parent.width * f
                 height: parent.height
                 radius: 3
-                color: f > 0.9 ? Colors.errorColor : Colors.primary
+                color: f > 0.9 ? Colors.errorColor : Colors.accent2
             }
         }
     }
@@ -125,16 +125,15 @@ Item {
             height: 22
             Text {
                 id: cardIcon
-                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-                width: 20
-                horizontalAlignment: Text.AlignHCenter
+                anchors { right: cardTitle.left; rightMargin: 9; verticalCenter: parent.verticalCenter }
                 text: card.icon
                 font.family: "JetBrainsMono Nerd Font"
                 font.pixelSize: 16
-                color: Colors.primary
+                color: Colors.accent2
             }
             SLabel {
-                anchors { left: cardIcon.right; leftMargin: 10; verticalCenter: parent.verticalCenter }
+                id: cardTitle
+                anchors { left: parent.left; leftMargin: 30; verticalCenter: parent.verticalCenter }
                 text: card.title
                 font.weight: Font.DemiBold
             }
