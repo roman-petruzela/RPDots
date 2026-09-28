@@ -124,7 +124,7 @@ Item {
                     text: page.status === "ok" ? "󰒃" : page.status === "panic" ? "󰦞" : "󰒄"
                     font.family: "JetBrainsMono Nerd Font"
                     font.pixelSize: 34
-                    color: page.status === "ok" ? Colors.primary
+                    color: page.status === "ok" ? Colors.accent2
                         : page.status === "loading" ? Colors.onSurfaceVariant : Colors.errorColor
                 }
                 Column {

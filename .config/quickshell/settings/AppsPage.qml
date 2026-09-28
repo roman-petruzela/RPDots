@@ -154,13 +154,13 @@ Item {
                         visible: ar.modelData.flatpak || ar.modelData.hidden
                         anchors.verticalCenter: parent.verticalCenter
                         width: tagT.implicitWidth + 14; height: 20; radius: 10
-                        color: Qt.alpha(Colors.primary, 0.14)
+                        color: Qt.alpha(Colors.accent2, 0.14)
                         Text {
                             id: tagT
                             anchors.centerIn: parent
                             text: ar.modelData.hidden ? "hidden" : "flatpak"
                             font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
-                            color: Colors.primary
+                            color: Colors.accent2
                         }
                     }
                     SButton {

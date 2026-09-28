@@ -57,7 +57,7 @@ Item {
                     text: "󰊴"
                     font.family: "JetBrainsMono Nerd Font"
                     font.pixelSize: 32
-                    color: page.g?.gamemode ? Colors.primary : Colors.onSurfaceVariant
+                    color: page.g?.gamemode ? Colors.accent2 : Colors.onSurfaceVariant
                 }
                 Column {
                     anchors { left: pad.right; leftMargin: 18; right: parent.right; rightMargin: 20; verticalCenter: parent.verticalCenter }

@@ -69,7 +69,7 @@ Item {
         width: parent ? parent.width : 0
         height: 48
         radius: 12
-        color: dev.default ? Qt.alpha(Colors.primary, 0.14)
+        color: dev.default ? Qt.alpha(Colors.accent2, 0.14)
             : drHover.hovered ? Qt.alpha(Colors.onSurface, 0.04) : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
         HoverHandler { id: drHover }
@@ -82,7 +82,7 @@ Item {
             text: page.deviceIcon(dr.dev.description)
             font.family: "JetBrainsMono Nerd Font"
             font.pixelSize: 16
-            color: dr.dev.default ? Colors.primary : Colors.onSurfaceVariant
+            color: dr.dev.default ? Colors.accent2 : Colors.onSurfaceVariant
         }
         SLabel {
             anchors { left: drIcon.right; leftMargin: 12; right: drRight.left; rightMargin: 12; verticalCenter: parent.verticalCenter }
@@ -113,7 +113,7 @@ Item {
                 text: dr.dev.default ? "󰄬" : ""
                 font.family: "JetBrainsMono Nerd Font"
                 font.pixelSize: 16
-                color: Colors.primary
+                color: Colors.accent2
                 width: 16
             }
         }

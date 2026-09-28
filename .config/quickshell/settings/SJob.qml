@@ -157,7 +157,7 @@ Rectangle {
             text: job.exitCode === 0 ? "󰄬" : "󰅖"
             font.family: "JetBrainsMono Nerd Font"
             font.pixelSize: 16
-            color: job.exitCode === 0 ? Colors.primary : Colors.errorColor
+            color: job.exitCode === 0 ? Colors.accent2 : Colors.errorColor
         }
         Column {
             anchors { left: parent.left; leftMargin: 46; right: buttons.left; rightMargin: 12; verticalCenter: parent.verticalCenter }
@@ -220,7 +220,7 @@ Rectangle {
             text: line
             wrapMode: Text.WrapAnywhere
             color: /^(error|chyba)|failed/i.test(line) ? Colors.errorColor
-                : /^(::|──)/.test(line) ? Colors.primary
+                : /^(::|──)/.test(line) ? Colors.accent2
                 : /^warning/i.test(line) ? Colors.tertiary : Colors.onSurfaceVariant
         }
     }

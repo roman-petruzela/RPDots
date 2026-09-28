@@ -49,7 +49,7 @@ Item {
         width: parent ? parent.width : 0
         height: 56
         radius: 12
-        color: dev.connected ? Qt.alpha(Colors.primary, 0.14)
+        color: dev.connected ? Qt.alpha(Colors.accent2, 0.14)
             : drHover.hovered ? Qt.alpha(Colors.onSurface, 0.04) : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
         HoverHandler { id: drHover }
@@ -62,7 +62,7 @@ Item {
             text: page.deviceIcon(dr.dev)
             font.family: "JetBrainsMono Nerd Font"
             font.pixelSize: 18
-            color: dr.dev.connected ? Colors.primary : Colors.onSurfaceVariant
+            color: dr.dev.connected ? Colors.accent2 : Colors.onSurfaceVariant
         }
         Column {
             anchors { left: drIcon.right; leftMargin: 12; right: drRight.left; rightMargin: 12; verticalCenter: parent.verticalCenter }
@@ -146,7 +146,7 @@ Item {
                     text: page.adapter?.enabled ? "󰂯" : "󰂲"
                     font.family: "JetBrainsMono Nerd Font"
                     font.pixelSize: 32
-                    color: page.adapter?.enabled ? Colors.primary : Colors.onSurfaceVariant
+                    color: page.adapter?.enabled ? Colors.accent2 : Colors.onSurfaceVariant
                 }
                 Column {
                     anchors { left: btIcon.right; leftMargin: 18; right: btToggle.left; rightMargin: 16; verticalCenter: parent.verticalCenter }

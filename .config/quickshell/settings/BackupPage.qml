@@ -49,7 +49,7 @@ Item {
                     text: "󰁯"
                     font.family: "JetBrainsMono Nerd Font"
                     font.pixelSize: 32
-                    color: page.b?.snapper ? Colors.primary : Colors.onSurfaceVariant
+                    color: page.b?.snapper ? Colors.accent2 : Colors.onSurfaceVariant
                 }
                 Column {
                     anchors { left: snapIcon.right; leftMargin: 18; right: parent.right; rightMargin: 20; verticalCenter: parent.verticalCenter }
@@ -70,17 +70,17 @@ Item {
             SRow {
                 label: "Timeline snapshots"
                 hint: "Hourly snapshots, thinned out over time (snapper-timeline.timer)."
-                SLabel { text: page.b?.timeline ? "On" : "Off"; color: page.b?.timeline ? Colors.primary : Colors.outline; font.pixelSize: 12 }
+                SLabel { text: page.b?.timeline ? "On" : "Off"; color: page.b?.timeline ? Colors.accent2 : Colors.outline; font.pixelSize: 12 }
             }
             SRow {
                 label: "Before and after every update"
                 hint: "snap-pac takes a pre/post pair around each pacman transaction."
-                SLabel { text: page.b?.snapPac ? "On" : "Not installed"; color: page.b?.snapPac ? Colors.primary : Colors.outline; font.pixelSize: 12 }
+                SLabel { text: page.b?.snapPac ? "On" : "Not installed"; color: page.b?.snapPac ? Colors.accent2 : Colors.outline; font.pixelSize: 12 }
             }
             SRow {
                 label: "Cleanup"
                 hint: "Old snapshots are removed by snapper-cleanup.timer."
-                SLabel { text: page.b?.cleanup ? "On" : "Off"; color: page.b?.cleanup ? Colors.primary : Colors.outline; font.pixelSize: 12 }
+                SLabel { text: page.b?.cleanup ? "On" : "Off"; color: page.b?.cleanup ? Colors.accent2 : Colors.outline; font.pixelSize: 12 }
             }
 
             SHeading { text: "MANUAL" }

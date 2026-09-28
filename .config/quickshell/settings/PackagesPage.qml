@@ -296,14 +296,14 @@ Item {
                             width: tagText.implicitWidth + 14
                             height: 20
                             radius: 10
-                            color: Qt.alpha(modelData === "orphan" ? Colors.tertiary : Colors.primary, 0.14)
+                            color: Qt.alpha(modelData === "orphan" ? Colors.tertiary : Colors.accent2, 0.14)
                             Text {
                                 id: tagText
                                 anchors.centerIn: parent
                                 text: modelData
                                 font.family: "JetBrainsMono Nerd Font"
                                 font.pixelSize: 10
-                                color: modelData === "orphan" ? Colors.tertiary : Colors.primary
+                                color: modelData === "orphan" ? Colors.tertiary : Colors.accent2
                             }
                         }
                     }

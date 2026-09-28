@@ -6,7 +6,7 @@ Text {
     font.pixelSize: 11
     font.weight: Font.DemiBold
     font.letterSpacing: 1.2
-    color: Colors.primary
+    color: Colors.accent2
     topPadding: 18
     bottomPadding: 6
     leftPadding: 14

@@ -114,7 +114,7 @@ Item {
                     text: page.checking ? "󰔟" : page.total > 0 ? "󰚰" : "󰄬"
                     font.family: "JetBrainsMono Nerd Font"
                     font.pixelSize: 34
-                    color: page.total > 0 ? Colors.tertiary : Colors.primary
+                    color: page.total > 0 ? Colors.tertiary : Colors.accent2
                 }
                 Column {
                     id: headCol

@@ -193,7 +193,7 @@ Item {
                         : page.primary.type === "wifi" ? "󰤨" : "󰈀"
                     font.family: "JetBrainsMono Nerd Font"
                     font.pixelSize: 32
-                    color: page.primary ? Colors.primary : Colors.onSurfaceVariant
+                    color: page.primary ? Colors.accent2 : Colors.onSurfaceVariant
                 }
                 Column {
                     anchors { left: netIcon.right; leftMargin: 18; right: airplane.left; rightMargin: 16; verticalCenter: parent.verticalCenter }
@@ -328,7 +328,7 @@ Item {
                     width: col.width
                     height: asking ? 96 : 48
                     radius: 12
-                    color: modelData.active ? Qt.alpha(Colors.primary, 0.14)
+                    color: modelData.active ? Qt.alpha(Colors.accent2, 0.14)
                         : nwHover.hovered || asking ? Qt.alpha(Colors.onSurface, 0.04) : "transparent"
                     HoverHandler { id: nwHover }
 
@@ -344,7 +344,7 @@ Item {
                             text: page.signalIcon(nw.modelData.signal)
                             font.family: "JetBrainsMono Nerd Font"
                             font.pixelSize: 16
-                            color: nw.modelData.active ? Colors.primary : Colors.onSurfaceVariant
+                            color: nw.modelData.active ? Colors.accent2 : Colors.onSurfaceVariant
                         }
                         SLabel {
                             anchors { left: sigIcon.right; leftMargin: 12; right: nwRight.left; rightMargin: 12; verticalCenter: parent.verticalCenter }
@@ -491,7 +491,7 @@ Item {
                                     anchors { right: parent.right; verticalCenter: parent.verticalCenter }
                                     wrapMode: Text.NoWrap
                                     text: ifc.modelData.state
-                                    color: ifc.modelData.state === "connected" ? Colors.primary : Colors.onSurfaceVariant
+                                    color: ifc.modelData.state === "connected" ? Colors.accent2 : Colors.onSurfaceVariant
                                 }
                             }
                             Field { label: "IPv4"; value: ifc.modelData.ipv4.join("\n") }

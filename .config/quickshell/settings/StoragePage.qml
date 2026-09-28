@@ -109,7 +109,7 @@ Item {
                             Rectangle {
                                 readonly property real f: modelData.used / Math.max(modelData.size, 1)
                                 width: parent.width * f; height: parent.height; radius: 4
-                                color: f > 0.9 ? Colors.errorColor : Colors.primary
+                                color: f > 0.9 ? Colors.errorColor : Colors.accent2
                             }
                         }
                     }
@@ -178,7 +178,7 @@ Item {
                         anchors { left: hn.right; leftMargin: 12; right: hs.left; rightMargin: 12; verticalCenter: parent.verticalCenter }
                         height: 6; radius: 3
                         color: Colors.surfaceContainerHighest
-                        Rectangle { width: parent.width * f; height: parent.height; radius: 3; color: Qt.alpha(Colors.primary, 0.7) }
+                        Rectangle { width: parent.width * f; height: parent.height; radius: 3; color: Qt.alpha(Colors.accent2, 0.7) }
                     }
                     SHint {
                         id: hs

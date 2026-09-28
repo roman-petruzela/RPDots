@@ -101,7 +101,7 @@ Item {
                     SHint {
                         anchors.right: parent.right
                         text: page.t?.synced ? "󰄬 Synced with internet time" : "Not synced"
-                        color: page.t?.synced ? Colors.primary : Colors.tertiary
+                        color: page.t?.synced ? Colors.accent2 : Colors.tertiary
                     }
                 }
             }
