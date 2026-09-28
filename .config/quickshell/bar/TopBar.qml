@@ -42,6 +42,11 @@ PanelWindow {
         }
     }
 
+    function anchorFor(key) {
+        const it = ({ network: netItem, audio: volItem, power: batt })[key]
+        return it && it.visible ? it.mapToItem(null, it.width / 2, 0).x : -1
+    }
+
     function sh(cmd) { Quickshell.execDetached(["bash", "-c", cmd]) }
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/"
 
@@ -299,6 +304,7 @@ PanelWindow {
             bare: true
             pad: 4
             Item_ {
+                id: netItem
                 value: bar.barData.network.text ?? ""
                 tip: bar.barData.network.tooltip ?? ""
                 baseColor: Colors.tertiary
@@ -348,6 +354,7 @@ PanelWindow {
 
         Pill {
             Item_ {
+                id: volItem
                 icon: bar.barData.muted ? "\ueee8" : (bar.barData.volume < 34 ? "\uf026" : bar.barData.volume < 67 ? "\uf027" : "\uf028")
                 value: bar.barData.muted ? "" : bar.barData.volume + "%"
                 iconColor: bar.barData.muted ? Qt.alpha(Colors.onSurfaceVariant, 0.5) : Colors.onSurfaceVariant

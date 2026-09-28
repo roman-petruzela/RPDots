@@ -37,7 +37,7 @@ ShellRoot {
         target: "audio"
         function toggle(): void { root.openFlyout(audioSwitcher, true) }
         function open(): void   { root.openFlyout(audioSwitcher, false) }
-        function hide(): void   { audioSwitcher.visible = false }
+        function hide(): void   { audioSwitcher.hide() }
         function next(): void   { audioSwitcher.selectNext() }
     }
 
@@ -45,14 +45,14 @@ ShellRoot {
         target: "power"
         function toggle(): void { root.openFlyout(powerSwitcher, true) }
         function open(): void   { root.openFlyout(powerSwitcher, false) }
-        function hide(): void   { powerSwitcher.visible = false }
+        function hide(): void   { powerSwitcher.hide() }
     }
 
     IpcHandler {
         target: "network"
         function toggle(): void { root.openFlyout(networkSwitcher, true) }
         function open(): void   { root.openFlyout(networkSwitcher, false) }
-        function hide(): void   { networkSwitcher.visible = false }
+        function hide(): void   { networkSwitcher.hide() }
     }
 
     IpcHandler {
@@ -101,9 +101,14 @@ ShellRoot {
         function hide(): void   { wallpaperPicker.visible = false }
     }
 
+    function barAnchor(output, key) {
+        const b = bars.instances.find(b => b.output === output)
+        return b ? b.anchorFor(key) : -1
+    }
+
     function openFlyout(target, allowToggle) {
         for (const f of [dashboard, audioSwitcher, powerSwitcher, networkSwitcher, wallpaperPicker, launcher, sessionMenu, clipboardHistory])
-            if (f === dashboard && f !== target) f.hide()
+            if ([dashboard, audioSwitcher, powerSwitcher, networkSwitcher].includes(f) && f !== target) f.hide()
             else if (f !== target) f.visible = false
 
         if (allowToggle) target.toggle()
@@ -172,6 +177,7 @@ ShellRoot {
     }
 
     Variants {
+        id: bars
         model: root.barScreens
         delegate: TopBar { barData: barSource; niri: root.niriRef }
     }
@@ -187,14 +193,17 @@ ShellRoot {
 
     AudioSwitcher {
         id: audioSwitcher
+        anchorFn: output => root.barAnchor(output, "audio")
     }
 
     PowerSwitcher {
         id: powerSwitcher
+        anchorFn: output => root.barAnchor(output, "power")
     }
 
     NetworkSwitcher {
         id: networkSwitcher
+        anchorFn: output => root.barAnchor(output, "network")
     }
 
     WallpaperPicker {
