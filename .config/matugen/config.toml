@@ -12,6 +12,7 @@ run_after = [
 ]
 
 [config.custom_colors]
+accent2 = { color = "#5f8a6e", blend = false }
 
 [templates.waybar-colors]
 input_path = "~/.config/matugen/templates/waybar-colors.css"

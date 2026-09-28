@@ -78,6 +78,7 @@ cursor.hide_after|int|0|0|60
 theme.scheme|enum|tonal-spot|tonal-spot,content,expressive,fidelity,fruit-salad,rainbow,neutral
 theme.contrast|float|0.00|-1|1
 theme.mono_mode|enum|auto|auto,on,off
+theme.accent2|enum|auto|auto,off
 theme.terminal_opacity|float|0.45|0.10|1
 theme.terminal_font|float|11.50|7|24
 theme.spotify_opacity|float|0.75|0.30|1
@@ -414,7 +415,7 @@ apply_for() {
         idle.*) start_idle ;;
         nightlight.*) start_nightlight ;;
         a11y.text_scale) gsettings set org.gnome.desktop.interface text-scaling-factor "${V[a11y.text_scale]}" 2>/dev/null ;;
-        *) return 0 ;;   # theme.scheme/contrast/mono_mode čte apply-wallpaper-theme.sh
+        *) return 0 ;;   # theme.scheme/contrast/mono_mode/accent2 čte apply-wallpaper-theme.sh
     esac
 }
 

@@ -421,6 +421,7 @@ PY
 
 MONO_MODE="${THEME_MONO_MODE:-$("$HOME/.local/bin/rp-settings" get theme.mono_mode 2>/dev/null || echo auto)}"
 MATUGEN_ARGS=()
+matugen_cfg="$HOME/.config/matugen/config.toml"
 case "$MONO_MODE" in
 on) IS_MONO=1 ;;
 off) IS_MONO=0 ;;
@@ -464,16 +465,57 @@ print(dst_cfg)
 PY
 )"
     if [[ -n "$mono_cfg" && -f "$mono_cfg" ]]; then
-        MATUGEN_ARGS+=(-c "$mono_cfg")
+        matugen_cfg="$mono_cfg"
     fi
 fi
 
-if command -v matugen >/dev/null 2>&1 && [[ -f "$wal_input" ]]; then
-    matugen "${MATUGEN_ARGS[@]}" image "$wal_input" --source-color-index 0 2>/dev/null || true
-fi
 _matugen_json=""
 if command -v matugen >/dev/null 2>&1; then
-    _matugen_json="$(matugen "${MATUGEN_ARGS[@]}" image "$wal_input" --source-color-index 0 -j hex 2>/dev/null || true)"
+    _matugen_json="$(matugen "${MATUGEN_ARGS[@]}" -c "$matugen_cfg" image "$wal_input" --source-color-index 0 -j hex --dry-run 2>/dev/null || true)"
+fi
+
+accent_cfg="$(ACCENT_MODE="$("$_rs" get theme.accent2 2>/dev/null || echo auto)" IS_MONO="$IS_MONO" \
+    BASE_CFG="$matugen_cfg" OUT_CFG="$STATE_DIR/matugen-accent.toml" _MATUGEN_JSON="$_matugen_json" \
+    SOURCES="$(matugen image "$wal_input" --show-source-colors 2>/dev/null || true)" python3 - <<'PY' 2>/dev/null || true
+import colorsys, json, os, pathlib, re
+
+def hsv(c):
+    return colorsys.rgb_to_hsv(*(int(c[i:i + 2], 16) / 255.0 for i in (1, 3, 5)))
+
+txt = os.environ["_MATUGEN_JSON"]
+colors = json.loads(txt[txt.index("{"):])["colors"]
+get = lambda k: colors[k]["default"]["color"]
+source = get("source_color")
+
+if os.environ["IS_MONO"] == "1":
+    accent = "#777777"
+elif os.environ["ACCENT_MODE"] == "off":
+    accent = source
+else:
+    accent, best = get("tertiary"), 30
+    h0 = hsv(source)[0]
+    for c in re.findall(r"#[0-9A-Fa-f]{6}", os.environ["SOURCES"])[1:]:
+        h, s, v = hsv(c)
+        d = abs(h - h0) * 360
+        d = min(d, 360 - d)
+        if d > best and s >= 0.2 and v >= 0.2:
+            accent, best = c, d
+
+base = pathlib.Path(os.environ["BASE_CFG"]).read_text()
+line = f'accent2 = {{ color = "{accent}", blend = false }}'
+if re.search(r"(?m)^accent2\s*=", base):
+    out = re.sub(r"(?m)^accent2\s*=.*$", line, base)
+else:
+    out = base.replace("[config.custom_colors]\n", f"[config.custom_colors]\n{line}\n", 1)
+dst = pathlib.Path(os.environ["OUT_CFG"])
+dst.write_text(out)
+print(dst)
+PY
+)"
+[[ -n "$accent_cfg" && -f "$accent_cfg" ]] && matugen_cfg="$accent_cfg"
+
+if command -v matugen >/dev/null 2>&1 && [[ -f "$wal_input" ]]; then
+    matugen "${MATUGEN_ARGS[@]}" -c "$matugen_cfg" image "$wal_input" --source-color-index 0 2>/dev/null || true
 fi
 
 export _MATUGEN_JSON="$_matugen_json"

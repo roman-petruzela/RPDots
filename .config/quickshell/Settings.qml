@@ -86,7 +86,8 @@ Scope {
                   labels: ["Tonal spot", "Content", "Expressive", "Fidelity", "Fruit salad", "Rainbow", "Neutral"] },
                 { key: "theme.contrast", label: "Contrast", hint: "−1 softest, 0 standard, 1 strongest.", step: 0.1, decimals: 1 },
                 { key: "theme.mono_mode", label: "Monochrome scheme", hint: "Grey palette for black-and-white wallpapers.", labels: ["Auto", "On", "Off"] },
-                { kind: "button", action: "theme", label: "Regenerate theme", hint: "Scheme, contrast and monochrome apply on the next regenerate.", icon: "󰑓", text: "Apply now" },
+                { key: "theme.accent2", label: "Second accent", hint: "A second wallpaper color for headings, icons and status; off follows the main color.", labels: ["From wallpaper", "Off"] },
+                { kind: "button", action: "theme", label: "Regenerate theme", hint: "Scheme, contrast, monochrome and second accent apply on the next regenerate.", icon: "󰑓", text: "Apply now" },
             ]},
             { title: "TERMINAL & APPS", rows: [
                 { key: "theme.terminal_opacity", label: "Terminal opacity", hint: "kitty background; running terminals update live.", percent: true, step: 0.05 },
