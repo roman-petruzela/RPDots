@@ -32,6 +32,7 @@ pacman -S --needed --noconfirm greetd
 
 install -d "$DST/greeter"
 install -m644 "$SRC"/greeter/*.qml "$DST/greeter/"
+install -Dm644 "$SRC/../../../.config/quickshell/lock/LockContent.qml" "$DST/greeter/lock/LockContent.qml"
 install -m644 "$USER_HOME/.config/quickshell/Colors.js" "$DST/greeter/Colors.js"
 
 outputs="$(cat "$USER_HOME/.config/niri/config.kdl" "$USER_HOME/.config/niri/displays.kdl" 2>/dev/null | awk '/^output /,/^}/')"
