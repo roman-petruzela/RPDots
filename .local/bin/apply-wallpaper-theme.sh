@@ -58,7 +58,7 @@ cleanup_lock() {
 trap cleanup_lock EXIT
 
 mkdir -p "$PID_DIR" "$WALL_DIR" "$CFG_DIR" "$SNAPSHOT_ROOT"
-export PATH="$HOME/.local/bin:$HOME/.spicetify:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.spicetify:${PATH:-}"
 if [[ -f "$WAYBAR_CSS" ]]; then
     waybar_css_hash_before="$(sha256sum "$WAYBAR_CSS" | awk '{print $1}')"
 fi
