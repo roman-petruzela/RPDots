@@ -15,13 +15,12 @@
   --rp-outline:            {{colors.outline.default.hex}};
   --rp-outline-variant:    {{colors.outline_variant.default.hex}};
 
-  --rp-tint-color: color-mix(in srgb, var(--rp-primary) 18%, var(--rp-primary-container));
-  --rp-window: color-mix(in srgb,
-      color-mix(in srgb, var(--rp-tint-color) 38%, var(--rp-surface)) 40%, transparent);
-  --rp-view-bg: color-mix(in srgb,
-      color-mix(in srgb, var(--rp-tint-color) 34%, var(--rp-bg)) 32%, transparent);
-  --rp-popover: color-mix(in srgb,
-      color-mix(in srgb, var(--rp-tint-color) 52%, var(--rp-bg-high)) 92%, transparent);
+  --rp-term-bg:            {{colors.surface_container_high.default.hex}};
+  --rp-alpha:              0.45;
+
+  --rp-window: color-mix(in srgb, var(--rp-term-bg) calc(var(--rp-alpha) * 100%), transparent);
+  --rp-panel: color-mix(in srgb, var(--rp-fg) 3%, transparent);
+  --rp-popover: color-mix(in srgb, color-mix(in srgb, var(--rp-term-bg) 60%, var(--rp-bg)) 94%, transparent);
   --rp-font: "Aller", "Inter", "Noto Sans", "Noto Color Emoji", "Symbols Nerd Font", sans-serif;
   --rp-font-code: "JetBrainsMono Nerd Font", "Noto Sans Mono", monospace;
 }
@@ -67,11 +66,13 @@ body,
   --mention-foreground: var(--rp-primary) !important;
   --mention-background: color-mix(in srgb, var(--rp-primary) 18%, var(--rp-bg)) !important;
 
-  --background-base-lowest: var(--rp-window) !important;
-  --background-base-lower: var(--rp-view-bg) !important;
-  --background-base-low: var(--rp-popover) !important;
-  --background-secondary: var(--rp-popover) !important;
-  --card-background-default: var(--rp-popover) !important;
+  --background-base-lowest: transparent !important;
+  --background-base-lower: transparent !important;
+  --background-base-low: var(--rp-panel) !important;
+  --background-surface-high: var(--rp-popover) !important;
+  --background-surface-higher: var(--rp-popover) !important;
+  --background-surface-highest: var(--rp-popover) !important;
+  --chat-background-default: var(--rp-panel) !important;
 
   --background-mod-subtle: color-mix(in srgb, var(--rp-primary) 10%, transparent) !important;
   --background-mod-normal: color-mix(in srgb, var(--rp-primary) 18%, transparent) !important;
