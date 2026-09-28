@@ -467,7 +467,8 @@ settings_import() {
 }
 
 case "${1:-}" in
-    info)        info ;;
+    info)        c="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"; out=$(info) || exit 1; printf '%s\n' "$out"
+                 mkdir -p "$c" && printf '%s\n' "$out" > "$c/sysinfo.json.$$" && mv -f "$c/sysinfo.json.$$" "$c/sysinfo.json" ;;
     updates)     updates ;;
     packages)    packages ;;
     pkginfo)     [[ $# -eq 2 ]] || die "usage: rp-sys pkginfo <name>"; pkginfo "$2" ;;

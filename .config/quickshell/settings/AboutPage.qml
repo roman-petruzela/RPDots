@@ -17,7 +17,17 @@ Item {
         proc.running = true
     }
 
-    Component.onCompleted: reload()
+    Component.onCompleted: {
+        try { info = JSON.parse(cache.text()) } catch (e) {}
+        reload()
+    }
+
+    FileView {
+        id: cache
+        path: (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache") + "/niri-rice/sysinfo.json"
+        blockLoading: true
+        printErrors: false
+    }
 
     Process {
         id: proc
