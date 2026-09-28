@@ -8,6 +8,7 @@ Item {
     required property var host
     property string wallpaper: Quickshell.env("HOME") + "/.local/share/wallpapers/current"
     property string backdrop: ""
+    property string user: Quickshell.env("USER") ?? ""
     readonly property string fontFamily: host.fontFamily
 
     function shortLayout(name) {
@@ -114,7 +115,7 @@ Item {
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: Quickshell.env("USER") ?? ""
+                text: content.user
                 font.family: content.fontFamily
                 font.pixelSize: 16
                 font.weight: Font.Medium
@@ -285,7 +286,7 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Quickshell.execDetached(["systemctl", pill.modelData[2]])
+                        onClicked: content.host.power(pill.modelData[2])
                     }
                 }
             }

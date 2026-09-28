@@ -68,6 +68,8 @@ Scope {
         if (!pam.start()) fail("Authentication is unavailable")
     }
 
+    function power(action) { Quickshell.execDetached(["systemctl", action]) }
+
     function fail(text) {
         busy = false
         password = ""
