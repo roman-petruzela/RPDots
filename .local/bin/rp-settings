@@ -341,6 +341,7 @@ EOF
         kitty @ --to "unix:$s" set-background-opacity --all "${V[theme.terminal_opacity]}" >/dev/null 2>&1
         kitty @ --to "unix:$s" set-font-size --all "${V[theme.terminal_font]}" >/dev/null 2>&1
     done
+    RP_ALPHA="${V[theme.terminal_opacity]}" "$HOME/.local/bin/theme-modules/70-vesktop.sh" >/dev/null 2>&1 || true
     return 0
 }
 
