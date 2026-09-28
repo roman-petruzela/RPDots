@@ -16,6 +16,7 @@ PanelWindow {
     screen: modelData
 
     readonly property string output: modelData.name
+    readonly property var hiddenTray: ["nm-applet"]
     readonly property int barHeight: 36
     readonly property int pillHeight: 28
     readonly property int edge: 8
@@ -384,13 +385,14 @@ PanelWindow {
         }
 
         Pill {
-            visible: SystemTray.items.values.length > 0
+            visible: SystemTray.items.values.some(i => !bar.hiddenTray.includes(i.id))
             pad: 10
             Repeater {
                 model: SystemTray.items
                 Item {
                     id: ti
                     required property SystemTrayItem modelData
+                    visible: !bar.hiddenTray.includes(modelData.id)
                     anchors.verticalCenter: parent.verticalCenter
                     width: 18; height: 18
                     readonly property bool symbolic: (ti.modelData.icon || "").indexOf("symbolic") >= 0
