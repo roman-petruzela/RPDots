@@ -278,7 +278,7 @@ Flyout {
                     onClicked: {
                         if (modelData.action === "mixer") {
                             mixerProc.running = true
-                            root.visible = false
+                            root.hide()
                         } else {
                             unpinProc.running = false
                             unpinProc.running = true

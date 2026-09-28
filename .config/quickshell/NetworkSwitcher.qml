@@ -448,7 +448,7 @@ Flyout {
                     onClicked: {
                         if (modelData.action === "editor") {
                             editorProc.running = true
-                            root.visible = false
+                            root.hide()
                         } else {
                             root.run(modelData.action)
                         }
