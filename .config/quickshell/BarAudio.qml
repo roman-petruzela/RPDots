@@ -28,9 +28,9 @@ Item {
         onTriggered: { volProc.running = false; volProc.running = true }
     }
 
-    Process { id: volUpProc;   command: ["bash", "-c", "$HOME/.local/bin/rp-audio volume up"] }
-    Process { id: volDownProc; command: ["bash", "-c", "$HOME/.local/bin/rp-audio volume down"] }
-    Process { id: muteProc;    command: ["bash", "-c", "$HOME/.local/bin/rp-audio mute toggle"] }
+    Process { id: volUpProc;   command: ["bash", "-c", "rp-audio volume up"] }
+    Process { id: volDownProc; command: ["bash", "-c", "rp-audio volume down"] }
+    Process { id: muteProc;    command: ["bash", "-c", "rp-audio mute toggle"] }
     Process { id: switcherProc; command: ["qs", "ipc", "call", "audio", "toggle"] }
 
     function refresh() {

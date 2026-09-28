@@ -87,7 +87,7 @@ fi
 write_session_env
 
 if command -v systemctl >/dev/null 2>&1; then
-  systemctl --user start --no-block niri-rice-quickshell.service niri-rice-audio-sync.service \
+  systemctl --user start --no-block niri-rice-quickshell.service rp-audio.service \
     niri-rice-cliphist.service niri-rice-playerctld.service niri-rice-wallpaper-healthcheck.timer \
     niri-rice-waybar.timer >/dev/null 2>&1 || true
 fi

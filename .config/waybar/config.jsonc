@@ -54,9 +54,9 @@
     "tooltip-format": "{desc}\n{volume} %",
     "on-click": "~/.local/bin/rp-shell audio toggle",
     "on-click-right": "~/.local/bin/rp-shell settings sound",
-    "on-click-middle": "~/.local/bin/rp-audio mute",
-    "on-scroll-up": "~/.local/bin/rp-audio volume up",
-    "on-scroll-down": "~/.local/bin/rp-audio volume down",
+    "on-click-middle": "rp-audio mute",
+    "on-scroll-up": "rp-audio volume up",
+    "on-scroll-down": "rp-audio volume down",
   },
   "backlight": { "format": "󰃟 {percent}%" },
   "custom/network": {

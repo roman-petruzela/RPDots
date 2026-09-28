@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-RP_AUDIO="$HOME/.local/bin/rp-audio"
+RP_AUDIO=rp-audio
 
 case "${1:-up}" in
     mute) exec "$RP_AUDIO" mute toggle ;;

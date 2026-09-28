@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-exec "$HOME/.local/bin/rp-audio" cycle
+exec rp-audio cycle

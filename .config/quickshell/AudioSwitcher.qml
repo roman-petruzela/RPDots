@@ -18,7 +18,7 @@ Flyout {
     readonly property bool muted: active && active.audio ? active.audio.muted : false
 
     Process { id: mixerProc; command: ["bash", "-c", "$HOME/.local/bin/rp-shell settings sound"] }
-    Process { id: unpinProc; command: ["bash", "-c", "$HOME/.local/bin/rp-audio unpin"] }
+    Process { id: unpinProc; command: ["bash", "-c", "rp-audio unpin"] }
 
     function selectSink(node) {
         Pipewire.preferredDefaultAudioSink = node

@@ -46,7 +46,7 @@ PanelWindow {
     function setVolume(v) {
         if (volProc.running) { root.volPending = v; return }
         root.volPending = null
-        volProc.command = [root.bin + "rp-audio", "volume", "set", String(v)]
+        volProc.command = ["rp-audio", "volume", "set", String(v)]
         volProc.running = true
     }
     function setBrightness(v) {
@@ -170,7 +170,7 @@ PanelWindow {
                             dimmed: root.barData ? root.barData.muted : false
                             onMoved: v => root.setVolume(v)
                             onReleased: v => root.setVolume(v)
-                            onIconClicked: Quickshell.execDetached([root.bin + "rp-audio", "mute", "toggle"])
+                            onIconClicked: Quickshell.execDetached(["rp-audio", "mute", "toggle"])
                         }
                         DashSlider {
                             width: parent.width

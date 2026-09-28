@@ -18,7 +18,7 @@ Item {
     }
 
     function audio(args) {
-        Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/rp-audio"].concat(args))
+        Quickshell.execDetached(["rp-audio"].concat(args))
         refresh.restart()
     }
 
@@ -26,7 +26,7 @@ Item {
 
     Process {
         id: statusProc
-        command: [Quickshell.env("HOME") + "/.local/bin/rp-audio", "status"]
+        command: ["rp-audio", "status"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {

@@ -146,9 +146,21 @@ install_packages() {
         fi
     fi
     [[ ${#repo[@]} -eq 0 && ${#aur[@]} -eq 0 ]] && echo " -> All packages already installed"
+    install_rp_audio
     install_cursor
     install_zsh
     return 0
+}
+
+install_rp_audio() {
+    pacman -Qq rp-audio-git &>/dev/null && return 0
+    echo " -> Building rp-audio"
+    local tmp; tmp="$(mktemp -d)"
+    git clone -q --depth 1 https://github.com/roman-petruzela/rp-audio.git "$tmp/rp-audio" \
+        && (cd "$tmp/rp-audio" && makepkg -si --noconfirm) \
+        && systemctl --user enable rp-audio.service 2>/dev/null \
+        || echo "warning: rp-audio installation failed" >&2
+    rm -rf "$tmp"
 }
 
 install_zsh() {
@@ -262,7 +274,7 @@ post_deploy() {
         "$HOME/.local/bin/apply-wallpaper-theme.sh" >/dev/null 2>&1 || echo "warning: theme generation failed" >&2
     fi
 
-    systemctl --user try-restart niri-rice-quickshell.service niri-rice-audio-sync.service \
+    systemctl --user try-restart niri-rice-quickshell.service rp-audio.service \
         2>/dev/null || true
     systemctl --user start niri-rice-cliphist.service 2>/dev/null || true
     pkill -USR2 -x waybar 2>/dev/null || true

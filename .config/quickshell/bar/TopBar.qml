@@ -362,8 +362,8 @@ PanelWindow {
                 clickable: true
                 onLeftClicked: bar.sh(bar.bin + "rp-shell audio toggle")
                 onRightClicked: bar.sh(bar.bin + "rp-shell settings sound")
-                onMiddleClicked: bar.sh(bar.bin + "rp-audio mute")
-                onWheel: dir => bar.sh(bar.bin + "rp-audio volume " + (dir > 0 ? "up" : "down"))
+                onMiddleClicked: bar.sh("rp-audio mute")
+                onWheel: dir => bar.sh("rp-audio volume " + (dir > 0 ? "up" : "down"))
             }
             Item_ {
                 id: batt
