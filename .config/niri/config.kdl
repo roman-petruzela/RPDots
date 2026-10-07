@@ -137,6 +137,7 @@ window-rule {
 window-rule {
     match title="^RPLauncher$"
     open-floating true
+    open-focused true
     geometry-corner-radius 12
     clip-to-geometry true
 }
