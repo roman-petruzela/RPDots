@@ -482,7 +482,7 @@ case "${1:-}" in
     upgrade-all)
         if has paru; then
             echo ":: paru -Syu (repositories and AUR, building as $USER, installing through pkexec)"
-            paru -Syu --noconfirm --sudo pkexec --skipreview --noprogressbar --color never 2>&1 || exit $?
+            paru -Syu --noconfirm --sudo pkexec --skipreview --batchinstall --failfast --noprogressbar --color never 2>&1 || exit $?
         else
             echo ":: pacman -Syu"
             pkexec pacman -Syu "${PACMAN_FLAGS[@]}" 2>&1 || exit $?
@@ -495,7 +495,7 @@ case "${1:-}" in
     upgrade-aur)
         has paru || die "paru is not installed"
         echo ":: paru -Sua (building as $USER, installing through pkexec)"
-        exec paru -Sua --noconfirm --sudo pkexec --skipreview --noprogressbar --color never 2>&1 ;;
+        exec paru -Sua --noconfirm --sudo pkexec --skipreview --batchinstall --failfast --noprogressbar --color never 2>&1 ;;
     upgrade-flatpak)
         echo ":: flatpak update"
         exec flatpak update -y --noninteractive 2>&1 ;;
@@ -512,7 +512,7 @@ case "${1:-}" in
         if (( ${#aurp[@]} )); then
             has paru || die "not in the repositories and paru is missing: ${aurp[*]}"
             echo ":: paru -S ${aurp[*]} (AUR)"
-            paru -S --needed --noconfirm --sudo pkexec --skipreview --noprogressbar --color never "${aurp[@]}" 2>&1 || exit $?
+            paru -S --needed --noconfirm --sudo pkexec --skipreview --batchinstall --failfast --noprogressbar --color never "${aurp[@]}" 2>&1 || exit $?
         fi ;;
     remove)
         shift; [[ $# -gt 0 ]] || die "usage: rp-sys remove <pkg…>"; valid_pkgs "$@"
