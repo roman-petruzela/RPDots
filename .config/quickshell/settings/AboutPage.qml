@@ -118,22 +118,25 @@ Item {
         property string title
         property string icon
         default property alias content: cardCol.data
-        height: cardCol.implicitHeight + 64
+        height: cardCol.implicitHeight + 66
+        readonly property int inset: 18
         Item {
             id: cardHead
-            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 18 }
-            height: 22
+            anchors { left: parent.left; right: parent.right; top: parent.top; margins: card.inset }
+            height: card.inset
             Text {
                 id: cardIcon
-                anchors { right: cardTitle.left; rightMargin: 9; verticalCenter: parent.verticalCenter }
+                width: card.inset; height: card.inset
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
                 text: card.icon
-                font.family: "JetBrainsMono Nerd Font"
+                font.family: "JetBrainsMono Nerd Font Propo"
                 font.pixelSize: 16
                 color: Colors.accent2
             }
             SLabel {
                 id: cardTitle
-                anchors { left: parent.left; leftMargin: 30; verticalCenter: parent.verticalCenter }
+                anchors { left: cardIcon.right; leftMargin: card.inset; verticalCenter: cardIcon.verticalCenter }
                 text: card.title
                 font.weight: Font.DemiBold
             }
