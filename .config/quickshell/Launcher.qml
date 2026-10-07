@@ -13,6 +13,42 @@ Scope {
     function hide()   { visible = false }
     function toggle() { visible = !visible }
 
+    property var recent: []
+    property var apps: []
+
+    function appIcon(name) {
+        return (name ? Quickshell.iconPath(name, true) : "")
+            || Quickshell.iconPath("application-x-executable")
+    }
+
+    function loadApps() {
+        apps = DesktopEntries.applications.values.filter(a => !a.noDisplay).map(a => ({
+            app: a, icon: appIcon(a.icon),
+            sub: a.genericName && a.genericName !== a.name ? a.genericName : (a.comment || "")
+        }))
+    }
+
+    function launched(id) {
+        recent = [id].concat(recent.filter(r => r !== id)).slice(0, 30)
+        recentFile.setText(JSON.stringify(recent))
+    }
+
+    Component.onCompleted: loadApps()
+
+    Connections {
+        target: DesktopEntries.applications
+        function onValuesChanged() { outer.loadApps() }
+    }
+
+    FileView {
+        id: recentFile
+        path: Quickshell.env("HOME") + "/.cache/niri-rice/launcher-recent.json"
+        printErrors: false
+        onLoaded: {
+            try { outer.recent = JSON.parse(text()) } catch (e) { outer.recent = [] }
+        }
+    }
+
     LazyLoader {
         active: outer.visible
 
@@ -24,7 +60,6 @@ Scope {
             readonly property int maxRows: 12
             readonly property int pad: 12
 
-            property var recent: []
             property var results: []
             property string query: ""
             property int selected: 0
@@ -53,21 +88,10 @@ Scope {
                 }
             }
 
-            FileView {
-                id: recentFile
-                path: Quickshell.env("HOME") + "/.cache/niri-rice/launcher-recent.json"
-                printErrors: false
-                onLoaded: {
-                    try { root.recent = JSON.parse(text()) } catch (e) { root.recent = [] }
-                    root.refresh()
-                }
-            }
-
             Connections {
-                target: DesktopEntries.applications
-                function onValuesChanged() {
-                    root.refresh()
-                }
+                target: outer
+                function onAppsChanged() { root.refresh() }
+                function onRecentChanged() { root.refresh() }
             }
 
             function calc(q) {
@@ -99,26 +123,24 @@ Scope {
             function refresh() {
                 const q = input.text.trim().toLowerCase()
                 query = q
-                const apps = DesktopEntries.applications.values.filter(a => !a.noDisplay)
+                const apps = outer.apps
                 const rank = id => {
-                    const i = root.recent.indexOf(id)
+                    const i = outer.recent.indexOf(id)
                     return i < 0 ? 0 : 20 - Math.min(i, 19)
                 }
                 let out
                 if (q === "") {
                     out = apps.slice().sort((a, b) =>
-                        rank(b.id) - rank(a.id) || a.name.localeCompare(b.name))
+                        rank(b.app.id) - rank(a.app.id) || a.app.name.localeCompare(b.app.name))
                 } else {
-                    out = apps.map(a => ({ a, s: score(a, q) }))
+                    out = apps.map(e => ({ e, s: score(e.app, q) }))
                         .filter(x => x.s > 0)
-                        .sort((x, y) => (y.s + rank(y.a.id) / 4) - (x.s + rank(x.a.id) / 4)
-                            || x.a.name.localeCompare(y.a.name))
-                        .map(x => x.a)
+                        .sort((x, y) => (y.s + rank(y.e.app.id) / 4) - (x.s + rank(x.e.app.id) / 4)
+                            || x.e.app.name.localeCompare(y.e.app.name))
+                        .map(x => x.e)
                 }
-                const rows = out.map(a => ({
-                    kind: "app", app: a, title: a.name,
-                    sub: a.genericName && a.genericName !== a.name ? a.genericName : (a.comment || ""),
-                    icon: root.appIcon(a.icon)
+                const rows = out.map(e => ({
+                    kind: "app", app: e.app, title: e.app.name, sub: e.sub, icon: e.icon
                 }))
                 const result = calc(q)
                 if (result !== null)
@@ -127,11 +149,6 @@ Scope {
                 results = rows
                 selected = 0
                 list.positionViewAtBeginning()
-            }
-
-            function appIcon(name) {
-                return (name ? Quickshell.iconPath(name, true) : "")
-                    || Quickshell.iconPath("application-x-executable")
             }
 
             function activate(i) {
@@ -144,9 +161,7 @@ Scope {
                 }
                 if (r.app.runInTerminal) Quickshell.execDetached(["kitty", "-e"].concat(r.app.command))
                 else r.app.execute()
-
-                recent = [r.app.id].concat(recent.filter(id => id !== r.app.id)).slice(0, 30)
-                recentFile.setText(JSON.stringify(recent))
+                outer.launched(r.app.id)
             }
 
             function highlight(name, q) {
