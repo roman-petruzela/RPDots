@@ -1,0 +1,7 @@
+[Unit]
+Description=Niri rice — notify about package updates
+After=graphical-session.target network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/rp-update-notify

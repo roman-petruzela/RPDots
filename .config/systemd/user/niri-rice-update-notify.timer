@@ -1,0 +1,10 @@
+[Unit]
+Description=Niri rice — periodic package update check
+PartOf=graphical-session.target
+
+[Timer]
+OnActiveSec=10min
+OnUnitActiveSec=3h
+
+[Install]
+WantedBy=graphical-session.target

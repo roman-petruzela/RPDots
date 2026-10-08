@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/update-notify.sig"
+BIN="$HOME/.local/bin"
+
+json=$("$BIN/rp-sys" updates) || exit 0
+[[ -z "$(jq -r '.error' <<<"$json")" ]] || exit 0
+
+count=$(jq '[.repo, .aur, .flatpak] | map(length) | add' <<<"$json")
+if [[ "$count" -eq 0 ]]; then
+    rm -f "$STATE"
+    exit 0
+fi
+
+sig=$(jq -c '[.repo, .aur, .flatpak] | add | map(.name + " " + .new) | sort' <<<"$json" | sha1sum | cut -d' ' -f1)
+[[ "$(cat "$STATE" 2>/dev/null)" == "$sig" ]] && exit 0
+mkdir -p "$(dirname "$STATE")"
+echo "$sig" > "$STATE"
+
+body=$(jq -r '[ (.repo | length | select(. > 0) | "\(.) from repositories"),
+                (.aur | length | select(. > 0) | "\(.) from AUR"),
+                (.flatpak | length | select(. > 0) | "\(.) Flatpak") ] | join(", ")' <<<"$json")
+[[ "$count" -eq 1 ]] && summary="1 update available" || summary="$count updates available"
+
+action=$(timeout 1h notify-send -a Updates -i system-software-update -A default=Open --wait "$summary" "$body" || true)
+[[ "$action" == default ]] && "$BIN/rp-shell" settings updates
+exit 0
