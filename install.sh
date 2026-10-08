@@ -213,8 +213,9 @@ repo_files() {
 }
 
 remember_dotfiles() {
-    mkdir -p "$HOME/.config/niri-rice"
+    mkdir -p "$HOME/.config/niri-rice" "$STATE_DIR"
     printf '%s\n' "$DOTFILES" >"$HOME/.config/niri-rice/dotfiles-path"
+    git -C "$DOTFILES" rev-parse HEAD >"$STATE_DIR/deployed-commit" 2>/dev/null || true
 }
 
 copy_configs() {
@@ -302,6 +303,131 @@ system_setup() {
         sudo "$share/rp-greeter/install.sh"
     fi
 }
+
+pull_repo() {
+    git -C "$DOTFILES" rev-parse --is-inside-work-tree &>/dev/null || { echo " -> Not a git checkout, skipping pull"; return 0; }
+    git -C "$DOTFILES" rev-parse --abbrev-ref '@{upstream}' &>/dev/null || { echo " -> No upstream branch, skipping pull"; return 0; }
+    echo ":: Pulling $(git -C "$DOTFILES" rev-parse --abbrev-ref '@{upstream}')"
+    [[ -t 0 ]] || export GIT_TERMINAL_PROMPT=0
+    if ! git -C "$DOTFILES" pull --rebase --autostash --quiet; then
+        echo "error: git pull failed; resolve it in $DOTFILES and run ./install.sh update again" >&2
+        exit 1
+    fi
+}
+
+UPDATED=()
+merge_configs() {
+    local base="$1" f src dst old tmp backup new=0 updated=0 merged=0 kept=0
+    local -a conflicts=()
+    backup="$STATE_DIR/deploy-backup/$(date +%Y%m%d-%H%M%S)"
+    tmp="$(mktemp -d)"
+    echo ":: Updating configs in $HOME (base ${base:0:7})"
+
+    while IFS= read -r f; do
+        src="$DOTFILES/$f"
+        dst="$HOME/$f"
+        if [[ ! -e "$dst" && ! -L "$dst" ]]; then
+            mkdir -p "$(dirname "$dst")"
+            cp -p "$src" "$dst"
+            UPDATED+=("$f"); new=$((new + 1))
+            continue
+        fi
+        cmp -s "$src" "$dst" && continue
+        old="$tmp/base"
+        if ! git -C "$DOTFILES" show "$base:$f" >"$old" 2>/dev/null; then
+            cp -p "$src" "$dst.new"; conflicts+=("$f"); continue
+        fi
+        cmp -s "$old" "$src" && { kept=$((kept + 1)); continue; }
+        mkdir -p "$backup/$(dirname "$f")"
+        cp -P "$dst" "$backup/$f"
+        if cmp -s "$old" "$dst"; then
+            cp -p "$src" "$dst"
+            UPDATED+=("$f"); updated=$((updated + 1))
+        elif cp "$dst" "$tmp/merged" && git merge-file -q "$tmp/merged" "$old" "$src" 2>/dev/null; then
+            cat "$tmp/merged" >"$dst"
+            UPDATED+=("$f"); merged=$((merged + 1))
+        else
+            cp -p "$src" "$dst.new"; conflicts+=("$f")
+        fi
+    done < <(repo_files)
+
+    while IFS= read -r f; do
+        [[ -z "$f" || -e "$DOTFILES/$f" || ! -f "$HOME/$f" ]] && continue
+        git -C "$DOTFILES" show "$base:$f" 2>/dev/null | cmp -s - "$HOME/$f" || continue
+        mkdir -p "$backup/$(dirname "$f")"
+        mv "$HOME/$f" "$backup/$f"
+        echo "  removed  $f"
+    done < <(git -C "$DOTFILES" diff --name-only --diff-filter=D "$base" HEAD 2>/dev/null)
+
+    rm -rf "$tmp"
+    echo " -> $new new, $updated updated, $merged merged with your changes, $kept kept as you changed them"
+    [[ -d "$backup" ]] && echo " -> Previous versions backed up to $backup"
+    if [[ ${#conflicts[@]} -gt 0 ]]; then
+        echo " -> Your changes conflict with the update; the new version is next to yours as .new:"
+        printf '      ~/%s.new\n' "${conflicts[@]}"
+    fi
+    return 0
+}
+
+update_packages() {
+    local pkg missing=()
+    for pkg in "${PKGS[@]}"; do
+        pacman -T "$pkg" &>/dev/null || missing+=("$pkg")
+    done
+    [[ ${#missing[@]} -eq 0 ]] && return 0
+    echo ":: Installing new dependencies: ${missing[*]}"
+    "$HOME/.local/bin/rp-sys" install "${missing[@]}" || echo "warning: package installation failed" >&2
+}
+
+update_units() {
+    local f unit restart=()
+    systemctl --user daemon-reload
+    for f in "${UPDATED[@]}"; do
+        [[ "$f" == .config/systemd/user/* ]] || continue
+        unit="${f##*/}"
+        grep -q '^\[Install\]' "$HOME/$f" && ! systemctl --user is-enabled -q "$unit" 2>/dev/null \
+            && systemctl --user enable --now "$unit" 2>/dev/null && echo " -> Enabled $unit"
+    done
+    for unit in $(systemctl --user list-units --type=service --state=running --no-legend --plain 'niri-rice-*' | awk '{print $1}'); do
+        [[ "$unit" == niri-rice-quickshell.service ]] && continue
+        for f in "${UPDATED[@]}"; do
+            if [[ "$f" == ".config/systemd/user/$unit" ]] \
+                || systemctl --user cat "$unit" 2>/dev/null | grep -q "^ExecStart=.*${f##*/}"; then
+                restart+=("$unit"); break
+            fi
+        done
+    done
+    if [[ ${#restart[@]} -gt 0 ]]; then
+        systemctl --user try-restart "${restart[@]}" && echo " -> Restarted ${restart[*]}"
+    fi
+    return 0
+}
+
+run_update() {
+    local base
+    base="$(cat "$STATE_DIR/deployed-commit" 2>/dev/null \
+        || git -C "$DOTFILES" rev-parse -q --verify ORIG_HEAD 2>/dev/null || git -C "$DOTFILES" rev-parse HEAD)"
+    if [[ "${1:-}" != --pulled ]]; then
+        pull_repo
+        exec "$DOTFILES/install.sh" update --pulled "$base"
+    fi
+    base="${2:-$base}"
+    git -C "$DOTFILES" cat-file -e "$base^{commit}" 2>/dev/null || base="$(git -C "$DOTFILES" rev-parse HEAD)"
+    merge_configs "$base"
+    remember_dotfiles
+    update_packages
+    update_units
+    if command -v niri >/dev/null && ! niri validate -c "$HOME/.config/niri/config.kdl" >/dev/null 2>&1; then
+        echo "warning: niri config validation failed" >&2
+    fi
+    echo ":: RPDots is up to date ($(git -C "$DOTFILES" log -1 --format='%h %s' 2>/dev/null))"
+}
+
+case "${1:-}" in
+    update) shift; run_update "$@"; exit 0 ;;
+    "") ;;
+    *) echo "usage: ./install.sh [update]" >&2; exit 2 ;;
+esac
 
 echo "RPDots installer ($DOTFILES)"
 echo
