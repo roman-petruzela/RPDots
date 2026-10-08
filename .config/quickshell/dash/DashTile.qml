@@ -8,6 +8,7 @@ Rectangle {
     property bool active: false
     property bool busy: false
     signal clicked()
+    signal rightClicked()
 
     implicitHeight: 64
     radius: 14
@@ -46,6 +47,11 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: if (!tile.busy) tile.clicked()
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: e => {
+            if (tile.busy) return
+            if (e.button === Qt.RightButton) tile.rightClicked()
+            else tile.clicked()
+        }
     }
 }

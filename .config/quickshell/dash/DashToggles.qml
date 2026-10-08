@@ -62,7 +62,8 @@ Item {
         action.running = true
     }
 
-    readonly property var powerLabels: ({ battery: "Battery", balanced: "Balanced", gaming: "Gaming", turbo: "Turbo" })
+    readonly property var powerLabels: ({ battery: "Battery", balanced: "Balanced", gaming: "Gaming" })
+    readonly property var powerCycle: ["battery", "balanced", "gaming"]
 
     Grid {
         id: grid
@@ -124,7 +125,13 @@ Item {
             icon: root.power === "battery" ? "\u{f032a}" : root.power === "gaming" ? "\u{f02b4}" : "\u{f0f85}"
             label: root.powerLabels[root.power] || "Power"
             active: root.power === "gaming"
-            onClicked: Quickshell.execDetached([root.bin + "rp-shell", "power", "open"])
+            busy: root.busyKey === "power"
+            onClicked: {
+                const next = root.powerCycle[(root.powerCycle.indexOf(root.power) + 1) % root.powerCycle.length]
+                root.power = next
+                root.run("power", [root.bin + "rp-power", next])
+            }
+            onRightClicked: Quickshell.execDetached([root.bin + "rp-shell", "power", "open"])
         }
         DashTile {
             width: grid.cellW
