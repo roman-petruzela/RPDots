@@ -81,6 +81,28 @@ updates() {
           error: $err, checked: $checked }'
 }
 
+dotfiles() {
+    local repo err="" behind=0 ahead=0 dirty=false log="" conflicts
+    repo=$(cat "$HOME/.config/niri-rice/dotfiles-path" 2>/dev/null || echo "$HOME/dotfiles")
+    if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        err="$repo is not a git checkout"
+    elif ! git -C "$repo" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+        err="No upstream branch"
+    else
+        GIT_TERMINAL_PROMPT=0 timeout 30 git -C "$repo" fetch --quiet 2>/dev/null || err="Fetch failed (offline?)"
+        read -r ahead behind < <(git -C "$repo" rev-list --left-right --count 'HEAD...@{upstream}' 2>/dev/null || echo "0 0")
+        [[ -n "$(git -C "$repo" status --porcelain --untracked-files=no 2>/dev/null)" ]] && dirty=true
+        log=$(git -C "$repo" log --format='%h%x09%cr%x09%s' 'HEAD..@{upstream}' 2>/dev/null | head -n 50)
+    fi
+    conflicts=$(cd "$HOME" && git -C "$repo" ls-files 2>/dev/null | while IFS= read -r f; do [[ -f "$f.new" ]] && echo "$f.new"; done)
+    jq -n --arg repo "$repo" --arg err "$err" --argjson behind "${behind:-0}" --argjson ahead "${ahead:-0}" \
+        --argjson dirty "$dirty" --arg log "$log" --arg conflicts "$conflicts" \
+        --arg head "$(git -C "$repo" log -1 --format='%h %s' 2>/dev/null)" '
+        { repo: $repo, head: $head, behind: $behind, ahead: $ahead, dirty: $dirty, error: $err,
+          commits: ($log | split("\n") | map(select(length > 0) | split("\t") | { hash: .[0], when: .[1], subject: .[2] })),
+          conflicts: ($conflicts | split("\n") | map(select(length > 0))) }'
+}
+
 packages() {
     local foreign; foreign=$(pacman -Qqm 2>/dev/null | paste -sd' ' -)
     local orphans; orphans=$(pacman -Qqdt 2>/dev/null | paste -sd' ' -)
@@ -470,6 +492,7 @@ case "${1:-}" in
     info)        c="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"; out=$(info) || exit 1; printf '%s\n' "$out"
                  mkdir -p "$c" && printf '%s\n' "$out" > "$c/sysinfo.json.$$" && mv -f "$c/sysinfo.json.$$" "$c/sysinfo.json" ;;
     updates)     updates ;;
+    dotfiles)    dotfiles ;;
     packages)    packages ;;
     pkginfo)     [[ $# -eq 2 ]] || die "usage: rp-sys pkginfo <name>"; pkginfo "$2" ;;
     search)      [[ $# -eq 2 ]] || die "usage: rp-sys search <query>"; search "$2" ;;

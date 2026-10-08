@@ -12,12 +12,29 @@ Item {
     readonly property bool checking: proc.running
     readonly property int total: result ? result.repo.length + result.aur.length + result.flatpak.length : 0
 
+    property var dots: null
+
     function check() {
         proc.running = false
         proc.running = true
+        checkDots()
+    }
+    function checkDots() {
+        dotsProc.running = false
+        dotsProc.running = true
     }
 
-    Component.onCompleted: if (!host.updatesCache) check()
+    Component.onCompleted: if (!host.updatesCache) check(); else checkDots()
+
+    Process {
+        id: dotsProc
+        command: [Quickshell.env("HOME") + "/.local/bin/rp-sys", "dotfiles"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { page.dots = JSON.parse(text) } catch (e) { page.dots = null }
+            }
+        }
+    }
 
     Process {
         id: proc
@@ -31,7 +48,7 @@ Item {
     }
 
     function run(title, cmd, term) {
-        host.job.start(title, cmd, term, code => { if (code === 0) page.check() })
+        host.job.start(title, cmd, term, code => { if (code === 0) page.check(); else page.checkDots() })
     }
 
     readonly property var terminalAll: ["kitty", "--hold", "-e", "paru"]
@@ -165,6 +182,28 @@ Item {
                 leftPadding: 14; rightPadding: 14
                 text: "Update all runs paru -Syu (repositories and AUR) and then Flatpak, with the log below. "
                     + "Terminal opens paru with prompts."
+            }
+
+            Group {
+                title: "RPDOTS"
+                icon: "󰊢"
+                items: (page.dots?.commits ?? []).map(c => ({ name: c.subject, old: "", new: c.hash + "  ·  " + c.when }))
+                actionText: "Update RPDots"
+                onAction: page.run("Updating RPDots", [page.dots.repo + "/install.sh", "update"],
+                                   ["kitty", "--hold", "-e", page.dots.repo + "/install.sh", "update"])
+            }
+            SHint {
+                width: parent.width
+                leftPadding: 14; rightPadding: 14
+                visible: text !== ""
+                color: page.dots?.conflicts.length ? Colors.tertiary : Colors.onSurfaceVariant
+                text: !page.dots ? ""
+                    : page.dots.conflicts.length ? "RPDots: your edits conflict with the update. Compare and delete: "
+                        + page.dots.conflicts.map(f => "~/" + f).join(", ")
+                    : page.dots.error !== "" ? "RPDots: " + page.dots.error
+                    : page.dots.behind === 0 ? "RPDots is up to date (" + page.dots.head + ")."
+                    : "Update RPDots pulls the repository and updates your configs. Files you changed are merged; "
+                        + "on a conflict the new version is saved next to yours as .new."
             }
 
             Group {
