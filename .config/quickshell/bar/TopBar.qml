@@ -58,14 +58,17 @@ PanelWindow {
             .filter(w => w.is_active || Object.values(niri.windows).some(x => x.workspace_id === w.id))
             .sort((a, b) => a.idx - b.idx)
     }
-    readonly property string windowTitle: {
-        if (!niri) return ""
+    readonly property var activeWindow: {
+        if (!niri) return null
         niri.revision
         const ws = Object.values(niri.workspaces).find(w => w.output === output && w.is_active)
-        const win = ws && ws.active_window_id != null ? niri.windows[ws.active_window_id] : null
-        const t = win ? (win.title || win.app_id || "") : ""
+        return ws && ws.active_window_id != null ? niri.windows[ws.active_window_id] : null
+    }
+    readonly property string windowTitle: {
+        const t = activeWindow ? (activeWindow.title || activeWindow.app_id || "") : ""
         return t.length > 50 ? t.slice(0, 49) + "…" : t
     }
+    readonly property string windowApp: activeWindow?.app_id ? niri.appName(activeWindow.app_id) : ""
 
     component Pill: Rectangle {
         id: pill
@@ -211,7 +214,10 @@ PanelWindow {
         }
 
         Pill {
+            id: titlePill
             visible: bar.windowTitle !== ""
+            HoverHandler { id: titleHover }
+            BarTooltip { target: titlePill; text: bar.windowApp; wanted: titleHover.hovered }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: bar.windowTitle
