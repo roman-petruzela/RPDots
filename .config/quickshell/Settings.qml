@@ -152,6 +152,10 @@ Scope {
                 { key: "notify.max_visible", label: "Visible at once" },
                 { kind: "button", action: "test-notify", label: "Test", hint: "Send a sample notification.", icon: "󰂚", text: "Send" },
             ]},
+            { title: "SOUNDS", rows: [
+                { key: "sounds.volume", label: "Volume feedback", hint: "Play a sound after changing volume with a slider." },
+                { key: "sounds.devices", label: "Device sounds", hint: "Play a sound when a USB device is plugged in or removed." },
+            ]},
             { title: "IDLE", rows: [
                 { key: "idle.lock_min", label: "Lock screen after", suffix: " min", zero: "Never" },
                 { key: "idle.screen_off_min", label: "Turn screens off after", suffix: " min", zero: "Never" },

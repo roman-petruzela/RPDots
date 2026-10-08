@@ -43,6 +43,11 @@ PanelWindow {
             else if (root.barData) root.barData.refreshBrightness()
         }
     }
+    Timer {
+        id: volumeBeep
+        interval: 200
+        onTriggered: Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/rp-sound", "volume"])
+    }
     function setVolume(v) {
         if (volProc.running) { root.volPending = v; return }
         root.volPending = null
@@ -169,7 +174,7 @@ PanelWindow {
                             value: root.barData ? root.barData.volume : 0
                             dimmed: root.barData ? root.barData.muted : false
                             onMoved: v => root.setVolume(v)
-                            onReleased: v => root.setVolume(v)
+                            onReleased: v => { root.setVolume(v); volumeBeep.restart() }
                             onIconClicked: Quickshell.execDetached(["rp-audio", "mute", "toggle"])
                         }
                         DashSlider {

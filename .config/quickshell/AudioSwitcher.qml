@@ -34,6 +34,12 @@ Flyout {
         root.selectSink(root.sinks[(cur + 1) % root.sinks.length])
     }
 
+    Timer {
+        id: volumeBeep
+        interval: 200
+        onTriggered: Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/rp-sound", "volume"])
+    }
+
     function setVolumeAll(v) {
         const clamped = Math.max(0, Math.min(1, v))
         for (const s of root.sinks)
@@ -204,8 +210,11 @@ Flyout {
                 onPositionChanged: e => {
                     if (pressed) root.setVolumeAll(e.x / slider.width)
                 }
-                onWheel: e => root.setVolumeAll(
-                    root.volume + (e.angleDelta.y > 0 ? 0.02 : -0.02))
+                onReleased: volumeBeep.restart()
+                onWheel: e => {
+                    root.setVolumeAll(root.volume + (e.angleDelta.y > 0 ? 0.02 : -0.02))
+                    volumeBeep.restart()
+                }
             }
         }
 

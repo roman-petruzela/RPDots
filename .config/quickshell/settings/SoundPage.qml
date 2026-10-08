@@ -17,6 +17,12 @@ Item {
         statusProc.running = true
     }
 
+    Timer {
+        id: volumeBeep
+        interval: 200
+        onTriggered: Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/rp-sound", "volume"])
+    }
+
     function audio(args) {
         Quickshell.execDetached(["rp-audio"].concat(args))
         refresh.restart()
@@ -174,7 +180,7 @@ Item {
                         from: 0; to: 100; step: 1
                         value: page.st?.volume ?? 0
                         suffix: "%"
-                        onMoved: v => page.audio(["volume", "set", String(Math.round(v))])
+                        onMoved: v => { page.audio(["volume", "set", String(Math.round(v))]); volumeBeep.restart() }
                     }
                 }
             }

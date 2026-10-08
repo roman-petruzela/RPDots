@@ -86,6 +86,8 @@ notify.position|enum|top-right|top-left,top-center,top-right,bottom-left,bottom-
 notify.timeout|int|6|0|60
 notify.max_visible|int|5|1|20
 notify.dnd|bool|false
+sounds.volume|bool|true
+sounds.devices|bool|true
 idle.lock_min|int|5|0|120
 idle.screen_off_min|int|10|0|180
 idle.lock_on_sleep|bool|true
