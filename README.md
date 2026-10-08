@@ -1,4 +1,4 @@
-# RPRice
+# RPDots
 
 Dotfiles for a [niri](https://github.com/YaLTeR/niri) desktop on Arch Linux and CachyOS. Colours are generated from the wallpaper with matugen; the bar, dashboard, launcher, settings, notifications, lock and login screens are built in [quickshell](https://quickshell.outfoxxed.me/).
 
@@ -20,7 +20,7 @@ Dotfiles for a [niri](https://github.com/YaLTeR/niri) desktop on Arch Linux and 
 ## Installation
 
 ```bash
-git clone https://github.com/roman-petruzela/RPRice ~/dotfiles
+git clone https://github.com/roman-petruzela/RPDots ~/dotfiles
 cd ~/dotfiles
 ./install.sh
 ```

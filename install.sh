@@ -40,6 +40,8 @@ PKGS=(
     playerctl
     brightnessctl
     wireplumber
+    pipewire-audio
+    sound-theme-freedesktop
     libpulse
     pavucontrol
     networkmanager
@@ -301,7 +303,7 @@ system_setup() {
     fi
 }
 
-echo "RPRice installer ($DOTFILES)"
+echo "RPDots installer ($DOTFILES)"
 echo
 
 PS3="> "
