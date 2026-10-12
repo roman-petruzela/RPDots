@@ -103,7 +103,6 @@ ensure_modules_cfg() {
 16-cli-theme-env.sh|1|16|
 20-waybar.sh|1|20|
 30-niri.sh|1|30|
-40-mako.sh|1|40|
 50-fuzzel.sh|1|50|
 55-rofi.sh|1|55|
 60-gtk.sh|1|60|
@@ -118,9 +117,8 @@ ensure_modules_cfg() {
 85-cava.sh|1|85|
 86-btop.sh|1|86|
 87-fastfetch.sh|1|87|
-88-alacritty.sh|1|88|
 89-swaylock.sh|1|89|
-90-eww.sh|1|90|
+90-quickshell.sh|1|90|
 95-smoke-test.sh|1|95|
 EOF
 }
@@ -140,7 +138,6 @@ collect_tracked_files() {
 $HOME/.config/kitty/current-theme.conf
 $HOME/.config/waybar/colors.css
 $HOME/.config/niri/theme-colors.kdl
-$HOME/.config/mako/config
 $HOME/.config/fuzzel/fuzzel.ini
 $HOME/.config/rofi/pywal-dynamic.rasi
 $HOME/.config/yazi/theme.toml

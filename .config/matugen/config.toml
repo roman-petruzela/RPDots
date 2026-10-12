@@ -2,7 +2,6 @@
 reload_apps = false
 set_wallpaper = false
 run_after = [
-    "makoctl reload 2>/dev/null || true",
     "pkill -SIGUSR2 waybar 2>/dev/null || true",
     "qs ipc call shell reload 2>/dev/null || true",
     "~/.local/bin/kitty-theme-postprocess.sh 2>/dev/null || true",
@@ -21,10 +20,6 @@ output_path = "~/.config/waybar/colors.css"
 [templates.quickshell-colors]
 input_path = "~/.config/matugen/templates/quickshell-colors.js"
 output_path = "~/.config/quickshell/Colors.js"
-
-[templates.mako-colors]
-input_path = "~/.config/matugen/templates/mako.ini"
-output_path = "~/.config/mako/config"
 
 [templates.kitty-theme]
 input_path = "~/.config/matugen/templates/kitty-theme.conf"

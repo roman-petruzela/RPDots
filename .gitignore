@@ -2,7 +2,6 @@
 .config/kitty/current-theme.conf
 .config/rofi/pywal-dynamic.rasi
 .config/quickshell/Colors.js
-.config/mako/config
 .config/swaylock/config
 .config/cava/config
 .config/fuzzel/fuzzel.ini
