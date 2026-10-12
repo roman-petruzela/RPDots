@@ -2,15 +2,13 @@
 set -euo pipefail
 
 CURRENT_WALL="${HOME}/.local/share/wallpapers/current"
-STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"
 FAST_MODE="${FAST_MODE:-}"
 
 apply_wallpaper_transition() {
     local wall="$1"
-    local client daemon
+    local client
     
     if command -v swww-daemon >/dev/null 2>&1 && command -v swww >/dev/null 2>&1; then
-        daemon="swww-daemon"
         client="swww"
     elif command -v awww >/dev/null 2>&1; then
         client="awww"

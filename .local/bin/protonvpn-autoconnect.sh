@@ -5,7 +5,7 @@ LOG="${XDG_CACHE_HOME:-$HOME/.cache}/protonvpn-autoconnect.log"
 exec >>"$LOG" 2>&1
 echo "[$(date)] autoconnect start"
 
-for i in $(seq 1 30); do
+for _ in $(seq 1 30); do
     pgrep -x protonvpn-app >/dev/null 2>&1 && break
     sleep 1
 done

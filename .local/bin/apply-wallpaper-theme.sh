@@ -24,7 +24,6 @@ SNAPSHOT_DIR=""
 MANIFEST_FILE=""
 RESTORE_DONE=0
 WALLPAPER_ARG=""
-SAME_WALLPAPER=0
 waybar_css_hash_before=""
 waybar_config_hash_before=""
 waybar_css_changed=0
@@ -319,10 +318,9 @@ if [[ -n "$WALLPAPER_ARG" ]]; then
     sig="$(wallpaper_sig)"
     last_sig_file="$STATE_DIR/last-wallpaper.sig"
     if [[ -f "$last_sig_file" ]] && [[ "$(cat "$last_sig_file" 2>/dev/null || true)" == "$sig" ]]; then
-        SAME_WALLPAPER=1
         apply_wallpaper_now "$CURRENT_WALL"
         if [[ "${THEME_SKIP_REGEN_IF_SAME_WALLPAPER:-0}" == "1" ]]; then
-            notify_msg "Rice" "Wallpaper beze zmeny — preskakuju regen theme."
+            notify_msg "Rice" "Wallpaper unchanged — skipping theme regeneration."
             exit 0
         fi
         notify_msg "Rice" "Wallpaper beze zmeny — obnovuju theme."

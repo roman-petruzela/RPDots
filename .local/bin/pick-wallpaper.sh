@@ -16,6 +16,7 @@ mkdir -p "$THUMB_DIR"
 
 if [[ -f "$STATE_COLORS" ]]; then
   set +u
+  # shellcheck source=/dev/null
   source "$STATE_COLORS"
   set -u
 fi
@@ -62,8 +63,8 @@ make_thumb() {
       fi
     fi
     if [[ -n "$src" ]]; then
-      [[ -f "$thumb" ]] || magick "$src[0]" -auto-orient -thumbnail "240x140^" -gravity center -background "$wal_bg" -extent 240x140 "$thumb" >/dev/null 2>&1 || true
-      [[ -f "$large" ]] || { magick "$src[0]" -auto-orient -thumbnail "960x540^" -gravity center -extent 960x540 -quality 88 "$large.tmp.jpg" >/dev/null 2>&1 \
+      [[ -f "$thumb" ]] || magick "${src}[0]" -auto-orient -thumbnail "240x140^" -gravity center -background "$wal_bg" -extent 240x140 "$thumb" >/dev/null 2>&1 || true
+      [[ -f "$large" ]] || { magick "${src}[0]" -auto-orient -thumbnail "960x540^" -gravity center -extent 960x540 -quality 88 "$large.tmp.jpg" >/dev/null 2>&1 \
         && mv -f "$large.tmp.jpg" "$large"; } || rm -f "$large.tmp.jpg"
     fi
     [[ -n "$tmpframe" ]] && rm -f "$tmpframe"

@@ -161,8 +161,8 @@ cmd_publicip() {
 }
 
 cmd_speedtest() {
-    local base="https://speed.cloudflare.com" i t lat=() mbps
-    for i in 1 2 3 4 5; do
+    local base="https://speed.cloudflare.com" t lat=() mbps
+    for _ in 1 2 3 4 5; do
         t=$(curl -s -o /dev/null --max-time 5 -w '%{time_starttransfer} %{time_pretransfer}' "$base/__down?bytes=0") || continue
         lat+=("$(awk '{ printf "%.1f", ($1 - $2) * 1000 }' <<<"$t")")
     done

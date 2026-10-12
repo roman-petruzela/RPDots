@@ -37,8 +37,7 @@ wait_for_transition() {
 stop_video() {
     pgrep -x mpvpaper >/dev/null 2>&1 || return 0
     pkill -x mpvpaper >/dev/null 2>&1 || true
-    local i
-    for i in 1 2 3 4 5 6 7 8 9 10; do
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
         sleep 0.05
         pgrep -x mpvpaper >/dev/null 2>&1 || return 0
     done
