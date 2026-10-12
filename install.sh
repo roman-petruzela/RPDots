@@ -94,7 +94,8 @@ EXTRAS=(
 CURSOR_THEME=Bibata-Modern-Ice
 CURSOR_URL="https://github.com/ful1e5/Bibata_Cursor/releases/latest/download/$CURSOR_THEME.tar.xz"
 
-NOT_DEPLOYED=(.gitignore .stow-local-ignore README.md install.sh CLAUDE.md .gitconfig)
+NOT_DEPLOYED=(.gitignore .stow-local-ignore README.md install.sh CLAUDE.md .gitconfig
+    .githooks/pre-commit .local/bin/theme-modules/.shellcheckrc)
 
 need_sudo() {
     [[ -n "${SUDO_KEEPALIVE:-}" ]] && return 0
@@ -221,7 +222,7 @@ remember_dotfiles() {
 copy_configs() {
     local dry="${1:-0}" f src dst backup="" changed=0 new=0
     [[ "$dry" == 1 ]] || backup="$STATE_DIR/deploy-backup/$(date +%Y%m%d-%H%M%S)"
-    echo ":: Deploying configs to $HOME"
+    if [[ "$dry" == 1 ]]; then echo ":: Comparing repo with $HOME"; else echo ":: Deploying configs to $HOME"; fi
 
     while IFS= read -r f; do
         src="$DOTFILES/$f"
@@ -425,15 +426,16 @@ run_update() {
 
 case "${1:-}" in
     update) shift; run_update "$@"; exit 0 ;;
+    diff) copy_configs 1; exit 0 ;;
     "") ;;
-    *) echo "usage: ./install.sh [update]" >&2; exit 2 ;;
+    *) echo "usage: ./install.sh [update|diff]" >&2; exit 2 ;;
 esac
 
 echo "RPDots installer ($DOTFILES)"
 echo
 
 PS3="> "
-select action in \
+select _ in \
     "Full install" \
     "Packages only" \
     "Configs only" \

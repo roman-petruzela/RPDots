@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+fail=0
+shell=()
+niri=0
+while IFS= read -r f; do
+    [[ -f "$f" ]] || continue
+    case "$f" in
+        .config/niri/*.kdl) niri=1 ;;
+        *.sh) shell+=("$f") ;;
+        *) head -n1 "$f" | grep -qE '^#!.*\b(ba)?sh\b' && shell+=("$f") ;;
+    esac
+done < <(git diff --cached --name-only --diff-filter=ACMR)
+
+if [[ ${#shell[@]} -gt 0 ]] && command -v shellcheck >/dev/null; then
+    shellcheck -S warning "${shell[@]}" || fail=1
+fi
+if [[ $niri == 1 ]] && command -v niri >/dev/null; then
+    niri validate -c .config/niri/config.kdl >/dev/null 2>&1 \
+        || { niri validate -c .config/niri/config.kdl; fail=1; }
+fi
+
+[[ $fail == 0 ]] || echo "pre-commit: fix the above or commit with --no-verify" >&2
+exit $fail

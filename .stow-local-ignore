@@ -5,3 +5,5 @@ README.*
 install\.sh
 CLAUDE\.md
 \.gitconfig
+\.githooks
+\.shellcheckrc
