@@ -24,7 +24,7 @@ Item {
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: event => {
-            if (event.pixelDelta.y !== 0) {
+            if (event.phase !== Qt.NoScrollPhase) {
                 anim.stop()
                 w.flick.contentY = w.clamp(w.flick.contentY - event.pixelDelta.y)
             } else {
