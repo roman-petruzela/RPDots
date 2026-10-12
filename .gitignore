@@ -30,3 +30,4 @@ __pycache__/
 .config/yazi/plugins/
 
 CLAUDE.md
+.config/fastfetch/config.jsonc
