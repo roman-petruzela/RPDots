@@ -176,7 +176,7 @@ write_store() {
 on() { [[ "${V[$1]}" == true ]]; }
 
 render_kdl() {
-    local opts=() ms
+    local opts=()
     [[ ${V[input.kb_switch]} != none ]] && opts+=("grp:${V[input.kb_switch]}")
     case ${V[input.caps_lock]} in
         escape)     opts+=("caps:escape") ;;
@@ -513,6 +513,10 @@ case "${1:-dump}" in
         [[ $# -eq 3 ]] || die "usage: rp-settings module <name> on|off"
         set_module "$2" "$3" ;;
     *)
-        sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' >&2
+        cat >&2 <<'EOF'
+usage: rp-settings dump | get <key> | set <key> <value> | reset [<key>]
+       rp-settings apply | idle | nightlight
+       rp-settings modules | module <name> on|off
+EOF
         exit 1 ;;
 esac

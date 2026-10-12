@@ -8,7 +8,7 @@ has() { command -v "$1" >/dev/null 2>&1; }
 PACMAN_FLAGS=(--noconfirm --noprogressbar --color never)
 
 info() {
-    local os kernel host up cpu cores gpu mem swap disks outputs
+    local os kernel host up cpu cores gpu mem disks outputs
     os=$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-Linux}")
     kernel=$(uname -r)
     host=$(cat /etc/hostname 2>/dev/null || uname -n)
@@ -478,7 +478,11 @@ snapshot() {
 
 settings_export() {
     local out="${1:-$HOME/rprice-settings-$(date +%Y%m%d-%H%M).tar.gz}"
-    tar -czf "$out" -C "$HOME/.config/niri-rice" $(cd "$HOME/.config/niri-rice" && ls settings.json displays.json modules.conf 2>/dev/null) && echo "$out"
+    local f files=()
+    for f in settings.json displays.json modules.conf; do
+        [[ -f "$HOME/.config/niri-rice/$f" ]] && files+=("$f")
+    done
+    tar -czf "$out" -C "$HOME/.config/niri-rice" "${files[@]}" && echo "$out"
 }
 
 settings_import() {
@@ -586,6 +590,14 @@ case "${1:-}" in
     settings-export) settings_export "${2:-}" ;;
     settings-import) settings_import "${2:-}" ;;
     *)
-        sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' >&2
+        cat >&2 <<'EOF'
+usage: rp-sys <command> [args]
+  read:    info updates dotfiles packages pkginfo search firewall fw-services
+           storage storage-home time locale account privacy gaming printers backup
+  actions: upgrade upgrade-all upgrade-aur upgrade-flatpak install remove
+           remove-orphans keep clean-cache clean fw set-timezone set-ntp set-clock
+           set-locale privacy-clear mango-set mango-everywhere printer snapshot
+           settings-export settings-import
+EOF
         exit 1 ;;
 esac

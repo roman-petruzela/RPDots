@@ -41,5 +41,10 @@ case "${1:-status}" in
         running && die "still running"
         rm -f "$META" "$CODEF" "$PIDF" "$LOG"
         ;;
-    *) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1 ;;
+    *) cat >&2 <<'EOF'
+usage: rp-job start <title> <terminal-json> -- <cmd...>
+       rp-job status
+       rp-job dismiss
+EOF
+        exit 1 ;;
 esac

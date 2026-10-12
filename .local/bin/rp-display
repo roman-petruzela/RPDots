@@ -169,5 +169,10 @@ case "${1:-list}" in
     list)     list ;;
     set)      [[ $# -eq 4 ]] || die "usage: rp-display set <output> <key> <value>"; set_value "$2" "$3" "$4" ;;
     identify) identify ;;
-    *)        sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1 ;;
+    *)        cat >&2 <<'EOF'
+usage: rp-display list
+       rp-display set <output> mode|scale|transform|position|vrr|enabled <value>
+       rp-display identify
+EOF
+        exit 1 ;;
 esac
