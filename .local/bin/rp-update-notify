@@ -3,6 +3,13 @@ set -euo pipefail
 
 STATE="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/update-notify.sig"
 BIN="$HOME/.local/bin"
+WAITER=rp-update-notify-wait
+
+if [[ "${1:-}" == --show ]]; then
+    action=$(timeout 1h notify-send -a Updates -i system-software-update -A default=Open --wait "$2" "$3" || true)
+    [[ "$action" == default ]] && exec "$BIN/rp-shell" settings updates
+    exit 0
+fi
 
 json=$("$BIN/rp-sys" updates) || exit 0
 [[ -z "$(jq -r '.error' <<<"$json")" ]] || exit 0
@@ -26,6 +33,5 @@ body=$(jq -r '[ (.repo | length | select(. > 0) | "\(.) from repositories"),
                 (.dots | length | select(. > 0) | "RPDots: \(.) new commit\(if . > 1 then "s" else "" end)") ] | join(", ")' <<<"$json")
 [[ "$count" -eq 1 ]] && summary="1 update available" || summary="$count updates available"
 
-action=$(timeout 1h notify-send -a Updates -i system-software-update -A default=Open --wait "$summary" "$body" || true)
-[[ "$action" == default ]] && "$BIN/rp-shell" settings updates
-exit 0
+systemctl --user stop "$WAITER.service" 2>/dev/null || true
+systemd-run --user --quiet --collect --unit="$WAITER" -- "$BIN/rp-update-notify" --show "$summary" "$body"
