@@ -1,22 +1,61 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-USER_HOME="$(getent passwd "${SUDO_USER:?run through sudo}" | cut -d: -f6)"
-[[ -d "$USER_HOME" ]] || { echo "rp-lightdm-sync-apply: no home for $SUDO_USER" >&2; exit 1; }
+USER_NAME="${SUDO_USER:?run through sudo}"
+USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+[[ -d "$USER_HOME" ]] || { echo "rp-lightdm-sync-apply: no home for $USER_NAME" >&2; exit 1; }
 SRC_THEME="$USER_HOME/.local/share/themes/RPRice"
 SRC_WALLPAPER="$USER_HOME/.local/share/wallpapers/current"
 DST_THEME="/usr/share/themes/RPRice"
 DST_WALLPAPER="/usr/share/backgrounds/rprice-current.jpg"
 GREETER_CONF="/etc/lightdm/lightdm-gtk-greeter.conf"
+SRC_GREETER="$USER_HOME/.local/share/rp-greeter"
+DST_GREETER="/usr/share/rp-greeter"
+
+sync_greeter() {
+    local colors="$USER_HOME/.config/quickshell/Colors.js" tmp line outputs
+    [[ -d "$DST_GREETER" && -f "$SRC_GREETER/niri.kdl" ]] || return 0
+
+    install -d "$DST_GREETER/greeter/lock"
+    install -m644 "$SRC_GREETER"/greeter/*.qml "$DST_GREETER/greeter/"
+    install -m644 "$USER_HOME/.config/quickshell/lock/LockContent.qml" "$DST_GREETER/greeter/lock/"
+    if [[ -f "$colors" ]]; then
+        install -m644 "$colors" "$DST_GREETER/greeter/Colors.js"
+    elif [[ ! -f "$DST_GREETER/greeter/Colors.js" ]]; then
+        install -m644 "$SRC_GREETER/Colors.default.js" "$DST_GREETER/greeter/Colors.js"
+    fi
+
+    outputs="$(cat "$USER_HOME/.config/niri/config.kdl" "$USER_HOME/.config/niri/displays.kdl" 2>/dev/null | awk '/^output /,/^}/')"
+    tmp="$(mktemp)"
+    while IFS= read -r line; do
+        if [[ "$line" == "// @OUTPUTS@" ]]; then
+            printf '%s\n' "$outputs"
+        else
+            printf '%s\n' "${line//@USER@/$USER_NAME}"
+        fi
+    done <"$SRC_GREETER/niri.kdl" >"$tmp"
+    if niri validate -c "$tmp" >/dev/null 2>&1; then
+        install -m644 "$tmp" "$DST_GREETER/niri.kdl"
+    else
+        echo "rp-lightdm-sync-apply: generated greeter niri.kdl is invalid, keeping the old one" >&2
+    fi
+    rm -f "$tmp"
+}
+
+sync_greeter
+
+if [[ -f "$SRC_WALLPAPER" ]]; then
+    mkdir -p /usr/share/backgrounds
+    cp -f "$SRC_WALLPAPER" "$DST_WALLPAPER"
+    chmod a+r "$DST_WALLPAPER"
+fi
 
 [[ -d "$SRC_THEME" ]] || exit 0
-[[ -f "$SRC_WALLPAPER" ]] || exit 0
-
-mkdir -p "$DST_THEME" /usr/share/backgrounds
+mkdir -p "$DST_THEME"
 rsync -a --delete "$SRC_THEME"/ "$DST_THEME"/
-cp -f "$SRC_WALLPAPER" "$DST_WALLPAPER"
 chmod -R a+rX "$DST_THEME"
-chmod a+r "$DST_WALLPAPER"
+
+[[ -f "$GREETER_CONF" && -f "$DST_WALLPAPER" ]] || exit 0
 
 set_key() {
     local key="$1" value="$2"
@@ -28,18 +67,6 @@ set_key() {
         sed -i "/^\[greeter\]/a ${key}=${value}" "$GREETER_CONF"
     fi
 }
-
-SRC_COLORS="$USER_HOME/.config/quickshell/Colors.js"
-SRC_LOCK="$USER_HOME/.config/quickshell/lock/LockContent.qml"
-SRC_GREETER="$USER_HOME/.local/share/rp-greeter/greeter/shell.qml"
-DST_GREETER="/usr/share/rp-greeter/greeter"
-if [[ -d "$DST_GREETER" ]]; then
-    [[ -f "$SRC_COLORS" ]] && install -m644 "$SRC_COLORS" "$DST_GREETER/Colors.js"
-    [[ -f "$SRC_LOCK" ]] && install -Dm644 "$SRC_LOCK" "$DST_GREETER/lock/LockContent.qml"
-    [[ -f "$SRC_GREETER" ]] && install -m644 "$SRC_GREETER" "$DST_GREETER/shell.qml"
-fi
-
-[[ -f "$GREETER_CONF" ]] || exit 0
 
 set_key "theme-name" "RPRice"
 set_key "icon-theme-name" "Papirus-Dark"

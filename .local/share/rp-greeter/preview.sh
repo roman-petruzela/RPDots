@@ -8,7 +8,7 @@ rm -rf "$DIR"
 mkdir -p "$DIR"
 cp "$SRC"/*.qml "$DIR"/
 install -Dm644 "$SRC/../../../../.config/quickshell/lock/LockContent.qml" "$DIR/lock/LockContent.qml"
-cp "$HOME/.config/quickshell/Colors.js" "$DIR"/
+cp "$HOME/.config/quickshell/Colors.js" "$DIR"/ 2>/dev/null || cp "$SRC/../Colors.default.js" "$DIR/Colors.js"
 
 RP_GREETER_TEST=1 RP_GREETER_SCREEN="$OUT" \
 RP_GREETER_WALLPAPER="$HOME/.local/share/wallpapers/current" \
