@@ -184,8 +184,7 @@ install_cursor() {
         [[ -d "$d/$CURSOR_THEME/cursors" ]] && return 0
     done
     echo " -> Installing cursor theme $CURSOR_THEME"
-    mkdir -p "$HOME/.local/share/icons"
-    curl -fsSL "$CURSOR_URL" | tar -xJ -C "$HOME/.local/share/icons" \
+    curl -fsSL "$CURSOR_URL" | sudo tar -xJ --no-same-owner -C /usr/share/icons \
         || echo "warning: failed to download $CURSOR_URL" >&2
 }
 
@@ -262,9 +261,26 @@ stow_configs() {
     stow --dir="$DOTFILES" --target="$HOME" --restow .
 }
 
+refresh_system() {
+    local name src dst
+    for name in rp-power rp-lightdm-sync; do
+        src="$HOME/.local/share/$name/$name-apply"
+        dst="/usr/local/bin/$name-apply"
+        [[ -f "$dst" && -f "$src" ]] || continue
+        cmp -s "$src" "$dst" && continue
+        echo " -> Updating $dst"
+        sudo install -Dm755 "$src" "$dst" || echo "warning: failed to update $dst" >&2
+    done
+    if [[ -d /usr/share/rp-greeter ]] && command -v rp-lightdm-sync-apply >/dev/null; then
+        sudo -n rp-lightdm-sync-apply || echo "warning: login screen sync failed" >&2
+    fi
+    return 0
+}
+
 post_deploy() {
     echo ":: Configuring session"
     systemctl --user daemon-reload
+    refresh_system
 
     command -v ya >/dev/null && ya pkg install >/dev/null 2>&1 || true
 
@@ -293,15 +309,16 @@ system_setup() {
         sudo install -Dm644 "$DOTFILES/.local/share/rp-sys/49-rp-pacman.rules" /etc/polkit-1/rules.d/49-rp-pacman.rules
     fi
     if ask "Install power profiles (rp-power)?"; then
-        sudo "$share/rp-power/install.sh"
+        sudo "$share/rp-power/install.sh" || echo "warning: rp-power installation failed" >&2
     fi
     if pacman -Qi lightdm &>/dev/null && ask "Apply the theme to the LightDM greeter?"; then
-        sudo "$share/rp-lightdm-sync/install.sh"
+        sudo "$share/rp-lightdm-sync/install.sh" && sudo rp-lightdm-sync-apply \
+            || echo "warning: LightDM theming failed" >&2
     fi
     echo " -> The RPRice login screen replaces the current display manager with greetd"
     echo " -> Preview: $share/rp-greeter/preview.sh, revert: $share/rp-greeter/install.sh --revert"
     if ask "Install the RPRice login screen?"; then
-        sudo "$share/rp-greeter/install.sh"
+        sudo "$share/rp-greeter/install.sh" || echo "warning: login screen installation failed, the current display manager stays" >&2
     fi
 }
 
@@ -418,6 +435,7 @@ run_update() {
     remember_dotfiles
     update_packages
     update_units
+    refresh_system
     if command -v niri >/dev/null && ! niri validate -c "$HOME/.config/niri/config.kdl" >/dev/null 2>&1; then
         echo "warning: niri config validation failed" >&2
     fi
