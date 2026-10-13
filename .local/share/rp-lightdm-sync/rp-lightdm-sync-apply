@@ -30,8 +30,13 @@ set_key() {
 }
 
 SRC_COLORS="$USER_HOME/.config/quickshell/Colors.js"
-if [[ -d /usr/share/rp-greeter/greeter && -f "$SRC_COLORS" ]]; then
-    install -m644 "$SRC_COLORS" /usr/share/rp-greeter/greeter/Colors.js
+SRC_LOCK="$USER_HOME/.config/quickshell/lock/LockContent.qml"
+SRC_GREETER="$USER_HOME/.local/share/rp-greeter/greeter/shell.qml"
+DST_GREETER="/usr/share/rp-greeter/greeter"
+if [[ -d "$DST_GREETER" ]]; then
+    [[ -f "$SRC_COLORS" ]] && install -m644 "$SRC_COLORS" "$DST_GREETER/Colors.js"
+    [[ -f "$SRC_LOCK" ]] && install -Dm644 "$SRC_LOCK" "$DST_GREETER/lock/LockContent.qml"
+    [[ -f "$SRC_GREETER" ]] && install -m644 "$SRC_GREETER" "$DST_GREETER/shell.qml"
 fi
 
 [[ -f "$GREETER_CONF" ]] || exit 0
