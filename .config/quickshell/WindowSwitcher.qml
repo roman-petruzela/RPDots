@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
 import QtQuick
@@ -22,12 +23,13 @@ PanelWindow {
 
     property var items: []
     property int selected: 0
+    property var winAtOpen: null
+    property var wsAtOpen: null
 
     visible: false
     color: "transparent"
-    implicitWidth: panel.width
-    implicitHeight: panel.height
 
+    anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "rp-switcher"
@@ -49,6 +51,8 @@ PanelWindow {
             selected = n > 1 ? (delta > 0 ? 1 : n - 1) : 0
             const fw = niri.focusedWorkspace()
             const scr = fw ? Quickshell.screens.find(s => s.name === fw.output) : null
+            winAtOpen = focusedWin()?.id ?? null
+            wsAtOpen = fw?.id ?? null
             if (!pop.cancelClose()) {
                 if (scr) screen = scr
                 visible = true
@@ -60,6 +64,31 @@ PanelWindow {
     }
 
     function hide() { pop.dismiss() }
+
+    function focusedWin() {
+        return Object.values(niri.windows).find(w => w.is_focused) ?? null
+    }
+
+    Connections {
+        target: root.niri
+        function onRevisionChanged() {
+            if (!pop.shown) return
+            const w = root.focusedWin()
+            if ((root.niri.focusedWorkspace()?.id ?? null) !== root.wsAtOpen
+                    || (w && w.id !== root.winAtOpen)) root.hide()
+        }
+    }
+
+    Process {
+        id: altCheck
+        command: [Quickshell.env("HOME") + "/.local/bin/rp-alt-held"]
+        onExited: code => { if (code === 1) root.commit() }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        onClicked: root.hide()
+    }
 
     function commit() {
         if (!pop.shown) return
@@ -104,6 +133,16 @@ PanelWindow {
         color: Qt.alpha(Colors.surfaceContainer, 0.78)
         border.color: Qt.alpha(Colors.outlineVariant, 0.8)
         border.width: 1
+        anchors.centerIn: parent
+
+        readonly property bool winActive: Window.active
+        onWinActiveChanged: {
+            if (!pop.shown) return
+            if (winActive) altCheck.running = true
+            else root.hide()
+        }
+
+        MouseArea { anchors.fill: parent }
 
         focus: pop.shown
         Keys.onPressed: event => {
