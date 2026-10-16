@@ -7,6 +7,7 @@ PanelWindow {
 
     property bool active: false
     property url source: ""
+    property url thumb: ""
 
     property bool shown: false
     visible: shown
@@ -59,13 +60,21 @@ PanelWindow {
         }
 
         Image {
+            id: lo
+            anchors.fill: parent
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: false
+            source: root.shown ? root.thumb : ""
+        }
+
+        Image {
             id: imgA
             anchors.fill: parent
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             cache: false
             sourceSize: Qt.size(root.width, root.height)
-            opacity: root.frontIsA ? 1 : 0
+            opacity: root.frontIsA && source.toString() === root.source.toString() ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.InOutQuad } }
             onStatusChanged: if (status === Image.Ready && !root.frontIsA && source.toString() === root.source.toString()) root.frontIsA = true
         }
@@ -77,7 +86,7 @@ PanelWindow {
             asynchronous: true
             cache: false
             sourceSize: Qt.size(root.width, root.height)
-            opacity: root.frontIsA ? 0 : 1
+            opacity: !root.frontIsA && source.toString() === root.source.toString() ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.InOutQuad } }
             onStatusChanged: if (status === Image.Ready && root.frontIsA && source.toString() === root.source.toString()) root.frontIsA = false
         }
