@@ -24,6 +24,8 @@ PanelWindow {
     property bool wallpaperShown: false
     property bool previewActive: false
     property url previewSource: ""
+    property url previewThumb: ""
+    property real fade: 0
 
     visible: false
     color: "transparent"
@@ -41,8 +43,11 @@ PanelWindow {
     function open() {
         applying = false
         filter = ""
+        zoomAnim.stop()
+        closeAnim.stop()
         stage.opacity = 1
         launch.visible = false
+        launch.opacity = 1
         focusPath(currentPath)
         previewActive = true
         previewTimer.restart()
@@ -50,18 +55,44 @@ PanelWindow {
         lister.running = true
         inhibitCheck.running = false
         inhibitCheck.running = true
+        if (visible) openAnim.restart()
+        else fade = 0
         opener.show()
     }
 
+    function close() {
+        if (!visible || applying || closeAnim.running) return
+        openAnim.stop()
+        closeAnim.start()
+    }
+
     function toggle() {
-        if (root.visible) root.visible = false
+        if (root.visible) root.close()
         else root.open()
     }
 
     onVisibleChanged: {
-        if (visible) return
+        if (visible) {
+            if (!applying) openAnim.restart()
+            return
+        }
+        openAnim.stop()
+        closeAnim.stop()
         settledIndex = -1
         if (!applying) previewActive = false
+    }
+
+    NumberAnimation {
+        id: openAnim
+        target: root; property: "fade"; from: 0; to: 1
+        duration: 200; easing.type: Easing.OutCubic
+    }
+
+    NumberAnimation {
+        id: closeAnim
+        target: root; property: "fade"; to: 0
+        duration: 140; easing.type: Easing.InQuad
+        onFinished: root.visible = false
     }
 
     Process {
@@ -112,9 +143,7 @@ PanelWindow {
     function focusPath(path) {
         for (let i = 0; i < shown.count; i++) {
             if (shown.get(i).path !== path) continue
-            instantMove = true
-            view.currentIndex = i
-            instantMove = false
+            view.jump(i)
             return
         }
     }
@@ -135,9 +164,7 @@ PanelWindow {
             if (e.path === focusPath) focus = shown.count
             shown.append(e)
         }
-        instantMove = true
-        view.currentIndex = Math.min(focus, Math.max(shown.count - 1, 0))
-        instantMove = false
+        view.jump(Math.min(focus, Math.max(shown.count - 1, 0)))
         settleTimer.restart()
     }
 
@@ -163,7 +190,8 @@ PanelWindow {
 
     function step(delta) {
         if (shown.count === 0) return
-        view.currentIndex = ((view.currentIndex + delta) % shown.count + shown.count) % shown.count
+        if (view.wraps) view.moveTo(view.target + delta)
+        else view.moveTo(view.wrapIndex(view.target + delta))
     }
 
     readonly property string shownFile: home + "/.cache/niri-rice/wallpaper-shown"
@@ -231,8 +259,14 @@ PanelWindow {
         }
     }
 
+    function updatePreviewThumb() {
+        const e = currentEntry()
+        if (e) previewThumb = "file://" + e.thumb
+    }
+
     Rectangle {
         anchors.fill: parent
+        opacity: root.fade
         gradient: Gradient {
             GradientStop { position: 0.0; color: Qt.alpha(Colors.background, 0.15) }
             GradientStop { position: 0.6; color: Qt.alpha(Colors.background, 0.3) }
@@ -242,7 +276,7 @@ PanelWindow {
 
     MouseArea {
         anchors.fill: parent
-        onClicked: if (!root.applying) root.visible = false
+        onClicked: root.close()
         onWheel: wheel => {
             wheelAccum += wheel.angleDelta.y + wheel.angleDelta.x
             while (Math.abs(wheelAccum) >= 120) {
@@ -258,6 +292,7 @@ PanelWindow {
         anchors.fill: parent
         focus: root.visible
         opacity: 0
+        scale: 0.97 + 0.03 * root.fade
 
         readonly property real cardW: Math.min(width * 0.44, 900)
         readonly property real cardH: cardW * 9 / 16
@@ -274,13 +309,13 @@ PanelWindow {
             case Qt.Key_Down:     root.step(-10); break
             case Qt.Key_PageUp:   root.step(-5); break
             case Qt.Key_PageDown: root.step(5); break
-            case Qt.Key_Home:     view.currentIndex = 0; break
-            case Qt.Key_End:      view.currentIndex = Math.max(shown.count - 1, 0); break
+            case Qt.Key_Home:     view.goTo(0); break
+            case Qt.Key_End:      view.goTo(Math.max(shown.count - 1, 0)); break
             case Qt.Key_Return:
             case Qt.Key_Enter:    root.apply(); break
             case Qt.Key_Escape:
                 if (root.filter !== "") root.filter = ""
-                else root.visible = false
+                else root.close()
                 break
             case Qt.Key_Backspace:
                 root.filter = ctrl ? "" : root.filter.slice(0, -1)
@@ -298,174 +333,209 @@ PanelWindow {
             event.accepted = true
         }
 
-        PathView {
+        Item {
             id: view
 
             x: 0
             width: parent.width
             y: stage.cy - height / 2
             height: stage.cardH * 1.25
+            opacity: root.fade
 
-            model: shown
-            pathItemCount: 7
-            preferredHighlightBegin: 0.5
-            preferredHighlightEnd: 0.5
-            highlightRangeMode: PathView.StrictlyEnforceRange
-            highlightMoveDuration: root.instantMove ? 0 : 170
-            snapMode: PathView.SnapOneItem
-            flickDeceleration: 900
-            cacheItemCount: 2
+            property int currentIndex: 0
+            property real target: 0
+            property real pos: 0
+            property bool dragging: false
+            readonly property int count: shown.count
+            readonly property bool wraps: count > 7
+            readonly property real mid: height / 2
+            readonly property real knee: stage.cardW * 0.62
+            readonly property real side: stage.cardW * 0.21
+
+            Behavior on pos {
+                enabled: !root.instantMove && !view.dragging
+                NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+            }
 
             onCurrentIndexChanged: {
                 settleTimer.restart()
                 previewTimer.restart()
+                root.updatePreviewThumb()
             }
 
-            readonly property real mid: height / 2
-            readonly property real knee: stage.cardW * 0.62
-
-            path: Path {
-                startX: -stage.cardW * 0.15; startY: view.mid
-                PathAttribute { name: "angle"; value: 64 }
-                PathAttribute { name: "cardScale"; value: 0.6 }
-                PathAttribute { name: "depth"; value: 0 }
-                PathAttribute { name: "dim"; value: 0.75 }
-
-                PathLine { x: stage.cx - view.knee; y: view.mid }
-                PathPercent { value: 0.5 - 1 / 7 }
-                PathAttribute { name: "angle"; value: 56 }
-                PathAttribute { name: "cardScale"; value: 0.72 }
-                PathAttribute { name: "depth"; value: 50 }
-                PathAttribute { name: "dim"; value: 0.45 }
-
-                PathLine { x: stage.cx; y: view.mid }
-                PathPercent { value: 0.5 }
-                PathAttribute { name: "angle"; value: 0 }
-                PathAttribute { name: "cardScale"; value: 1 }
-                PathAttribute { name: "depth"; value: 100 }
-                PathAttribute { name: "dim"; value: 0 }
-
-                PathLine { x: stage.cx + view.knee; y: view.mid }
-                PathPercent { value: 0.5 + 1 / 7 }
-                PathAttribute { name: "angle"; value: -56 }
-                PathAttribute { name: "cardScale"; value: 0.72 }
-                PathAttribute { name: "depth"; value: 50 }
-                PathAttribute { name: "dim"; value: 0.45 }
-
-                PathLine { x: stage.width + stage.cardW * 0.15; y: view.mid }
-                PathPercent { value: 1 }
-                PathAttribute { name: "angle"; value: -64 }
-                PathAttribute { name: "cardScale"; value: 0.6 }
-                PathAttribute { name: "depth"; value: 0 }
-                PathAttribute { name: "dim"; value: 0.75 }
+            function wrapIndex(i) {
+                return count > 0 ? ((Math.round(i) % count) + count) % count : 0
             }
 
-            delegate: Item {
-                id: card
+            function moveTo(t) {
+                target = t
+                pos = t
+                currentIndex = wrapIndex(t)
+            }
 
-                required property int index
-                required property string path
-                required property string thumb
-                required property string name
-                required property bool video
+            function jump(i) {
+                root.instantMove = true
+                moveTo(i)
+                root.instantMove = false
+            }
 
-                readonly property bool focused: PathView.isCurrentItem
-                readonly property url thumbUrl: "file://" + thumb
+            function goTo(i) {
+                if (!wraps) { moveTo(i); return }
+                let d = ((i - currentIndex) % count + count) % count
+                if (d > count / 2) d -= count
+                moveTo(target + d)
+            }
 
-                width: stage.cardW
-                height: stage.cardH
-                z: PathView.depth ?? 0
-                scale: PathView.cardScale ?? 1
-
-                transform: Rotation {
-                    origin.x: card.width / 2
-                    origin.y: card.height / 2
-                    axis { x: 0; y: 1; z: 0 }
-                    angle: card.PathView.angle ?? 0
+            DragHandler {
+                target: null
+                yAxis.enabled: false
+                property real startPos: 0
+                onActiveChanged: {
+                    if (active) {
+                        startPos = view.pos
+                        view.dragging = true
+                        return
+                    }
+                    view.dragging = false
+                    const p = Math.round(view.pos)
+                    view.moveTo(view.wraps ? p : Math.max(0, Math.min(view.count - 1, p)))
                 }
+                onActiveTranslationChanged: {
+                    if (!active || root.applying) return
+                    let p = startPos - activeTranslation.x / view.knee
+                    if (!view.wraps) p = Math.max(-0.35, Math.min(view.count - 0.65, p))
+                    view.pos = p
+                    view.currentIndex = view.wrapIndex(p)
+                }
+            }
 
-                ClippingRectangle {
-                    id: face
-                    anchors.fill: parent
-                    radius: 14
-                    color: Colors.surfaceContainer
+            Repeater {
+                model: shown
 
-                    Text {
-                        anchors.centerIn: parent
-                        width: parent.width - 48
-                        visible: img.status !== Image.Ready
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.Wrap
-                        text: card.name + "\n\nPreparing preview"
-                        font.family: root.fontFamily
-                        font.pixelSize: 15
-                        color: Colors.onSurfaceVariant
+                delegate: Item {
+                    id: card
+
+                    required property int index
+                    required property string path
+                    required property string thumb
+                    required property string name
+                    required property bool video
+
+                    readonly property real off: {
+                        let o = index - view.pos
+                        if (view.wraps) {
+                            const n = view.count
+                            o = ((o % n) + n) % n
+                            if (o > n / 2) o -= n
+                        }
+                        return o
+                    }
+                    readonly property real a: Math.abs(off)
+                    readonly property real sgn: off < 0 ? -1 : 1
+                    readonly property real inner: Math.min(a, 1)
+                    readonly property real outer: Math.min(Math.max(a - 1, 0), 1)
+                    readonly property bool focused: index === view.currentIndex
+                    readonly property bool near: a < 5.5
+                    readonly property url thumbUrl: "file://" + thumb
+
+                    visible: a < 4.5
+                    width: stage.cardW
+                    height: stage.cardH
+                    x: stage.cx - width / 2 + sgn * (inner * view.knee + Math.max(a - 1, 0) * view.side)
+                    y: view.mid - height / 2
+                    z: 100 - a * 10
+                    scale: 1 - 0.28 * inner - 0.12 * outer
+                    opacity: Math.min(1, 4.5 - a)
+
+                    transform: Rotation {
+                        origin.x: card.width / 2
+                        origin.y: card.height / 2
+                        axis { x: 0; y: 1; z: 0 }
+                        angle: -card.sgn * (56 * card.inner + 8 * card.outer)
                     }
 
-                    Image {
-                        id: img
+                    ClippingRectangle {
+                        id: face
                         anchors.fill: parent
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        cache: false
-                        sourceSize: Qt.size(960, 540)
-                        source: card.thumbUrl
+                        radius: 14
+                        color: Colors.surfaceContainer
 
-                        Connections {
-                            target: root
-                            function onThumbEpochChanged() {
-                                if (img.status === Image.Error) {
-                                    img.source = ""
-                                    img.source = card.thumbUrl
+                        Text {
+                            anchors.centerIn: parent
+                            width: parent.width - 48
+                            visible: img.status !== Image.Ready
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.Wrap
+                            text: card.name + "\n\nPreparing preview"
+                            font.family: root.fontFamily
+                            font.pixelSize: 15
+                            color: Colors.onSurfaceVariant
+                        }
+
+                        Image {
+                            id: img
+                            anchors.fill: parent
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            sourceSize: Qt.size(960, 540)
+                            source: card.near ? card.thumbUrl : ""
+
+                            Connections {
+                                target: root
+                                function onThumbEpochChanged() {
+                                    if (img.status === Image.Error) {
+                                        img.source = ""
+                                        img.source = card.thumbUrl
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    Loader {
-                        anchors.fill: parent
-                        active: card.video && card.focused && root.visible
-                            && root.videoAllowed && !root.applying
-                            && root.settledIndex === card.index
-                        source: "WallpaperVideoPreview.qml"
-                        onLoaded: item.path = card.path
+                        Loader {
+                            anchors.fill: parent
+                            active: card.video && card.focused && card.a < 0.01 && root.visible
+                                && root.videoAllowed && !root.applying
+                                && root.settledIndex === card.index
+                            source: "WallpaperVideoPreview.qml"
+                            onLoaded: item.path = card.path
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "black"
+                            opacity: 0.45 * card.inner + 0.3 * card.outer
+                        }
                     }
 
                     Rectangle {
                         anchors.fill: parent
-                        color: "black"
-                        opacity: card.PathView.dim ?? 0
+                        radius: face.radius
+                        color: "transparent"
+                        border.width: card.focused ? 2 : 1
+                        border.color: card.focused ? Colors.primary : Qt.alpha(Colors.onSurface, 0.14)
                     }
-                }
 
-                Rectangle {
-                    anchors.fill: parent
-                    radius: face.radius
-                    color: "transparent"
-                    border.width: card.focused ? 2 : 1
-                    border.color: card.focused ? Colors.primary : Qt.alpha(Colors.onSurface, 0.14)
-                }
-
-                Rectangle {
-                    visible: card.video
-                    anchors { left: parent.left; bottom: parent.bottom; margins: 12 }
-                    width: 30; height: 30; radius: 15
-                    color: Qt.alpha(Colors.background, 0.7)
-                    Text {
-                        anchors.centerIn: parent
-                        anchors.horizontalCenterOffset: 1
-                        text: "▶"
-                        font.pixelSize: 12
-                        color: Colors.onSurface
+                    Rectangle {
+                        visible: card.video
+                        anchors { left: parent.left; bottom: parent.bottom; margins: 12 }
+                        width: 30; height: 30; radius: 15
+                        color: Qt.alpha(Colors.background, 0.7)
+                        Text {
+                            anchors.centerIn: parent
+                            anchors.horizontalCenterOffset: 1
+                            text: "▶"
+                            font.pixelSize: 12
+                            color: Colors.onSurface
+                        }
                     }
-                }
 
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (card.focused) root.apply()
-                        else view.currentIndex = card.index
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (card.focused && card.a < 0.5) root.apply()
+                            else view.moveTo(Math.round(view.pos + card.off))
+                        }
                     }
                 }
             }
@@ -478,6 +548,7 @@ PanelWindow {
             width: stage.cardW
             spacing: 10
             visible: shown.count > 0
+            opacity: root.fade
 
             Text {
                 width: parent.width
@@ -546,6 +617,7 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 36
+            opacity: root.fade
             spacing: 28
 
             Text {
@@ -601,21 +673,28 @@ PanelWindow {
         }
     }
 
-    ParallelAnimation {
+    SequentialAnimation {
         id: zoomAnim
-        NumberAnimation { target: stage; property: "opacity"; to: 0; duration: 100 }
-        NumberAnimation { target: launch; property: "x"; from: stage.cx - stage.cardW / 2; to: 0; duration: 300; easing.type: Easing.OutCubic }
-        NumberAnimation { target: launch; property: "y"; from: stage.cy - stage.cardH / 2; to: 0; duration: 300; easing.type: Easing.OutCubic }
-        NumberAnimation { target: launch; property: "width"; from: stage.cardW; to: root.width; duration: 300; easing.type: Easing.OutCubic }
-        NumberAnimation { target: launch; property: "height"; from: stage.cardH; to: root.height; duration: 300; easing.type: Easing.OutCubic }
-        NumberAnimation { target: launch; property: "radius"; from: 14; to: 0; duration: 300 }
-        NumberAnimation { target: launch; property: "opacity"; from: 1; to: 0; duration: 300; easing.type: Easing.InQuad }
-        onFinished: {
-            root.visible = false
-            launch.visible = false
-            launch.opacity = 1
-            root.zoomDone = true
-            root.maybeReveal()
+        ParallelAnimation {
+            NumberAnimation { target: stage; property: "opacity"; to: 0; duration: 140 }
+            NumberAnimation { target: launch; property: "x"; from: stage.cx - stage.cardW / 2; to: 0; duration: 260; easing.type: Easing.OutQuart }
+            NumberAnimation { target: launch; property: "y"; from: stage.cy - stage.cardH / 2; to: 0; duration: 260; easing.type: Easing.OutQuart }
+            NumberAnimation { target: launch; property: "width"; from: stage.cardW; to: root.width; duration: 260; easing.type: Easing.OutQuart }
+            NumberAnimation { target: launch; property: "height"; from: stage.cardH; to: root.height; duration: 260; easing.type: Easing.OutQuart }
+            NumberAnimation { target: launch; property: "radius"; from: 14; to: 0; duration: 260 }
+        }
+        ParallelAnimation {
+            NumberAnimation { target: launch; property: "opacity"; from: 1; to: 0; duration: 180; easing.type: Easing.InQuad }
+            NumberAnimation { target: root; property: "fade"; to: 0; duration: 180; easing.type: Easing.InQuad }
+        }
+        ScriptAction {
+            script: {
+                root.visible = false
+                launch.visible = false
+                launch.opacity = 1
+                root.zoomDone = true
+                root.maybeReveal()
+            }
         }
     }
 }
