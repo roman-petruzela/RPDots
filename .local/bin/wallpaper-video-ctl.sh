@@ -50,6 +50,10 @@ start_video() {
     have_mpvpaper || { mark_shown; return 0; }
     [[ -f "$video" ]] || { mark_shown; return 0; }
     [[ -f "$VIDEO_INHIBIT" ]] && { stop_video; mark_shown; return 0; }
+    if pgrep -a -x mpvpaper 2>/dev/null | grep -qF -- " $video"; then
+        mark_shown
+        return 0
+    fi
 
     stop_video
     mark_shown
