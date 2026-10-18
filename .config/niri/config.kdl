@@ -338,9 +338,5 @@ binds {
     Mod+S hotkey-overlay-title="Settings: quickshell" { spawn "~/.local/bin/rp-shell" "settings" "toggle"; }
 }
 
-debug {
-    render-drm-device "/dev/dri/by-path/pci-0000:06:00.0-render"
-}
-
 include optional=true "~/.config/niri/settings.kdl"
 include optional=true "~/.config/niri/displays.kdl"

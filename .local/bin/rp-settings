@@ -304,6 +304,14 @@ render_kdl() {
     echo "    match app-id=\"(?i)^spotify\$\""
     echo "    opacity ${V[theme.spotify_opacity]}"
     echo "}"
+
+    local render
+    render=$("$HOME/.local/bin/rp-gpu" render)
+    if [[ -n $render ]]; then
+        echo "debug {"
+        echo "    render-drm-device \"$render\""
+        echo "}"
+    fi
 }
 
 apply_kdl() {
