@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+gpus() {
+    local c
+    for c in /sys/class/drm/card[0-9]*; do
+        [[ $c == */card*-* || ! -r $c/device/vendor ]] && continue
+        printf '%s %s\n' "$(cat "$c/device/vendor")" "$(readlink -f "$c/device")"
+    done
+}
+
+dgpu() { gpus | awk '$1 == "0x10de" { print $2; exit }'; }
+igpu() { gpus | awk '$1 != "0x10de" { print $2; exit }'; }
+
+case "${1:-}" in
+    dgpu) dgpu ;;
+    igpu) igpu ;;
+    render)
+        d=$(dgpu); i=$(igpu)
+        node="/dev/dri/by-path/pci-${i##*/}-render"
+        [[ -n $d && -n $i && -e $node ]] && echo "$node"
+        ;;
+    *)  echo "usage: rp-gpu {dgpu|igpu|render}" >&2; exit 1 ;;
+esac
+exit 0
