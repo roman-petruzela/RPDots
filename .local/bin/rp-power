@@ -83,7 +83,7 @@ status() {
     fi
 
     local rt
-    rt=$(cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status 2>/dev/null)
+    rt=$(cat "$("$HOME/.local/bin/rp-gpu" dgpu)/power/runtime_status" 2>/dev/null)
     if [[ "$rt" == "suspended" ]]; then
         echo "dGPU:             spí (0 W)"
     elif command -v nvidia-smi >/dev/null 2>&1; then

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-DGPU_PCI=/sys/bus/pci/devices/0000:01:00.0
-IGPU=/sys/class/drm/card1/device
+DGPU_PCI=$("$HOME/.local/bin/rp-gpu" dgpu)
+IGPU=$("$HOME/.local/bin/rp-gpu" igpu)
 
 json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g'; }
 
@@ -17,7 +17,7 @@ if [[ -r "$IGPU/gpu_busy_percent" ]]; then
         temp=$(( $(cat "$h/temp1_input") / 1000 ))
         break
     done
-    igpu_lines="AMD iGPU (Renoir/Cezanne)"
+    igpu_lines="AMD $([[ -n $DGPU_PCI ]] && echo iGPU || echo GPU)"
     igpu_lines+=$'\n'"  load  ${igpu_busy} %"
     (( total > 0 )) && igpu_lines+=$'\n'"  VRAM  $(( used / 1048576 )) / $(( total / 1048576 )) MiB"
     [[ -n "$temp" ]] && igpu_lines+=$'\n'"  temp  ${temp} °C"
