@@ -6,10 +6,6 @@ STATE_FILE="$STATE_DIR/mode"
 EFFECTIVE_FILE="$STATE_DIR/effective"
 
 GPU_FLOOR_MHZ=800
-GPU_TOP_MHZ=2100
-GPU_PL_GAMING=85
-GPU_PL_BALANCED=60
-GPU_PL_BATTERY=40
 
 on_ac() {
     local d
@@ -20,7 +16,12 @@ on_ac() {
 }
 
 dgpu_suspended() {
-    [[ "$(cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status 2>/dev/null)" == "suspended" ]]
+    local d
+    for d in /sys/class/drm/card[0-9]*/device; do
+        [[ "$(cat "$d/vendor" 2>/dev/null)" == 0x10de ]] || continue
+        [[ "$(cat "$d/power/runtime_status" 2>/dev/null)" == suspended ]]; return
+    done
+    return 1
 }
 
 set_platform_profile() {
@@ -40,7 +41,7 @@ set_cpu() {
 }
 
 set_gpu() {
-    local mode=$1
+    local mode=$1 def max top
     command -v nvidia-smi >/dev/null 2>&1 || return 0
 
     if dgpu_suspended; then
@@ -48,18 +49,24 @@ set_gpu() {
         return 0
     fi
 
+    IFS=', ' read -r def max top < <(nvidia-smi --format=csv,noheader,nounits \
+        --query-gpu=power.default_limit,power.max_limit,clocks.max.graphics 2>/dev/null | head -n1)
+    def=${def%.*}; max=${max%.*}
+    [[ $def =~ ^[0-9]+$ ]] || return 0
+    [[ $max =~ ^[0-9]+$ ]] || max=$def
+
     case "$mode" in
         gaming)
-            nvidia-smi -pl "$GPU_PL_GAMING"  >/dev/null 2>&1 || true
-            nvidia-smi -lgc "${GPU_FLOOR_MHZ},${GPU_TOP_MHZ}" >/dev/null 2>&1 || true
+            nvidia-smi -pl "$max" >/dev/null 2>&1 || true
+            [[ $top =~ ^[0-9]+$ ]] && { nvidia-smi -lgc "${GPU_FLOOR_MHZ},${top}" >/dev/null 2>&1 || true; }
             ;;
         balanced)
             nvidia-smi -rgc >/dev/null 2>&1 || true
-            nvidia-smi -pl "$GPU_PL_BALANCED" >/dev/null 2>&1 || true
+            nvidia-smi -pl "$def" >/dev/null 2>&1 || true
             ;;
         battery)
             nvidia-smi -rgc >/dev/null 2>&1 || true
-            nvidia-smi -pl "$GPU_PL_BATTERY" >/dev/null 2>&1 || true
+            nvidia-smi -pl "$(( def * 2 / 3 ))" >/dev/null 2>&1 || true
             ;;
     esac
 }
