@@ -4,10 +4,12 @@ import Quickshell.Wayland
 import Quickshell.Widgets
 import QtQuick
 import "Colors.js" as Colors
+import "settings"
 
 Scope {
     id: outer
 
+    property var niri
     property bool visible: false
     function open()   { visible = true }
     function hide()   { visible = false }
@@ -63,6 +65,7 @@ Scope {
             property var results: []
             property string query: ""
             property int selected: 0
+            property var known: ({})
 
             title: "RPLauncher"
             visible: true
@@ -77,14 +80,40 @@ Scope {
 
             function hide() { outer.hide() }
 
-            Component.onCompleted: refresh()
+            Component.onCompleted: {
+                for (const id in outer.niri?.windows ?? {}) known[id] = true
+                refresh()
+            }
 
             Item {
+                id: focusWatch
                 readonly property bool winActive: Window.active
                 property bool wasActive: false
                 onWinActiveChanged: {
-                    if (winActive) wasActive = true
-                    else if (wasActive) outer.hide()
+                    if (winActive) { wasActive = true; lostFocus.stop() }
+                    else if (wasActive) { lostFocus.restart(); check() }
+                }
+
+                function check() {
+                    const wins = Object.values(outer.niri?.windows ?? {})
+                    const self = wins.find(w => w.title === "RPLauncher")
+                    const focused = wins.find(w => w.is_focused)
+                    if (!self || !focused || focused.id === self.id) return
+                    lostFocus.stop()
+                    if (root.known[focused.id]) outer.hide()
+                    else Quickshell.execDetached(["niri", "msg", "action", "focus-window", "--id", String(self.id)])
+                }
+
+                Timer {
+                    id: lostFocus
+                    interval: 300
+                    onTriggered: outer.hide()
+                }
+
+                Connections {
+                    target: outer.niri
+                    enabled: lostFocus.running
+                    function onRevisionChanged() { focusWatch.check() }
                 }
             }
 
@@ -305,6 +334,8 @@ Scope {
                         }
                     }
                 }
+
+                SWheel { flick: list }
             }
         }
     }
