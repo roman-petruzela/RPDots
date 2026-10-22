@@ -16,6 +16,15 @@ Scope {
     function toggle() { visible = !visible }
 
     property var recent: []
+    readonly property var win: {
+        niri?.revision
+        return Object.values(niri?.windows ?? {}).find(w => w.title === "RPLauncher") ?? null
+    }
+    readonly property var winScreen: {
+        niri?.revision
+        const ws = win ? niri.workspaces[win.workspace_id] : null
+        return ws ? Quickshell.screens.find(s => s.name === ws.output) ?? null : null
+    }
     property var apps: []
 
     function appIcon(name) {
@@ -48,6 +57,39 @@ Scope {
         printErrors: false
         onLoaded: {
             try { outer.recent = JSON.parse(text()) } catch (e) { outer.recent = [] }
+        }
+    }
+
+    LazyLoader {
+        active: outer.visible && outer.winScreen !== null
+
+        PanelWindow {
+            screen: outer.winScreen
+            anchors { top: true; bottom: true; left: true; right: true }
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.layer: WlrLayer.Top
+            WlrLayershell.namespace: "rp-launcher-catcher"
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            color: "transparent"
+            mask: Region {
+                item: catcher
+                Region { item: hole; intersection: Intersection.Subtract }
+            }
+
+            Item {
+                id: hole
+                x: outer.win?.layout.tile_pos_in_workspace_view?.[0] ?? 0
+                y: outer.win?.layout.tile_pos_in_workspace_view?.[1] ?? 0
+                width: outer.win?.layout.tile_size[0] ?? 0
+                height: outer.win?.layout.tile_size[1] ?? 0
+            }
+
+            MouseArea {
+                id: catcher
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+                onPressed: outer.hide()
+            }
         }
     }
 
