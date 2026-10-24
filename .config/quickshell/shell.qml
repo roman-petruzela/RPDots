@@ -11,19 +11,7 @@ import "lock"
 ShellRoot {
     id: root
 
-    FileView {
-        id: barFlag
-        path: Quickshell.env("HOME") + "/.config/niri-rice/bar"
-        watchChanges: true
-        printErrors: false
-        onFileChanged: reload()
-    }
-    readonly property string barMode: (barFlag.text() || "waybar").trim()
-    readonly property var barScreens: barMode === "quickshell" ? Quickshell.screens
-        : barMode.startsWith("test:") ? Quickshell.screens.filter(s => s.name === barMode.slice(5))
-        : []
-
-    BarData { id: barSource; active: root.barScreens.length > 0 || dashboard.visible }
+    BarData { id: barSource; active: true }
     readonly property var niriRef: niri
 
     IpcHandler {
@@ -178,7 +166,7 @@ ShellRoot {
 
     Variants {
         id: bars
-        model: root.barScreens
+        model: Quickshell.screens
         delegate: TopBar { barData: barSource; niri: root.niriRef }
     }
 

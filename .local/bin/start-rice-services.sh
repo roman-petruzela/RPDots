@@ -46,31 +46,6 @@ ensure_pidfile_running() {
   echo $! > "$pidfile"
 }
 
-start_waybar_with_retry() {
-  local pidfile="$PID_DIR/waybar.pid"
-  local attempt pid
-
-  for attempt in {1..8}; do
-    "$HOME/.local/bin/waybar-watchdog.sh" >/dev/null 2>&1 || true
-    pid="$(cat "$pidfile" 2>/dev/null || true)"
-
-    if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
-      sleep 0.6
-      if kill -0 "$pid" 2>/dev/null; then
-        kill -USR2 "$pid" 2>/dev/null || true
-        log "waybar running pid=$pid attempt=$attempt"
-        return 0
-      fi
-    fi
-
-    rm -f "$pidfile"
-    sleep 1
-  done
-
-  log "waybar failed to stay alive after retries"
-  return 1
-}
-
 if command -v systemctl >/dev/null 2>&1 && ! systemctl --user is-active -q graphical-session.target; then
   export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-niri}" XDG_SESSION_TYPE=wayland
   systemctl --user import-environment WAYLAND_DISPLAY DISPLAY NIRI_SOCKET XDG_CURRENT_DESKTOP XDG_SESSION_TYPE 2>/dev/null || true
@@ -110,10 +85,9 @@ command -v wayvnc >/dev/null 2>&1 \
 pgrep -x swayidle >/dev/null 2>&1 || "$HOME/.local/bin/rp-settings" idle || log "rp-settings idle failed"
 
 (
-  "$HOME/.local/bin/apply-wallpaper-theme.sh" --no-daemon-restart \
+  "$HOME/.local/bin/apply-wallpaper-theme.sh" \
     || log "apply-wallpaper-theme failed, continuing with the existing theme"
   systemctl --user start --no-block niri-rice-wallpaper-healthcheck.service
-  [[ "$(cat "$HOME/.config/niri-rice/bar" 2>/dev/null)" == quickshell ]] || start_waybar_with_retry
 ) >/dev/null 2>&1 &
 disown
 exit 0

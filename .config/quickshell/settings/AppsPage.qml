@@ -312,7 +312,7 @@ Item {
                 SHint {
                     width: parent.width
                     leftPadding: 14; rightPadding: 14; bottomPadding: 6
-                    text: "Started by niri (start-rice-services.sh) and systemd user units: waybar, quickshell, swayidle, kanshi, "
+                    text: "Started by niri (start-rice-services.sh) and systemd user units: quickshell, swayidle, kanshi, "
                         + "nm-applet, blueman-applet, the audio sync daemon and the wallpaper. Edit those in the dotfiles."
                 }
                 SHeading {

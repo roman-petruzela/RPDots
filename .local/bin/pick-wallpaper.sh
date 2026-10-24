@@ -3,7 +3,6 @@ set -euo pipefail
 
 WALL_DIR=""
 THUMB_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/wallpaper-thumbs"
-STATE_COLORS="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice/colors.sh"
 for candidate in "$HOME/Pictures/Wallpapers" "$HOME/.local/share/wallpapers" "$HOME/Pictures"; do
   if [[ -d "$candidate" ]]; then
     WALL_DIR="$candidate"
@@ -13,16 +12,6 @@ done
 
 [[ -n "$WALL_DIR" ]] || exit 0
 mkdir -p "$THUMB_DIR"
-
-if [[ -f "$STATE_COLORS" ]]; then
-  set +u
-  # shellcheck source=/dev/null
-  source "$STATE_COLORS"
-  set -u
-fi
-wal_bg="${background:-#0b0909}"
-wal_fg="${foreground:-#e3c8a1}"
-wal_ac="${accent:-#976D54}"
 
 is_video() {
   case "${1,,}" in
@@ -63,7 +52,7 @@ make_thumb() {
       fi
     fi
     if [[ -n "$src" ]]; then
-      [[ -f "$thumb" ]] || magick "${src}[0]" -auto-orient -thumbnail "240x140^" -gravity center -background "$wal_bg" -extent 240x140 "$thumb" >/dev/null 2>&1 || true
+      [[ -f "$thumb" ]] || magick "${src}[0]" -auto-orient -thumbnail "240x140^" -gravity center -background "#0b0909" -extent 240x140 "$thumb" >/dev/null 2>&1 || true
       [[ -f "$large" ]] || { magick "${src}[0]" -auto-orient -thumbnail "960x540^" -gravity center -extent 960x540 -quality 88 "$large.tmp.jpg" >/dev/null 2>&1 \
         && mv -f "$large.tmp.jpg" "$large"; } || rm -f "$large.tmp.jpg"
     fi
@@ -134,71 +123,13 @@ if [[ "${1:-}" == "--list" ]]; then
   exit 0
 fi
 
-if [[ "${1:-}" != "--rofi" ]] && "$HOME/.local/bin/rp-shell" wallpaper toggle; then
+if [[ "${1:-}" != "--menu" ]] && "$HOME/.local/bin/rp-shell" wallpaper toggle; then
   exit 0
 fi
 
 pick_wallpaper() {
   local selected=""
-  if command -v rofi >/dev/null 2>&1; then
-    mapfile -d '' files < <(list_wallpapers)
-    [[ "${#files[@]}" -gt 0 ]] || { echo ""; return; }
-    local current_src=""
-    local current_index=""
-    current_src="$(current_wallpaper_source)"
-    local rofi_theme
-    rofi_theme='
-      * {
-        bg: '"${wal_bg}"'ee;
-        bg-alt: '"${wal_bg}"'cc;
-        fg: '"${wal_fg}"'ff;
-        ac: '"${wal_ac}"'ff;
-      }
-      window { width: 46%; border: 2px; border-color: @ac; border-radius: 12px; background-color: @bg; }
-      mainbox { padding: 8px; spacing: 6px; }
-      inputbar { padding: 6px; border-radius: 8px; background-color: @bg-alt; }
-      prompt { text-color: @ac; }
-      entry { text-color: @fg; background-color: transparent; }
-      textbox, textbox-prompt-colon { text-color: @fg; background-color: transparent; }
-      listview { lines: 6; columns: 1; spacing: 4px; scrollbar: false; }
-      element { padding: 4px; border-radius: 8px; background-color: transparent; }
-      element normal.normal, element normal.urgent, element normal.active, element alternate.normal, element alternate.urgent, element alternate.active { background-color: transparent; }
-      element selected.normal, element selected.urgent, element selected.active { background-color: @bg-alt; border: 1px; border-color: @ac; }
-      element-text { vertical-align: 0.5; text-color: @fg; }
-      element-text selected { text-color: @ac; }
-      element-text active { text-color: @ac; }
-      element-icon { size: 72px; border-radius: 6px; }
-    '
-    for i in "${!files[@]}"; do
-      file="${files[$i]}"
-      if [[ -n "$current_src" && "$file" == "$current_src" ]]; then
-        current_index="$i"
-      fi
-    done
-    warm_missing_thumbs "${files[@]}"
-    build_entries() {
-      local file base thumb
-      for file in "${files[@]}"; do
-        base="$(basename "$file")"
-        thumb="$(thumb_path_for "$file")"
-        if [[ -f "$thumb" ]]; then
-          printf '%s\0icon\x1f%s\n' "$base" "$thumb"
-        else
-          printf '%s\n' "$base"
-        fi
-      done
-    }
-    if [[ -n "$current_index" ]]; then
-      selected="$(build_entries | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
-          -show-icons -no-config -theme-str "$rofi_theme" -a "$current_index")"
-    else
-      selected="$(build_entries | rofi -dmenu -i -p "Wallpaper" -mesg "Fuzzel-style + náhled" \
-          -show-icons -no-config -theme-str "$rofi_theme")"
-    fi
-    if [[ -n "${selected:-}" ]]; then
-      selected="$WALL_DIR/$selected"
-    fi
-  elif command -v zenity >/dev/null 2>&1; then
+  if command -v zenity >/dev/null 2>&1; then
     selected="$(zenity --file-selection --title="Vyber tapetu" --filename="$WALL_DIR/" --file-filter="Wallpapers | *.jpg *.jpeg *.png *.webp *.gif *.mp4 *.mkv *.webm" 2>/dev/null || true)"
   elif command -v fuzzel >/dev/null 2>&1; then
     local choice

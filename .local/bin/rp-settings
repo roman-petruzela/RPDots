@@ -382,7 +382,6 @@ apply_cursor() {
     systemctl --user set-environment XCURSOR_THEME="$t" XCURSOR_SIZE="$s" 2>/dev/null
     command -v dbus-update-activation-environment >/dev/null 2>&1 &&
         XCURSOR_THEME="$t" XCURSOR_SIZE="$s" dbus-update-activation-environment XCURSOR_THEME XCURSOR_SIZE 2>/dev/null
-    systemctl --user try-restart waybar.service >/dev/null 2>&1 &
     return 0
 }
 

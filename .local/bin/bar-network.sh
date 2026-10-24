@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-STATE="${XDG_RUNTIME_DIR:-/tmp}/waybar-network.state"
+STATE="${XDG_RUNTIME_DIR:-/tmp}/rp-bar-network.state"
 
 human() {
     awk -v b="$1" 'BEGIN {

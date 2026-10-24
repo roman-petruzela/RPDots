@@ -7,7 +7,7 @@ Dotfiles for a [niri](https://github.com/YaLTeR/niri) desktop on Arch Linux and 
 | | |
 |---|---|
 | Compositor | niri |
-| Shell | quickshell (waybar available as an alternative bar) |
+| Shell | quickshell |
 | Terminal | kitty |
 | Notifications | quickshell (popups and a notification centre in the dashboard) |
 | Lock screen | quickshell (swaylock-effects as a fallback) |

@@ -137,7 +137,7 @@ Scope {
                 { key: "input.mouse_left_handed", label: "Left-handed", hint: "Swap left and right buttons." },
             ]},
             { title: "CURSOR", rows: [
-                { key: "cursor.theme", label: "Cursor theme", hint: "Changes right away where niri draws the cursor; apps that draw their own (waybar, GTK3, XWayland, this window) pick it up after a restart." },
+                { key: "cursor.theme", label: "Cursor theme", hint: "Changes right away where niri draws the cursor; apps that draw their own (GTK3, XWayland, this window) pick it up after a restart." },
                 { key: "cursor.size", label: "Cursor size", suffix: " px", step: 2 },
                 { key: "cursor.hide_typing", label: "Hide while typing", hint: "Can confuse mouselook in some Wine games." },
                 { key: "cursor.hide_after", label: "Hide when idle", hint: "Hide the pointer after this long without movement.", suffix: " s", zero: "Never" },
