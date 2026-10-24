@@ -44,7 +44,7 @@ niri.center_single|bool|false
 niri.empty_ws_first|bool|false
 niri.overview_zoom|float|0.35|0.10|0.75
 niri.hot_corner|enum|top-left|off,top-left,top-right,bottom-left,bottom-right
-input.kb_layouts|string|cz,us|^[a-z]{2,3}(,[a-z]{2,3}){0,3}$
+input.kb_layouts|string|us|^[a-z]{2,3}(,[a-z]{2,3}){0,3}$
 input.kb_switch|enum|alt_shift_toggle|alt_shift_toggle,ctrl_shift_toggle,caps_toggle,none
 input.caps_lock|enum|default|default,escape,ctrl,swapescape,none
 input.compose|enum|none|none,ralt,rctrl,menu

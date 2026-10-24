@@ -1,7 +1,7 @@
 input {
     keyboard {
         xkb {
-            layout "cz,us"
+            layout "us"
             options "grp:alt_shift_toggle"
         }
     }
