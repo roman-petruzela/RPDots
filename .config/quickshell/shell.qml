@@ -210,7 +210,7 @@ ShellRoot {
         id: wallpaperPicker
     }
 
-    Launcher { id: launcher }
+    Launcher { id: launcher; niri: niri }
 
     SessionMenu { id: sessionMenu }
 
@@ -250,6 +250,7 @@ ShellRoot {
             screen: modelData
             active: wallpaperPicker.previewActive
             source: wallpaperPicker.previewSource
+            thumb: wallpaperPicker.previewThumb
         }
     }
 
