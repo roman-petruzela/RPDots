@@ -2,24 +2,29 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-export ZSH="$HOME/.oh-my-zsh"
+export ZSH=/usr/share/oh-my-zsh
+[[ -d $ZSH ]] || ZSH="$HOME/.oh-my-zsh"
+ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-zsh"
+[[ -d $ZSH_CACHE_DIR/completions ]] || mkdir -p "$ZSH_CACHE_DIR/completions"
 
 ZSH_THEME=""
 
 plugins=(
 git
 fzf
-zsh-autosuggestions
-z
 docker
 python
 rust
 sudo
 archlinux
-zsh-syntax-highlighting
 )
 
 [[ -f $ZSH/oh-my-zsh.sh ]] && source $ZSH/oh-my-zsh.sh
+
+for p in zsh-autosuggestions zsh-syntax-highlighting; do
+  [[ -f /usr/share/zsh/plugins/$p/$p.zsh ]] && source /usr/share/zsh/plugins/$p/$p.zsh
+done
+unset p
 
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='vim'

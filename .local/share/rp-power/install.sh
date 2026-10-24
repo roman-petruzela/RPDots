@@ -48,13 +48,15 @@ OnUnitActiveSec=2min
 WantedBy=timers.target
 EOF
 
-systemctl daemon-reload
-systemctl enable rp-power-auto.service
-systemctl enable --now rp-power-gpu-guard.timer
-udevadm control --reload-rules
+systemctl enable rp-power-auto.service rp-power-gpu-guard.timer
+if [[ -d /run/systemd/system ]]; then
+    systemctl daemon-reload
+    systemctl start rp-power-gpu-guard.timer
+    udevadm control --reload-rules
+fi
 
 mkdir -p /var/lib/rp-power
-echo balanced > /var/lib/rp-power/mode
+[[ -s /var/lib/rp-power/mode ]] || echo balanced > /var/lib/rp-power/mode
 
 echo
 echo "Done. Try:  rp-power status"

@@ -1,0 +1,8 @@
+FROM docker.io/library/archlinux:latest
+RUN pacman -Syu --noconfirm --needed base-devel git sudo \
+    && useradd -m tester \
+    && echo 'tester ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/tester
+COPY --chown=tester:tester repo /home/tester/dotfiles
+USER tester
+ENV USER=tester
+WORKDIR /home/tester

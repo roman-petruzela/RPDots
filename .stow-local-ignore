@@ -7,3 +7,4 @@ CLAUDE\.md
 \.gitconfig
 \.githooks
 \.shellcheckrc
+^/tests

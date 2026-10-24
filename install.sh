@@ -11,12 +11,10 @@ STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"
 
 PKGS=(
     niri
-    waybar
     quickshell
     qt6-multimedia
     kitty
     fuzzel
-    rofi
     swaylock-effects
     swayidle
     kanshi
@@ -51,6 +49,7 @@ PKGS=(
     git
 
     zsh
+    oh-my-zsh-git
     zsh-theme-powerlevel10k
     zsh-autosuggestions
     zsh-syntax-highlighting
@@ -60,6 +59,7 @@ PKGS=(
     cava
 
     ttf-jetbrains-mono-nerd
+    bibata-cursor-theme-bin
     papirus-icon-theme
     nwg-look
     qt6ct
@@ -91,11 +91,8 @@ EXTRAS=(
     fastfetch
 )
 
-CURSOR_THEME=Bibata-Modern-Ice
-CURSOR_URL="https://github.com/ful1e5/Bibata_Cursor/releases/latest/download/$CURSOR_THEME.tar.xz"
-
 NOT_DEPLOYED=(.gitignore .stow-local-ignore README.md install.sh CLAUDE.md .gitconfig
-    .githooks/pre-commit .local/bin/theme-modules/.shellcheckrc)
+    .githooks .local/bin/theme-modules/.shellcheckrc tests)
 
 need_sudo() {
     [[ -n "${SUDO_KEEPALIVE:-}" ]] && return 0
@@ -106,8 +103,10 @@ need_sudo() {
     trap 'kill "$SUDO_KEEPALIVE" 2>/dev/null' EXIT
 }
 
+ASSUME_YES=0
 ask() {
     local reply
+    [[ $ASSUME_YES == 1 ]] && { echo "$1 [y/N] y"; return 0; }
     read -r -p "$1 [y/N] " reply
     [[ "$reply" == [yYaA]* ]]
 }
@@ -140,18 +139,18 @@ install_packages() {
         sudo pacman -Su --needed --noconfirm "${repo[@]}"
     fi
     if [[ ${#aur[@]} -gt 0 ]]; then
-        command -v paru &>/dev/null || install_paru
-        if command -v paru &>/dev/null; then
+        paru_works || install_paru
+        if paru_works; then
             echo " -> AUR: ${aur[*]}"
-            paru -S --needed --noconfirm --skipreview "${aur[@]}"
+            paru -S --needed --noconfirm --skipreview "${aur[@]}" \
+                || echo "warning: some AUR packages failed to install: ${aur[*]}" >&2
         else
             echo "warning: paru unavailable, skipping AUR packages: ${aur[*]}" >&2
         fi
     fi
     [[ ${#repo[@]} -eq 0 && ${#aur[@]} -eq 0 ]] && echo " -> All packages already installed"
     install_rp_audio
-    install_cursor
-    install_zsh
+    set_shell
     return 0
 }
 
@@ -166,36 +165,27 @@ install_rp_audio() {
     rm -rf "$tmp"
 }
 
-install_zsh() {
-    local custom="$HOME/.oh-my-zsh/custom/plugins" p
-    [[ -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]] \
-        || git clone -q --depth 1 https://github.com/ohmyzsh/ohmyzsh "$HOME/.oh-my-zsh" \
-        || echo "warning: failed to clone oh-my-zsh" >&2
-    for p in zsh-autosuggestions zsh-syntax-highlighting; do
-        [[ -d "$custom/$p" ]] || git clone -q --depth 1 "https://github.com/zsh-users/$p" "$custom/$p" \
-            || echo "warning: failed to clone $p" >&2
-    done
-    [[ "$(getent passwd "$USER" | cut -d: -f7)" == */zsh ]] || sudo chsh -s /usr/bin/zsh "$USER"
+set_shell() {
+    local me; me="$(id -un)"
+    [[ "$(getent passwd "$me" | cut -d: -f7)" == */zsh ]] || sudo chsh -s /usr/bin/zsh "$me"
 }
 
-install_cursor() {
-    local d
-    for d in /usr/share/icons "$HOME/.local/share/icons" "$HOME/.icons"; do
-        [[ -d "$d/$CURSOR_THEME/cursors" ]] && return 0
-    done
-    echo " -> Installing cursor theme $CURSOR_THEME"
-    curl -fsSL "$CURSOR_URL" | sudo tar -xJ --no-same-owner -C /usr/share/icons \
-        || echo "warning: failed to download $CURSOR_URL" >&2
-}
+paru_works() { paru --version &>/dev/null; }
 
 install_paru() {
     echo " -> Installing paru"
     sudo pacman -S --needed --noconfirm base-devel git
-    local tmp; tmp="$(mktemp -d)"
-    git clone -q --depth 1 https://aur.archlinux.org/paru-bin.git "$tmp/paru-bin" \
-        && (cd "$tmp/paru-bin" && makepkg -si --noconfirm) \
-        || echo "warning: paru installation failed" >&2
+    local tmp pkg; tmp="$(mktemp -d)"
+    for pkg in paru-bin paru; do
+        if [[ $pkg == paru ]]; then
+            echo " -> paru-bin doesn't run against this pacman, building paru from source"
+            sudo pacman -Rns --noconfirm paru-bin paru-bin-debug &>/dev/null || true
+        fi
+        git clone -q --depth 1 "https://aur.archlinux.org/$pkg.git" "$tmp/$pkg" \
+            && (cd "$tmp/$pkg" && makepkg -si --noconfirm) && paru_works && break
+    done
     rm -rf "$tmp"
+    paru_works || echo "warning: paru installation failed" >&2
 }
 
 repo_files() {
@@ -207,7 +197,7 @@ repo_files() {
             (cd "$DOTFILES" && find . -type f -not -path './.git/*' | sed 's|^\./||')
         fi
     } | while IFS= read -r f; do
-        for skip in "${NOT_DEPLOYED[@]}"; do [[ "$f" == "$skip" ]] && continue 2; done
+        for skip in "${NOT_DEPLOYED[@]}"; do [[ "$f" == "$skip" || "$f" == "$skip"/* ]] && continue 2; done
         [[ -f "$DOTFILES/$f" ]] && printf '%s\n' "$f"
     done
 }
@@ -277,9 +267,21 @@ refresh_system() {
     return 0
 }
 
+enable_units() {
+    local f units=()
+    for f in "$HOME"/.config/systemd/user/niri-rice-*; do
+        [[ -f "$f" ]] && grep -q '^\[Install\]' "$f" && units+=("${f##*/}")
+    done
+    command -v cliphist >/dev/null && units+=(cliphist.service)
+    systemctl --user daemon-reload 2>/dev/null || return 0
+    systemctl --user enable "${units[@]}" >/dev/null 2>&1 || echo "warning: failed to enable user units" >&2
+    in_session && systemctl --user start cliphist.service >/dev/null 2>&1
+    return 0
+}
+
 post_deploy() {
     echo ":: Configuring session"
-    systemctl --user daemon-reload
+    enable_units
     refresh_system
 
     command -v ya >/dev/null && ya pkg install >/dev/null 2>&1 || true
@@ -296,8 +298,6 @@ post_deploy() {
 
     systemctl --user try-restart niri-rice-quickshell.service rp-audio.service \
         2>/dev/null || true
-    systemctl --user start niri-rice-cliphist.service 2>/dev/null || true
-    pkill -USR2 -x waybar 2>/dev/null || true
     echo ":: Done"
 }
 
@@ -371,6 +371,7 @@ merge_configs() {
 
     while IFS= read -r f; do
         [[ -z "$f" || -e "$DOTFILES/$f" || ! -f "$HOME/$f" ]] && continue
+        [[ "$f" == .config/systemd/user/* ]] && systemctl --user disable --now "${f##*/}" >/dev/null 2>&1
         git -C "$DOTFILES" show "$base:$f" 2>/dev/null | cmp -s - "$HOME/$f" || continue
         mkdir -p "$backup/$(dirname "$f")"
         mv "$HOME/$f" "$backup/$f"
@@ -399,13 +400,7 @@ update_packages() {
 
 update_units() {
     local f unit restart=()
-    systemctl --user daemon-reload
-    for f in "${UPDATED[@]}"; do
-        [[ "$f" == .config/systemd/user/* ]] || continue
-        unit="${f##*/}"
-        grep -q '^\[Install\]' "$HOME/$f" && ! systemctl --user is-enabled -q "$unit" 2>/dev/null \
-            && systemctl --user enable --now "$unit" 2>/dev/null && echo " -> Enabled $unit"
-    done
+    enable_units
     for unit in $(systemctl --user list-units --type=service --state=running --no-legend --plain 'niri-rice-*' | awk '{print $1}'); do
         [[ "$unit" == niri-rice-quickshell.service ]] && continue
         for f in "${UPDATED[@]}"; do
@@ -445,8 +440,13 @@ run_update() {
 case "${1:-}" in
     update) shift; run_update "$@"; exit 0 ;;
     diff) copy_configs 1; exit 0 ;;
+    full)
+        [[ "${2:-}" == --yes ]] && ASSUME_YES=1
+        choose_extras; need_sudo; install_packages; copy_configs; remember_dotfiles; post_deploy
+        ask "Run system integration?" && system_setup
+        exit 0 ;;
     "") ;;
-    *) echo "usage: ./install.sh [update|diff]" >&2; exit 2 ;;
+    *) echo "usage: ./install.sh [update|diff|full [--yes]]" >&2; exit 2 ;;
 esac
 
 echo "RPDots installer ($DOTFILES)"
