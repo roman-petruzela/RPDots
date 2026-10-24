@@ -76,13 +76,29 @@ Item {
         return m + ":" + (r < 10 ? "0" : "") + r
     }
 
-    Image {
-        id: artImg
-        source: root.artUrl
-        fillMode: Image.PreserveAspectCrop
-        sourceSize: Qt.size(128, 128)
-        asynchronous: true
+    Item {
+        id: blurred
+        anchors.fill: parent
         visible: false
+        layer.enabled: true
+
+        Image {
+            id: artImg
+            anchors { fill: parent; margins: -24 }
+            source: root.artUrl
+            fillMode: Image.PreserveAspectCrop
+            sourceSize.width: 480
+            asynchronous: true
+            visible: false
+        }
+        MultiEffect {
+            anchors.fill: artImg
+            source: artImg
+            autoPaddingEnabled: false
+            blurEnabled: true
+            blur: 0.6
+            blurMax: 32
+        }
     }
 
     Rectangle {
@@ -102,15 +118,19 @@ Item {
 
     MultiEffect {
         anchors.fill: parent
-        source: artImg
+        source: blurred
         visible: root.hasArt
-        opacity: 0.35
-        blurEnabled: true
-        blur: 1
-        blurMax: 48
-        saturation: -0.2
         maskEnabled: true
         maskSource: cardMask
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 1
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        radius: card.radius
+        visible: root.hasArt
+        color: Qt.alpha(Colors.surfaceContainerHigh, 0.55)
     }
 
     Rectangle {
@@ -131,40 +151,8 @@ Item {
             width: parent.width
             height: 56
 
-            Item {
-                id: art
-                width: 56; height: 56
-                Rectangle {
-                    id: artMask
-                    anchors.fill: parent
-                    radius: 12
-                    visible: false
-                    layer.enabled: true
-                }
-                MultiEffect {
-                    anchors.fill: parent
-                    source: artImg
-                    visible: root.hasArt
-                    maskEnabled: true
-                    maskSource: artMask
-                }
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 12
-                    visible: !root.hasArt
-                    color: Qt.alpha(Colors.primary, 0.16)
-                    Text {
-                        anchors.centerIn: parent
-                        text: "\u{f075a}"
-                        font.family: "JetBrainsMono Nerd Font Propo"
-                        font.pixelSize: 22
-                        color: Colors.primary
-                    }
-                }
-            }
-
             Column {
-                anchors { left: art.right; leftMargin: 12; right: controls.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
+                anchors { left: parent.left; leftMargin: 4; right: controls.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
                 spacing: 3
                 Text {
                     width: parent.width
