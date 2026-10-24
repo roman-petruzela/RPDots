@@ -63,21 +63,14 @@ write_session_env
 
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user start --no-block niri-rice-quickshell.service rp-audio.service \
-    niri-rice-cliphist.service niri-rice-playerctld.service niri-rice-wallpaper-healthcheck.timer \
-    niri-rice-waybar.timer >/dev/null 2>&1 || true
+    cliphist.service niri-rice-wallpaper-healthcheck.timer >/dev/null 2>&1 || true
 fi
 
-command -v xwayland-satellite >/dev/null 2>&1 \
-  && ensure_pidfile_running "$PID_DIR/xwayland-satellite.pid" xwayland-satellite xwayland-satellite
 command -v kanshi >/dev/null 2>&1 && [[ -f "$HOME/.config/kanshi/config" ]] \
   && ensure_pidfile_running "$PID_DIR/kanshi.pid" kanshi kanshi
 [[ -f /usr/lib/systemd/user/mako.service && ! -L "$HOME/.config/systemd/user/mako.service" ]] \
   && { systemctl --user mask mako.service >/dev/null 2>&1 || true; }
 pkill -x mako 2>/dev/null || true
-command -v nm-applet >/dev/null 2>&1 \
-  && ensure_pidfile_running "$PID_DIR/nm-applet.pid" nm-applet nm-applet --indicator
-command -v blueman-applet >/dev/null 2>&1 \
-  && ensure_pidfile_running "$PID_DIR/blueman-applet.pid" blueman-applet blueman-applet
 command -v wayvnc >/dev/null 2>&1 \
   && ensure_pidfile_running "$PID_DIR/wayvnc.pid" wayvnc wayvnc 127.0.0.1 5900
 
