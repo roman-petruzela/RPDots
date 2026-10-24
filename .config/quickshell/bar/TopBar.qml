@@ -278,6 +278,16 @@ PanelWindow {
     }
 
     property var now: new Date()
+    FileView {
+        id: rpSettings
+        path: Quickshell.env("HOME") + "/.config/niri-rice/settings.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+    }
+    readonly property string clockFormat: {
+        try { return JSON.parse(rpSettings.text())["bar.clock"] || "dd.MM. HH:mm" } catch (e) { return "dd.MM. HH:mm" }
+    }
     Timer { interval: 1000; running: true; repeat: true; onTriggered: bar.now = new Date() }
 
     Pill {
@@ -290,7 +300,7 @@ PanelWindow {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.StyledText
-            text: "<font color=\"" + Colors.primary + "\">\uf017</font>&nbsp;" + Qt.formatDateTime(bar.now, "dd.MM. HH:mm")
+            text: "<font color=\"" + Colors.primary + "\">\uf017</font>&nbsp;" + Qt.formatDateTime(bar.now, bar.clockFormat)
             font.family: bar.fontFamily
             font.pixelSize: 13
             font.weight: Font.DemiBold
@@ -325,7 +335,7 @@ PanelWindow {
                 baseColor: (bar.barData.vpn.class ?? []).includes("active") ? Colors.tertiary : Qt.alpha(Colors.tertiary, 0.4)
                 font.pixelSize: 12
                 clickable: true
-                onLeftClicked: bar.sh(bar.bin + "protonvpn-app")
+                onLeftClicked: bar.sh("command -v protonvpn-app >/dev/null && exec protonvpn-app || exec " + bar.bin + "rp-shell network toggle")
             }
         }
 
@@ -350,9 +360,10 @@ PanelWindow {
                 iconColor: Colors.secondary
                 tip: bar.barData.gpu.tooltip ?? ""
             }
-            Item_ { icon: "\uefc5"; value: bar.barData.mem + "%"; iconColor: Colors.secondary }
+            Item_ { icon: "\uefc5"; value: bar.barData.mem + "%"; iconColor: Colors.secondary; tip: bar.barData.memTip }
             Item_ {
                 icon: "\uf2c9"; value: bar.barData.temp + "°C"
+                tip: bar.barData.tempTip
                 iconColor: bar.barData.temp >= 85 ? Colors.errorColor : Colors.tertiary
                 baseColor: bar.barData.temp >= 85 ? Colors.errorColor : Colors.onSurface
             }

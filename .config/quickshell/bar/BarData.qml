@@ -18,6 +18,8 @@ Item {
     property var cores: []
     property string load: ""
     property int mem: 0
+    property string memTip: ""
+    property string tempTip: ""
     property int temp: 0
     property int brightness: 0
     property bool hasBacklight: false
@@ -63,14 +65,15 @@ Item {
         Timer { interval: jp.interval; running: root.active; repeat: true; onTriggered: p.running = true }
     }
 
-    JsonPoll { command: [root.bin + "waybar-network.sh"]; interval: 2000; onResult: o => root.network = o }
-    JsonPoll { command: [root.bin + "waybar-vpn.sh"]; interval: 5000; onResult: o => root.vpn = o }
-    JsonPoll { command: [root.bin + "waybar-gpu.sh"]; interval: 3000; onResult: o => root.gpu = o }
+    JsonPoll { command: [root.bin + "bar-network.sh"]; interval: 2000; onResult: o => root.network = o }
+    JsonPoll { command: [root.bin + "bar-vpn.sh"]; interval: 5000; onResult: o => root.vpn = o }
+    JsonPoll { command: [root.bin + "bar-gpu.sh"]; interval: 3000; onResult: o => root.gpu = o }
+    JsonPoll { command: [root.bin + "bar-temps.sh"]; interval: 3000; onResult: o => root.tempTip = o.tooltip ?? "" }
 
     Process {
         id: cavaProc
         running: root.active
-        command: [root.bin + "waybar-cava-stream.sh"]
+        command: [root.bin + "bar-cava-stream.sh"]
         stdout: SplitParser { onRead: line => root.cava = line }
     }
     Timer { interval: 3000; running: root.active && !cavaProc.running; repeat: true; onTriggered: cavaProc.running = true }
@@ -101,6 +104,14 @@ Item {
             const kb = k => Number((m.match(new RegExp("^" + k + ":\\s+(\\d+)", "m")) ?? [0, 0])[1])
             const tot = kb("MemTotal")
             if (tot > 0) root.mem = Math.round(100 * (1 - kb("MemAvailable") / tot))
+            const gib = v => (v / 1048576).toFixed(1).padStart(5) + " GiB"
+            const swapTot = kb("SwapTotal")
+            root.memTip = [
+                "used      " + gib(tot - kb("MemAvailable")) + " / " + gib(tot).trim(),
+                "available " + gib(kb("MemAvailable")),
+                "cached    " + gib(kb("Cached") + kb("SReclaimable")),
+                "swap      " + gib(swapTot - kb("SwapFree")) + " / " + gib(swapTot).trim()
+            ].join("\n")
             root.temp = Math.round(Number(tempFile.text().trim()) / 1000)
         }
     }
