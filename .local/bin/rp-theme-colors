@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""Color helpers for apply-wallpaper-theme.sh.
+
+  rp-theme-colors is-mono <image>                    exit 0 when the image is (nearly) black and white
+  rp-theme-colors mono-config <matugen.toml> <dir>   saturation-free copy of the templates, prints its config
+  rp-theme-colors accent-config <matugen.toml> <out> <palette.json> <image> <auto|off> <0|1>
+  rp-theme-colors palette <palette.json>             shell assignments: background, foreground, color0..15
+  rp-theme-colors image-accent <image>               one or two dominant, reasonably saturated colors
+"""
+import colorsys
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+
+HIST_RE = re.compile(r"^\s*(\d+):.*#([0-9A-Fa-f]{6})(?:[0-9A-Fa-f]{2})?\b")
+
+
+def hsv(hexv):
+    hexv = hexv.lstrip("#")
+    return colorsys.rgb_to_hsv(*(int(hexv[i:i + 2], 16) / 255.0 for i in (0, 2, 4)))
+
+
+def histogram(image, colors):
+    proc = subprocess.run(
+        ["magick", f"{image}[0]", "-auto-orient", "-resize", "320x320>",
+         "-colors", str(colors), "-format", "%c\n", "histogram:info:-"],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        sys.exit(1)
+    for line in proc.stdout.splitlines():
+        m = HIST_RE.match(line)
+        if m:
+            yield int(m.group(1)), m.group(2).upper()
+
+
+def load_palette(path):
+    txt = pathlib.Path(path).read_text()
+    return {k: v["default"]["color"] for k, v in json.loads(txt[txt.index("{"):])["colors"].items()}
+
+
+def is_mono(image):
+    total = colored = 0
+    for count, hexv in histogram(image, 64):
+        _, s, v = hsv(hexv)
+        total += count
+        if s >= 0.15 and v >= 0.12:
+            colored += count
+    if not total:
+        sys.exit(1)
+    sys.exit(0 if colored / total * 100.0 < float(os.environ.get("THEME_MONO_THRESHOLD", "2.0")) else 1)
+
+
+def mono_config(cfg, mono_dir):
+    cfg, mono_dir = pathlib.Path(cfg), pathlib.Path(mono_dir)
+    mono_dir.mkdir(parents=True, exist_ok=True)
+    out = []
+    for line in cfg.read_text().splitlines():
+        m = re.match(r'^(\s*input_path\s*=\s*")(.+)(")\s*$', line)
+        if m:
+            src = pathlib.Path(os.path.expanduser(m.group(2)))
+            if src.is_file() and "set_saturation" in (text := src.read_text()):
+                dst = mono_dir / src.name
+                dst.write_text(re.sub(r"set_saturation:\s*\d+(\.\d+)?", "set_saturation: 0", text))
+                line = f"{m.group(1)}{dst}{m.group(3)}"
+        out.append(line)
+    dst_cfg = mono_dir / "config.toml"
+    dst_cfg.write_text("\n".join(out) + "\n")
+    print(dst_cfg)
+
+
+def accent_config(base_cfg, out_cfg, palette, image, mode, mono):
+    colors = load_palette(palette)
+    source = colors["source_color"]
+    if mono == "1":
+        accent = "#777777"
+    elif mode == "off":
+        accent = source
+    else:
+        sources = subprocess.run(["matugen", "image", image, "--show-source-colors"],
+                                 capture_output=True, text=True).stdout
+        accent, best = colors["tertiary"], 30
+        h0 = hsv(source)[0]
+        for c in re.findall(r"#[0-9A-Fa-f]{6}", sources)[1:]:
+            h, s, v = hsv(c)
+            d = abs(h - h0) * 360
+            d = min(d, 360 - d)
+            if d > best and s >= 0.2 and v >= 0.2:
+                accent, best = c, d
+    base = pathlib.Path(base_cfg).read_text()
+    line = f'accent2 = {{ color = "{accent}", blend = false }}'
+    if re.search(r"(?m)^accent2\s*=", base):
+        out = re.sub(r"(?m)^accent2\s*=.*$", line, base)
+    else:
+        out = base.replace("[config.custom_colors]\n", f"[config.custom_colors]\n{line}\n", 1)
+    pathlib.Path(out_cfg).write_text(out)
+    print(out_cfg)
+
+
+FALLBACK = {
+    "background": "#1a120d", "on_surface": "#f0dfd7", "primary": "#ffb68c",
+    "surface_container_lowest": "#140d08", "error": "#ffb4ab",
+    "tertiary": "#ccc992", "secondary": "#e5bfaa",
+    "tertiary_fixed_dim": "#ccc992", "secondary_fixed_dim": "#e5bfaa",
+    "on_surface_variant": "#d7c2b8", "surface_container": "#271e19",
+    "error_container": "#93000a", "tertiary_container": "#4a481d",
+    "secondary_container": "#5c4131", "primary_container": "#6f3812",
+    "tertiary_fixed": "#e9e5ab", "secondary_fixed": "#ffdbc9",
+}
+ANSI = ["surface_container_lowest", "error", "tertiary", "secondary", "primary", "tertiary_fixed_dim",
+        "secondary_fixed_dim", "on_surface_variant", "surface_container", "error_container",
+        "tertiary_container", "secondary_container", "primary_container", "tertiary_fixed",
+        "secondary_fixed", "on_surface"]
+
+
+def palette(path):
+    c = dict(FALLBACK)
+    try:
+        c.update(load_palette(path))
+    except Exception:
+        pass
+    print(f'background="{c["background"]}"')
+    print(f'foreground="{c["on_surface"]}"')
+    print(f'cursor="{c["primary"]}"')
+    for i, key in enumerate(ANSI):
+        print(f'color{i}="{c[key]}"')
+
+
+def image_accent(image):
+    cands = []
+    for count, hexv in histogram(image, 16):
+        _, s, v = hsv(hexv)
+        if v >= 0.20:
+            cands.append((count * (0.25 + s * 0.75) * (0.35 + v * 0.65), f"#{hexv}", s))
+    cands.sort(reverse=True)
+    if cands:
+        print(cands[0][1])
+        second = next((h for _, h, sat in cands[1:] if sat >= 0.18), None)
+        if second:
+            print(second)
+
+
+COMMANDS = {"is-mono": is_mono, "mono-config": mono_config, "accent-config": accent_config,
+            "palette": palette, "image-accent": image_accent}
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
+        sys.exit(__doc__)
+    COMMANDS[sys.argv[1]](*sys.argv[2:])

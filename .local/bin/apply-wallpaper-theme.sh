@@ -12,22 +12,13 @@ MODULE_DIR="$HOME/.local/bin/theme-modules"
 THEME_LOG="$STATE_DIR/theme-modules.log"
 MODULE_CFG="$CFG_DIR/modules.conf"
 SNAPSHOT_ROOT="$STATE_DIR/snapshots"
-WAYBAR_RESTART_ON_THEME="${WAYBAR_RESTART_ON_THEME:-0}"
-WAYBAR_CSS="$HOME/.config/waybar/colors.css"
-WAYBAR_CONFIG="$HOME/.config/waybar/config.jsonc"
 LOCK_DIR="$STATE_DIR/theme-apply.lock.d"
 PENDING_FLAG="$STATE_DIR/theme-apply.pending"
 PENDING_ARGS="$STATE_DIR/theme-apply.pending.args"
-NO_RESTART=""
-FAST_MODE=""
 SNAPSHOT_DIR=""
 MANIFEST_FILE=""
 RESTORE_DONE=0
 WALLPAPER_ARG=""
-waybar_css_hash_before=""
-waybar_config_hash_before=""
-waybar_css_changed=0
-waybar_config_changed=0
 
 mkdir -p "$STATE_DIR"
 lock_is_stale() {
@@ -45,6 +36,17 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
     else
         printf '%s\0' "$@" >"$PENDING_ARGS"
         : >"$PENDING_FLAG"
+        if [[ -f "${1:-}" ]]; then
+            printf '%s\n' "$1" >"$STATE_DIR/current-wallpaper-source"
+            case "${1,,}" in
+            *.mp4 | *.mkv | *.webm | *.mov | *.avi) printf '%s\n' "$1" >"$STATE_DIR/current-video" ;;
+            *)
+                rm -f "$STATE_DIR/current-video"
+                awww img "$1" --transition-type "${WALL_TRANSITION_TYPE:-simple}" >/dev/null 2>&1 || true
+                ;;
+            esac
+            setsid "$HOME/.local/bin/wallpaper-video-ctl.sh" sync >/dev/null 2>&1 </dev/null &
+        fi
         exit 0
     fi
 fi
@@ -58,17 +60,9 @@ trap cleanup_lock EXIT
 
 mkdir -p "$PID_DIR" "$WALL_DIR" "$CFG_DIR" "$SNAPSHOT_ROOT"
 export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.spicetify:${PATH:-}"
-if [[ -f "$WAYBAR_CSS" ]]; then
-    waybar_css_hash_before="$(sha256sum "$WAYBAR_CSS" | awk '{print $1}')"
-fi
-if [[ -f "$WAYBAR_CONFIG" ]]; then
-    waybar_config_hash_before="$(sha256sum "$WAYBAR_CONFIG" | awk '{print $1}')"
-fi
 
 notify_msg() {
-    if command -v notify-send >/dev/null 2>&1; then
-        notify-send -a "rice" "$1" "$2"
-    fi
+    notify-send -a "rice" "$1" "$2" 2>/dev/null || true
 }
 
 parse_meta() {
@@ -91,40 +85,9 @@ parse_meta() {
     printf '%s|%s|%s|%s\n' "$base" "$enabled" "$priority" "$requires"
 }
 
-ensure_modules_cfg() {
-    if [[ -f "$MODULE_CFG" ]]; then
-        return
-    fi
-    cat >"$MODULE_CFG" <<'EOF'
-# module|enabled|priority|requires(comma separated commands)
-05-cache-hygiene.sh|1|5|
-10-kitty.sh|1|10|kitty
-15-zed.sh|1|15|
-16-cli-theme-env.sh|1|16|
-20-waybar.sh|1|20|
-30-niri.sh|1|30|
-50-fuzzel.sh|1|50|
-55-rofi.sh|1|55|
-60-gtk.sh|1|60|
-61-thunar.sh|1|61|
-62-qt.sh|1|62|qt5ct,qt6ct
-63-dcol.sh|1|63|
-65-vscode.sh|1|65|jq
-66-browser.sh|1|66|jq
-70-vesktop.sh|1|70|jq
-80-spicetify.sh|1|80|spicetify
-84-lightdm.sh|1|84|rp-lightdm-sync-apply
-85-cava.sh|1|85|
-86-btop.sh|1|86|
-87-fastfetch.sh|1|87|
-89-swaylock.sh|1|89|
-90-quickshell.sh|1|90|
-95-smoke-test.sh|1|95|
-EOF
-}
-
 load_module_cfg() {
     declare -gA CFG_ENABLED CFG_PRIORITY CFG_REQUIRES
+    [[ -f "$MODULE_CFG" ]] || return 0
     while IFS='|' read -r module enabled priority requires; do
         [[ -z "${module:-}" || "${module:0:1}" == "#" ]] && continue
         CFG_ENABLED["$module"]="${enabled:-1}"
@@ -136,10 +99,8 @@ load_module_cfg() {
 collect_tracked_files() {
     cat <<EOF
 $HOME/.config/kitty/current-theme.conf
-$HOME/.config/waybar/colors.css
 $HOME/.config/niri/theme-colors.kdl
 $HOME/.config/fuzzel/fuzzel.ini
-$HOME/.config/rofi/pywal-dynamic.rasi
 $HOME/.config/yazi/theme.toml
 $HOME/.config/gtk-3.0/gtk.css
 $HOME/.config/gtk-4.0/gtk.css
@@ -224,18 +185,9 @@ is_heavy_module() {
 
 apply_wallpaper_now() {
     local wall="$1"
-    local daemon=""
-    
-    if command -v awww-daemon >/dev/null 2>&1 && command -v awww >/dev/null 2>&1; then
-        daemon="awww-daemon"
-    elif command -v swww-daemon >/dev/null 2>&1 && command -v swww >/dev/null 2>&1; then
-        daemon="swww-daemon"
-    else
-        return 0
-    fi
-    
-    if ! pgrep -x "$daemon" >/dev/null 2>&1; then
-        "$daemon" >/dev/null 2>&1 &
+    command -v awww-daemon >/dev/null 2>&1 || return 0
+    if ! pgrep -x awww-daemon >/dev/null 2>&1; then
+        awww-daemon >/dev/null 2>&1 &
         sleep 0.3
     fi
     
@@ -280,14 +232,6 @@ install_wallpaper_source() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-    --no-daemon-restart)
-        NO_RESTART="yes"
-        shift
-        ;;
-    --fast)
-        FAST_MODE="yes"
-        shift
-        ;;
     --*)
         echo "Unknown option: $1" >&2
         exit 1
@@ -340,8 +284,7 @@ else
     sig="$(wallpaper_sig)"
     last_sig_file="$STATE_DIR/last-wallpaper.sig"
     if [[ -f "$last_sig_file" ]] && [[ "$(cat "$last_sig_file" 2>/dev/null || true)" == "$sig" ]]; then
-        _wd="swww-daemon"; command -v awww-daemon >/dev/null 2>&1 && _wd="awww-daemon"
-        if ! pgrep -x "$_wd" >/dev/null 2>&1; then
+        if ! pgrep -x awww-daemon >/dev/null 2>&1; then
             apply_wallpaper_now "$WALLPAPER"
         fi
         exit 0
@@ -368,50 +311,12 @@ wal_input="$wal_source"
 if command -v magick >/dev/null 2>&1; then
     matugen_png="$STATE_DIR/wal-matugen.png"
     rm -f "$matugen_png"
-    if [[ "$FAST_MODE" == "yes" ]]; then
-        magick "${wal_source}[0]" -auto-orient -resize "960x960>" "$matugen_png" >/dev/null 2>&1 || true
-    else
-        magick "${wal_source}[0]" -auto-orient -resize "1920x1920>" "$matugen_png" >/dev/null 2>&1 || true
-    fi
+    magick "${wal_source}[0]" -auto-orient -resize "1920x1920>" "$matugen_png" >/dev/null 2>&1 || true
     [[ -f "$matugen_png" ]] && wal_input="$matugen_png"
 fi
 
 is_mono_wallpaper() {
-    local img="$1"
-    command -v python3 >/dev/null 2>&1 || return 1
-    command -v magick >/dev/null 2>&1 || return 1
-    [[ -f "$img" ]] || return 1
-    THEME_MONO_THRESHOLD="${THEME_MONO_THRESHOLD:-2.0}" python3 - "$img" <<'PY'
-import colorsys, os, re, subprocess, sys
-
-proc = subprocess.run(
-    ["magick", f"{sys.argv[1]}[0]", "-auto-orient", "-resize", "320x320>",
-     "-colors", "64", "-format", "%c\n", "histogram:info:-"],
-    capture_output=True, text=True,
-)
-if proc.returncode != 0:
-    sys.exit(1)
-
-total = colored = 0
-for line in proc.stdout.splitlines():
-    m = re.match(r'^\s*(\d+):.*#([0-9A-Fa-f]{6})(?:[0-9A-Fa-f]{2})?\b', line)
-    if not m:
-        continue
-    count = int(m.group(1))
-    hexv = m.group(2)
-    r, g, b = (int(hexv[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
-    _, s, v = colorsys.rgb_to_hsv(r, g, b)
-    total += count
-    # Near-black and near-white pixels carry no usable hue, so they count towards
-    # the total but never towards "this image has colour".
-    if s >= 0.15 and v >= 0.12:
-        colored += count
-
-if not total:
-    sys.exit(1)
-pct = colored / total * 100.0
-sys.exit(0 if pct < float(os.environ["THEME_MONO_THRESHOLD"]) else 1)
-PY
+    command -v magick >/dev/null 2>&1 && [[ -f "$1" ]] && rp-theme-colors is-mono "$1"
 }
 
 MONO_MODE="${THEME_MONO_MODE:-$("$HOME/.local/bin/rp-settings" get theme.mono_mode 2>/dev/null || echo auto)}"
@@ -432,235 +337,41 @@ fi
 
 if [[ "$IS_MONO" == "1" ]]; then
     MATUGEN_ARGS+=(-t scheme-monochrome)
-    mono_cfg="$(MONO_DIR="$STATE_DIR/templates-mono" python3 - <<'PY' 2>/dev/null || true
-import os, pathlib, re, sys
-
-cfg = pathlib.Path(os.path.expanduser("~/.config/matugen/config.toml"))
-if not cfg.is_file():
-    sys.exit(1)
-mono_dir = pathlib.Path(os.environ["MONO_DIR"])
-mono_dir.mkdir(parents=True, exist_ok=True)
-
-out = []
-for line in cfg.read_text().splitlines():
-    m = re.match(r'^(\s*input_path\s*=\s*")(.+)(")\s*$', line)
-    if m:
-        src = pathlib.Path(os.path.expanduser(m.group(2)))
-        if src.is_file():
-            text = src.read_text()
-            if "set_saturation" in text:
-                dst = mono_dir / src.name
-                dst.write_text(re.sub(r'set_saturation:\s*\d+(\.\d+)?', 'set_saturation: 0', text))
-                line = f"{m.group(1)}{dst}{m.group(3)}"
-    out.append(line)
-
-dst_cfg = mono_dir / "config.toml"
-dst_cfg.write_text("\n".join(out) + "\n")
-print(dst_cfg)
-PY
-)"
+    mono_cfg="$(rp-theme-colors mono-config "$matugen_cfg" "$STATE_DIR/templates-mono" 2>/dev/null || true)"
     if [[ -n "$mono_cfg" && -f "$mono_cfg" ]]; then
         matugen_cfg="$mono_cfg"
     fi
 fi
 
-_matugen_json=""
+palette_json="$STATE_DIR/matugen-palette.json"
+: >"$palette_json"
 if command -v matugen >/dev/null 2>&1; then
-    _matugen_json="$(matugen "${MATUGEN_ARGS[@]}" -c "$matugen_cfg" image "$wal_input" --source-color-index 0 -j hex --dry-run 2>/dev/null || true)"
+    matugen "${MATUGEN_ARGS[@]}" -c "$matugen_cfg" image "$wal_input" --source-color-index 0 -j hex --dry-run \
+        >"$palette_json" 2>/dev/null || true
 fi
 
-accent_cfg="$(ACCENT_MODE="$("$_rs" get theme.accent2 2>/dev/null || echo auto)" IS_MONO="$IS_MONO" \
-    BASE_CFG="$matugen_cfg" OUT_CFG="$STATE_DIR/matugen-accent.toml" _MATUGEN_JSON="$_matugen_json" \
-    SOURCES="$(matugen image "$wal_input" --show-source-colors 2>/dev/null || true)" python3 - <<'PY' 2>/dev/null || true
-import colorsys, json, os, pathlib, re
-
-def hsv(c):
-    return colorsys.rgb_to_hsv(*(int(c[i:i + 2], 16) / 255.0 for i in (1, 3, 5)))
-
-txt = os.environ["_MATUGEN_JSON"]
-colors = json.loads(txt[txt.index("{"):])["colors"]
-get = lambda k: colors[k]["default"]["color"]
-source = get("source_color")
-
-if os.environ["IS_MONO"] == "1":
-    accent = "#777777"
-elif os.environ["ACCENT_MODE"] == "off":
-    accent = source
-else:
-    accent, best = get("tertiary"), 30
-    h0 = hsv(source)[0]
-    for c in re.findall(r"#[0-9A-Fa-f]{6}", os.environ["SOURCES"])[1:]:
-        h, s, v = hsv(c)
-        d = abs(h - h0) * 360
-        d = min(d, 360 - d)
-        if d > best and s >= 0.2 and v >= 0.2:
-            accent, best = c, d
-
-base = pathlib.Path(os.environ["BASE_CFG"]).read_text()
-line = f'accent2 = {{ color = "{accent}", blend = false }}'
-if re.search(r"(?m)^accent2\s*=", base):
-    out = re.sub(r"(?m)^accent2\s*=.*$", line, base)
-else:
-    out = base.replace("[config.custom_colors]\n", f"[config.custom_colors]\n{line}\n", 1)
-dst = pathlib.Path(os.environ["OUT_CFG"])
-dst.write_text(out)
-print(dst)
-PY
-)"
+accent_cfg="$(rp-theme-colors accent-config "$matugen_cfg" "$STATE_DIR/matugen-accent.toml" "$palette_json" \
+    "$wal_input" "$("$_rs" get theme.accent2 2>/dev/null || echo auto)" "$IS_MONO" 2>/dev/null || true)"
 [[ -n "$accent_cfg" && -f "$accent_cfg" ]] && matugen_cfg="$accent_cfg"
 
 if command -v matugen >/dev/null 2>&1 && [[ -f "$wal_input" ]]; then
     matugen "${MATUGEN_ARGS[@]}" -c "$matugen_cfg" image "$wal_input" --source-color-index 0 2>/dev/null || true
 fi
 
-export _MATUGEN_JSON="$_matugen_json"
-eval "$(python3 - <<'PYEOF'
-import json, os
-txt = os.environ.get("_MATUGEN_JSON", "").strip()
-fallbacks = {
-    "background": "#1a120d", "on_surface": "#f0dfd7", "primary": "#ffb68c",
-    "surface_container_lowest": "#140d08", "error": "#ffb4ab",
-    "tertiary": "#ccc992", "secondary": "#e5bfaa",
-    "tertiary_fixed_dim": "#ccc992", "secondary_fixed_dim": "#e5bfaa",
-    "on_surface_variant": "#d7c2b8", "surface_container": "#271e19",
-    "error_container": "#93000a", "tertiary_container": "#4a481d",
-    "secondary_container": "#5c4131", "primary_container": "#6f3812",
-    "tertiary_fixed": "#e9e5ab", "secondary_fixed": "#ffdbc9",
-}
-c = fallbacks.copy()
-try:
-    data = json.loads(txt[txt.index("{"):])
-    for k, v in data.get("colors", {}).items():
-        c[k] = v.get("default", {}).get("color", fallbacks.get(k, "#000000"))
-except Exception:
-    pass
-print(f'background="{c["background"]}"')
-print(f'foreground="{c["on_surface"]}"')
-print(f'cursor="{c["primary"]}"')
-print(f'color0="{c["surface_container_lowest"]}"')
-print(f'color1="{c["error"]}"')
-print(f'color2="{c["tertiary"]}"')
-print(f'color3="{c["secondary"]}"')
-print(f'color4="{c["primary"]}"')
-print(f'color5="{c["tertiary_fixed_dim"]}"')
-print(f'color6="{c["secondary_fixed_dim"]}"')
-print(f'color7="{c["on_surface_variant"]}"')
-print(f'color8="{c["surface_container"]}"')
-print(f'color9="{c["error_container"]}"')
-print(f'color10="{c["tertiary_container"]}"')
-print(f'color11="{c["secondary_container"]}"')
-print(f'color12="{c["primary_container"]}"')
-print(f'color13="{c["tertiary_fixed"]}"')
-print(f'color14="{c["secondary_fixed"]}"')
-print(f'color15="{c["on_surface"]}"')
-PYEOF
-)"
-unset _MATUGEN_JSON
-
-pick_vivid_color() {
-    command -v python3 >/dev/null 2>&1 || return 1
-    python3 - "$@" <<'PY'
-import colorsys, sys
-cands = sys.argv[1:]
-scored = []
-for c in cands:
-    if not c or not c.startswith("#") or len(c) != 7:
-        continue
-    r = int(c[1:3], 16) / 255.0
-    g = int(c[3:5], 16) / 255.0
-    b = int(c[5:7], 16) / 255.0
-    h, s, v = colorsys.rgb_to_hsv(r, g, b)
-    score = (s * 0.82) + (v * 0.18)
-    scored.append((score, c))
-scored.sort(reverse=True)
-if scored:
-    print(scored[0][1])
-    if len(scored) > 1:
-        print(scored[1][1])
-PY
-}
-
-pick_image_accent() {
-    local image="$1"
-    command -v python3 >/dev/null 2>&1 || return 1
-    command -v magick >/dev/null 2>&1 || return 1
-    [[ -f "$image" ]] || return 1
-    python3 - "$image" <<'PY'
-import colorsys, re, subprocess, sys
-
-image = sys.argv[1]
-proc = subprocess.run(
-    ["magick", f"{image}[0]", "-auto-orient", "-resize", "320x320>", "-colors", "16", "-format", "%c\n", "histogram:info:-"],
-    capture_output=True,
-    text=True,
-)
-if proc.returncode != 0:
-    sys.exit(1)
-
-rows = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-cands = []
-for line in rows:
-    # Wallpapers with an alpha channel make ImageMagick print #RRGGBBAA, so the
-    # trailing pair has to be optional — with a fixed six the \b never matched,
-    # every candidate was dropped and accent came out empty.
-    m = re.match(r'^\s*(\d+):.*#([0-9A-Fa-f]{6})(?:[0-9A-Fa-f]{2})?\b', line)
-    if not m:
-        continue
-    count = int(m.group(1))
-    hexv = m.group(2).upper()
-    r = int(hexv[0:2], 16) / 255.0
-    g = int(hexv[2:4], 16) / 255.0
-    b = int(hexv[4:6], 16) / 255.0
-    _, s, v = colorsys.rgb_to_hsv(r, g, b)
-    if v < 0.20:
-        continue
-    score = count * (0.25 + (s * 0.75)) * (0.35 + (v * 0.65))
-    cands.append((score, f"#{hexv}", s))
-
-cands.sort(reverse=True)
-if cands:
-    print(cands[0][1])
-    second = None
-    for _, hexv, sat in cands[1:]:
-        if sat >= 0.18:
-            second = hexv
-            break
-    if second:
-        print(second)
-PY
-}
+eval "$(rp-theme-colors palette "$palette_json")"
 
 accent="${color5}"
 accent_soft="${color6}"
 accent_blue="${color4}"
 accent_urgent="${color1}"
 
-accent_mode="${THEME_ACCENT_MODE:-image}"
-case "$accent_mode" in
-image)
-    if image_pick="$(pick_image_accent "$WALLPAPER")"; then
-        first="$(echo "$image_pick" | sed -n '1p')"
-        second="$(echo "$image_pick" | sed -n '2p')"
-        if [[ -n "${first:-}" ]]; then
-            accent="$first"
-        fi
-        if [[ -n "${second:-}" ]]; then
-            accent_blue="$second"
-        fi
-    fi
-    ;;
-vivid)
-    if vivid="$(pick_vivid_color "${color1}" "${color2}" "${color3}" "${color4}" "${color5}" "${color6}")"; then
-        accent="$(echo "$vivid" | sed -n '1p')"
-        second="$(echo "$vivid" | sed -n '2p')"
-        if [[ -n "${second:-}" ]]; then
-            accent_blue="$second"
-        fi
-    fi
-    ;;
-wal | *)
-    ;;
-esac
+if [[ -f "$WALLPAPER" ]] && command -v magick >/dev/null 2>&1 \
+    && image_pick="$(rp-theme-colors image-accent "$WALLPAPER" 2>/dev/null)"; then
+    first="$(sed -n '1p' <<<"$image_pick")"
+    second="$(sed -n '2p' <<<"$image_pick")"
+    [[ -n "$first" ]] && accent="$first"
+    [[ -n "$second" ]] && accent_blue="$second"
+fi
 
 : "${accent:=${color5:-#ffb68c}}"
 : "${accent_soft:=${color6:-#e5bfaa}}"
@@ -671,22 +382,12 @@ esac
 [[ -n "$accent_blue" ]] || accent_blue="#ffb68c"
 [[ -n "$accent_urgent" ]] || accent_urgent="#ffb4ab"
 
-if [[ "${THEME_ACCENT_SOFT_FOLLOW_ACCENT:-0}" == "1" ]]; then
-    accent_soft="$accent"
-fi
-if [[ "${THEME_ACCENT_BLUE_FOLLOW_ACCENT:-0}" == "1" ]]; then
-    accent_blue="$accent"
-fi
-
-export HOME PID_DIR NO_RESTART CURRENT_WALL WALLPAPER
+export HOME PID_DIR CURRENT_WALL WALLPAPER
 export background foreground cursor
 export color0 color1 color2 color3 color4 color5 color6 color7 color8 color9 color10 color11 color12 color13 color14 color15
 export accent accent_soft accent_blue accent_urgent
 
-if [[ "$FAST_MODE" != "yes" ]]; then
-    snapshot_files
-fi
-ensure_modules_cfg
+snapshot_files
 load_module_cfg
 
 if [[ -d "$MODULE_DIR" ]]; then
@@ -700,11 +401,6 @@ if [[ -d "$MODULE_DIR" ]]; then
         enabled="${CFG_ENABLED[$base]:-${meta_enabled:-1}}"
         if [[ "$enabled" != "1" ]]; then
             printf '[skip] %s disabled\n' "$base" >>"$THEME_LOG"
-            continue
-        fi
-
-        if [[ "$FAST_MODE" == "yes" ]] && is_heavy_module "$base"; then
-            printf '[skip] %s deferred (fast mode)\n' "$base" >>"$THEME_LOG"
             continue
         fi
 
@@ -735,20 +431,15 @@ if [[ -d "$MODULE_DIR" ]]; then
         printf '%s|%s\n' "$priority" "$module" >>"$runlist"
     done < <(find "$MODULE_DIR" -maxdepth 1 -type f -name '*.sh' | sort)
 
-    async_enabled="${THEME_ASYNC:-1}"
-    async_pids=()
-    async_names=()
     while IFS='|' read -r _priority module; do
         [[ -x "$module" ]] || continue
         base="$(basename "$module")"
-        if [[ "$async_enabled" == "1" ]] && is_heavy_module "$base"; then
+        if is_heavy_module "$base"; then
             printf '[async] %s started\n' "$base" >>"$THEME_LOG"
             (
                 "$module" >>"$THEME_LOG" 2>&1
                 printf '[async] %s done rc=%s\n' "$base" "$?" >>"$THEME_LOG"
             ) &
-            async_pids+=("$!")
-            async_names+=("$base")
             continue
         fi
         if ! "$module" >>"$THEME_LOG" 2>&1; then
@@ -761,85 +452,6 @@ if [[ -d "$MODULE_DIR" ]]; then
         notify_msg "Rice" "Theme modul selhal: ${failed_modules[*]}"
         exit 1
     fi
-
-    if [[ "${THEME_ASYNC_WAIT:-0}" == "1" ]] && [[ ${#async_pids[@]} -gt 0 ]]; then
-        for pid in "${async_pids[@]}"; do
-            wait "$pid" || true
-        done
-    fi
-fi
-if [[ -f "$WAYBAR_CSS" ]]; then
-    waybar_css_hash_after="$(sha256sum "$WAYBAR_CSS" | awk '{print $1}')"
-    if [[ -n "$waybar_css_hash_after" && "$waybar_css_hash_after" != "$waybar_css_hash_before" ]]; then
-        waybar_css_changed=1
-    fi
-fi
-if [[ -f "$WAYBAR_CONFIG" ]]; then
-    waybar_config_hash_after="$(sha256sum "$WAYBAR_CONFIG" | awk '{print $1}')"
-    if [[ -n "$waybar_config_hash_after" && "$waybar_config_hash_after" != "$waybar_config_hash_before" ]]; then
-        waybar_config_changed=1
-    fi
-fi
-
-ensure_pidfile_running() {
-    local pidfile="$1"
-    local proc_name="$2"
-    shift 2
-
-    if [[ -f "$pidfile" ]]; then
-        local pid
-        pid="$(cat "$pidfile" 2>/dev/null || true)"
-        if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-            return 0
-        fi
-    fi
-
-    local existing_pid
-    existing_pid="$(pgrep -x "$proc_name" | head -n 1 || true)"
-    if [[ -n "$existing_pid" ]]; then
-        echo "$existing_pid" >"$pidfile"
-        return 0
-    fi
-
-    "$@" >/dev/null 2>&1 &
-    echo $! >"$pidfile"
-}
-
-signal_running_processes() {
-    local proc_name="$1"
-    local sig="$2"
-    while IFS= read -r pid; do
-        [[ -n "${pid:-}" ]] || continue
-        kill "-$sig" "$pid" 2>/dev/null || true
-    done < <(pgrep -x "$proc_name" 2>/dev/null || true)
-}
-
-restart_waybar_if_running() {
-    [[ "$WAYBAR_RESTART_ON_THEME" == "1" ]] || return 0
-    mapfile -t pids < <(pgrep -x waybar 2>/dev/null || true)
-    ((${#pids[@]})) || return 0
-    for pid in "${pids[@]}"; do
-        kill -TERM "$pid" 2>/dev/null || true
-    done
-    for _ in {1..15}; do
-        sleep 0.1
-        pgrep -x waybar >/dev/null 2>&1 || break
-    done
-    if [[ -x "$HOME/.local/bin/waybar-watchdog.sh" ]]; then
-        "$HOME/.local/bin/waybar-watchdog.sh" >/dev/null 2>&1 || true
-    else
-        waybar -c "$HOME/.config/waybar/config.jsonc" -s "$HOME/.config/waybar/style.css" >/dev/null 2>&1 &
-        echo $! >"$PID_DIR/waybar.pid"
-    fi
-}
-
-if [[ "$NO_RESTART" != "yes" ]]; then
-    ensure_pidfile_running "$PID_DIR/waybar.pid" waybar waybar
-fi
-
-signal_running_processes waybar USR2
-if [[ "$waybar_css_changed" -eq 1 || "$waybar_config_changed" -eq 1 ]]; then
-    restart_waybar_if_running
 fi
 
 niri msg action load-config-file >/dev/null 2>&1 || true
@@ -864,6 +476,4 @@ if [[ -f "$PENDING_FLAG" ]]; then
     exec "$0" "${pending_args[@]}"
 fi
 notify_msg "Rice" "Theme aplikovano."
-if [[ "$FAST_MODE" != "yes" ]]; then
-    cleanup_snapshots
-fi
+cleanup_snapshots
