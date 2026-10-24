@@ -45,13 +45,13 @@ Item {
     }
 
     readonly property var clockFormats: [
-        { f: "  {:%d.%m. %H:%M}", label: "26.09. 14:30" },
-        { f: "  {:%H:%M}", label: "14:30" },
-        { f: "  {:%H:%M:%S}", label: "14:30:05" },
-        { f: "  {:%a %d.%m. %H:%M}", label: "Sat 26.09. 14:30" },
-        { f: "  {:%A %d. %B %H:%M}", label: "Saturday 26. September 14:30" },
-        { f: "  {:%I:%M %p}", label: "02:30 PM" },
-        { f: "  {:%Y-%m-%d %H:%M}", label: "2026-09-26 14:30" },
+        { f: "dd.MM. HH:mm", label: "26.09. 14:30" },
+        { f: "HH:mm", label: "14:30" },
+        { f: "HH:mm:ss", label: "14:30:05" },
+        { f: "ddd dd.MM. HH:mm", label: "Sat 26.09. 14:30" },
+        { f: "dddd d. MMMM HH:mm", label: "Saturday 26. September 14:30" },
+        { f: "hh:mm AP", label: "02:30 PM" },
+        { f: "yyyy-MM-dd HH:mm", label: "2026-09-26 14:30" },
     ]
 
     readonly property var localeChoices: {
@@ -127,14 +127,12 @@ Item {
             }
             SRow {
                 label: "Clock in the bar"
-                hint: "Format of waybar's clock."
                 SDropdown {
                     width: 280
                     options: page.clockFormats.map(c => c.f)
                     labels: page.clockFormats.map(c => c.label)
-                    current: page.t?.clockFormat ?? ""
-                    displayText: page.clockFormats.find(c => c.f === page.t?.clockFormat)?.label ?? (page.t?.clockFormat ?? "")
-                    onPicked: v => page.sys(["set-clock", v], "Bar clock format")
+                    current: page.host.settings["bar.clock"]?.value ?? ""
+                    onPicked: v => page.host.set("bar.clock", v)
                 }
             }
 

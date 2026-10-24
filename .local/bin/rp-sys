@@ -289,11 +289,10 @@ clean() {
 }
 
 timeinfo() {
-    local fmt; fmt=$(grep -A2 '"clock"' "$HOME/.config/waybar/config.jsonc" 2>/dev/null | grep -oP '"format":\s*"\K[^"]*' | head -1)
-    timedatectl show 2>/dev/null | jq -R -s --arg fmt "$fmt" --arg zones "$(timedatectl list-timezones 2>/dev/null)" '
+    timedatectl show 2>/dev/null | jq -R -s --arg zones "$(timedatectl list-timezones 2>/dev/null)" '
         split("\n") | map(select(contains("=")) | capture("^(?<k>[^=]+)=(?<v>.*)$") | { (.k): .v }) | add
         | { timezone: .Timezone, ntp: (.NTP == "yes"), synced: (.NTPSynchronized == "yes"), canNtp: (.CanNTP == "yes"),
-            localRtc: (.LocalRTC == "yes"), clockFormat: $fmt,
+            localRtc: (.LocalRTC == "yes"),
             zones: ($zones | split("\n") | map(select(length > 0))) }'
 }
 
@@ -323,24 +322,6 @@ set_locale() {
         [ -n "$regen" ] && locale-gen
         localectl set-locale LANG="$1" LC_TIME="$2" LC_NUMERIC="$2" LC_MONETARY="$2" LC_PAPER="$2" LC_MEASUREMENT="$2"
     ' sh "$lang" "$formats" 2>&1
-}
-
-set_clock() {
-    local fmt=$1 f
-    [[ "$fmt" =~ ^[^\"\\]+$ ]] || die "invalid clock format"
-    local repo; repo=$(cat "$HOME/.config/niri-rice/dotfiles-path" 2>/dev/null || echo "$HOME/dotfiles")
-    for f in "$HOME/.config/waybar/config.jsonc" "$repo/.config/waybar/config.jsonc"; do
-        [[ -f "$f" ]] || continue
-        python3 - "$f" "$fmt" <<'PY'
-import re, sys
-path, fmt = sys.argv[1], sys.argv[2]
-s = open(path).read()
-new = re.sub(r'("clock"\s*:\s*\{[^}]*?"format"\s*:\s*")[^"]*(")', lambda m: m.group(1) + fmt + m.group(2), s, count=1)
-if new != s:
-    open(path, "w").write(new)
-PY
-    done
-    systemctl --user restart waybar.service 2>/dev/null
 }
 
 account() {
@@ -574,7 +555,6 @@ case "${1:-}" in
     time)          timeinfo ;;
     set-timezone)  [[ "${2:-}" =~ ^[A-Za-z_+/-]+$ ]] || die "invalid timezone"; timedatectl set-timezone "$2" 2>&1 ;;
     set-ntp)       timedatectl set-ntp "${2:-true}" 2>&1 ;;
-    set-clock)     set_clock "${2:-}" ;;
     locale)        localeinfo ;;
     set-locale)    set_locale "${2:-}" "${3:-${2:-}}" ;;
     account)       account ;;
@@ -595,7 +575,7 @@ usage: rp-sys <command> [args]
   read:    info updates dotfiles packages pkginfo search firewall fw-services
            storage storage-home time locale account privacy gaming printers backup
   actions: upgrade upgrade-all upgrade-aur upgrade-flatpak install remove
-           remove-orphans keep clean-cache clean fw set-timezone set-ntp set-clock
+           remove-orphans keep clean-cache clean fw set-timezone set-ntp
            set-locale privacy-clear mango-set mango-everywhere printer snapshot
            settings-export settings-import
 EOF

@@ -75,6 +75,7 @@ cursor.theme|enum|Bibata-Modern-Ice|@cursors
 cursor.size|int|24|16|64
 cursor.hide_typing|bool|false
 cursor.hide_after|int|0|0|60
+bar.clock|enum|dd.MM. HH:mm|dd.MM. HH:mm,HH:mm,HH:mm:ss,ddd dd.MM. HH:mm,dddd d. MMMM HH:mm,hh:mm AP,yyyy-MM-dd HH:mm
 theme.scheme|enum|tonal-spot|tonal-spot,content,expressive,fidelity,fruit-salad,rainbow,neutral
 theme.contrast|float|0.00|-1|1
 theme.mono_mode|enum|auto|auto,on,off
