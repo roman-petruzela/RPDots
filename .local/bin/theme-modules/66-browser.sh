@@ -20,7 +20,7 @@ user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 user_pref("layout.css.prefers-color-scheme.content-override", 0);
 user_pref("zen.view.window.scheme", 0);
 user_pref("zen.widget.linux.transparency", true);
-user_pref("browser.tabs.allow_transparent_browser", true);
+user_pref("browser.tabs.allow_transparent_browser", false);
 EOF
 
 done < <(find "$ZEN_BASE" -mindepth 1 -maxdepth 1 -type d ! -name "Profile Groups" 2>/dev/null)
