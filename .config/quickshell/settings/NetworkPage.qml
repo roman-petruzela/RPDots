@@ -18,6 +18,13 @@ Item {
     property string connectError: ""
 
     readonly property string bin: Quickshell.env("HOME") + "/.local/bin/rp-net"
+    property bool hasProton: false
+    Process {
+        id: protonCheck
+        running: true
+        command: ["sh", "-c", "command -v protonvpn-app"]
+        onExited: code => page.hasProton = code === 0
+    }
 
     function reload() {
         detailsProc.running = false
@@ -428,8 +435,15 @@ Item {
             }
             SRow {
                 label: "Proton VPN"
-                hint: "Servers, kill switch and Secure Core live in the Proton app."
-                SButton { icon: "󰏌"; text: "Open"; onClicked: Quickshell.execDetached(["protonvpn-app"]) }
+                hint: page.hasProton ? "Servers, kill switch and Secure Core live in the Proton app."
+                                     : "Not installed. Installs the official app and a keyring for its login."
+                SButton {
+                    icon: page.hasProton ? "󰏌" : "󰇚"
+                    text: page.hasProton ? "Open" : "Install"
+                    onClicked: page.hasProton ? Quickshell.execDetached(["protonvpn-app"])
+                        : page.host.job.start("Install Proton VPN", ["rp-sys", "install", "proton-vpn-gtk-app", "gnome-keyring"], [],
+                                              code => { protonCheck.running = true })
+                }
             }
 
             SHeading { text: "SAVED CONNECTIONS" }

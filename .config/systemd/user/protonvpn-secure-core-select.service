@@ -2,6 +2,7 @@
 Description=Pick fastest Secure Core server for ProtonVPN autostart
 Before=app-protonvpn@autostart.service
 PartOf=graphical-session.target
+ConditionPathExists=/usr/bin/protonvpn-app
 
 [Service]
 Type=oneshot
