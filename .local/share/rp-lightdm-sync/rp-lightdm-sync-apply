@@ -13,7 +13,7 @@ SRC_GREETER="$USER_HOME/.local/share/rp-greeter"
 DST_GREETER="/usr/share/rp-greeter"
 
 sync_greeter() {
-    local colors="$USER_HOME/.config/quickshell/Colors.js" tmp line outputs
+    local colors="$USER_HOME/.config/quickshell/Colors.js" tmp line outputs settings
     [[ -d "$DST_GREETER" && -f "$SRC_GREETER/niri.kdl" ]] || return 0
 
     install -d "$DST_GREETER/greeter/lock"
@@ -25,11 +25,15 @@ sync_greeter() {
         install -m644 "$SRC_GREETER/Colors.default.js" "$DST_GREETER/greeter/Colors.js"
     fi
 
-    outputs="$(cat "$USER_HOME/.config/niri/config.kdl" "$USER_HOME/.config/niri/displays.kdl" 2>/dev/null | awk '/^output /,/^}/')"
+    settings="$(awk '/^(input|cursor) \{/,/^\}/' "$USER_HOME/.config/niri/settings.kdl" 2>/dev/null || true)"
+    [[ -n "$settings" ]] || settings=$'input {\n    keyboard {\n        xkb {\n            layout "us"\n        }\n        numlock\n    }\n    touchpad {\n        tap\n        natural-scroll\n    }\n}'
+    outputs="$(cat "$USER_HOME/.config/niri/config.kdl" "$USER_HOME/.config/niri/displays.kdl" 2>/dev/null | awk '/^output /,/^}/' || true)"
     tmp="$(mktemp)"
     while IFS= read -r line; do
         if [[ "$line" == "// @OUTPUTS@" ]]; then
             printf '%s\n' "$outputs"
+        elif [[ "$line" == "// @SETTINGS@" ]]; then
+            printf '%s\n' "$settings"
         else
             printf '%s\n' "${line//@USER@/$USER_NAME}"
         fi

@@ -3,24 +3,7 @@ hotkey-overlay {
 }
 prefer-no-csd
 
-input {
-    keyboard {
-        xkb {
-            layout "cz,us"
-            options "grp:alt_shift_toggle"
-        }
-        numlock
-    }
-    touchpad {
-        tap
-        natural-scroll
-    }
-}
-
-cursor {
-    xcursor-theme "Bibata-Modern-Ice"
-    xcursor-size 24
-}
+// @SETTINGS@
 
 environment {
     RP_GREETER_USER "@USER@"
