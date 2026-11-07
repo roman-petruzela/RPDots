@@ -96,6 +96,12 @@ warm_missing_thumbs() {
   setsid "${prefix[@]}" "$0" --warm-dispatch "${missing[@]}" >/dev/null 2>&1 </dev/null &
 }
 
+if [[ "${1:-}" == "--warm" ]]; then
+  mapfile -d '' files < <(list_wallpapers)
+  [[ "${#files[@]}" -gt 0 ]] && warm_missing_thumbs "${files[@]}"
+  exit 0
+fi
+
 if [[ "${1:-}" == "--list" ]]; then
   mapfile -d '' files < <(list_wallpapers)
   [[ "${#files[@]}" -gt 0 ]] || exit 0
@@ -107,11 +113,13 @@ if [[ "${1:-}" == "--list" ]]; then
   for i in "${!files[@]}"; do
     file="${files[$i]}"
     large="$THUMB_DIR/large-v1-${sigs[$i]}-${file##*/}.jpg"
+    current=0
+    [[ "$file" == "$current_src" ]] && current=1
+    # the picker opens on the current wallpaper, so its thumbnail must exist right away
+    [[ -f "$large" || $current -eq 0 ]] || make_thumb "$file" >/dev/null
     [[ -f "$large" ]] || missing+=("$file")
     kind=image
     is_video "$file" && kind=video
-    current=0
-    [[ "$file" == "$current_src" ]] && current=1
     printf '%s\t%s\t%s\t%d\n' "$file" "$large" "$kind" "$current"
   done
   if [[ "${#missing[@]}" -gt 0 ]]; then

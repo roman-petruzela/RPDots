@@ -74,6 +74,7 @@ pkill -x mako 2>/dev/null || true
 command -v wayvnc >/dev/null 2>&1 \
   && ensure_pidfile_running "$PID_DIR/wayvnc.pid" wayvnc wayvnc 127.0.0.1 5900
 
+"$HOME/.local/bin/pick-wallpaper.sh" --warm || log "wallpaper thumbnail warm-up failed"
 "$HOME/.local/bin/rp-settings" nightlight || log "rp-settings nightlight failed"
 pgrep -x swayidle >/dev/null 2>&1 || "$HOME/.local/bin/rp-settings" idle || log "rp-settings idle failed"
 

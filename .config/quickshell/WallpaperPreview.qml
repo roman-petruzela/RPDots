@@ -67,6 +67,13 @@ PanelWindow {
             source: root.shown ? root.thumb : ""
         }
 
+        // thumbnails are generated in the background; try again until the file exists
+        Timer {
+            interval: 1000; repeat: true
+            running: root.shown && lo.status === Image.Error
+            onTriggered: { const s = root.thumb; lo.source = ""; lo.source = s }
+        }
+
         Image {
             id: imgA
             anchors.fill: parent
