@@ -11,6 +11,7 @@ STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niri-rice"
 
 PKGS=(
     niri
+    xwayland-satellite
     quickshell
     qt6-multimedia
     kitty
@@ -208,6 +209,37 @@ remember_dotfiles() {
     git -C "$DOTFILES" rev-parse HEAD >"$STATE_DIR/deployed-commit" 2>/dev/null || true
 }
 
+# Remove deployed files the repo no longer ships (waybar, eww, renamed scripts...).
+# A file is only removed when it is byte-identical to some version git history has seen,
+# so anything the user edited stays.
+prune_obsolete() {
+    local dry="${1:-0}" backup="${2:-}" f c h skip pruned=0
+    git -C "$DOTFILES" rev-parse --is-inside-work-tree &>/dev/null || return 0
+    local current; current="$(mktemp)"
+    repo_files | sort >"$current"
+    while IFS= read -r f; do
+        [[ -z "$f" || ! -f "$HOME/$f" || -L "$HOME/$f" ]] && continue
+        grep -qxF -- "$f" "$current" && continue
+        for skip in "${NOT_DEPLOYED[@]}"; do [[ "$f" == "$skip" || "$f" == "$skip"/* ]] && continue 2; done
+        h="$(git hash-object "$HOME/$f")"; c=""
+        while IFS= read -r c; do
+            [[ "$(git -C "$DOTFILES" rev-parse -q --verify "$c:$f" 2>/dev/null)" == "$h" ]] && break
+            c=""
+        done < <(git -C "$DOTFILES" log --no-renames --format=%H -- "$f")
+        [[ -n "$c" ]] || continue
+        pruned=$((pruned + 1))
+        if [[ "$dry" == 1 ]]; then echo "  obsolete $f"; continue; fi
+        [[ "$f" == .config/systemd/user/* ]] && { systemctl --user disable --now "${f##*/}" >/dev/null 2>&1 || true; }
+        [[ "$f" == *waybar* ]] && { pkill -x waybar 2>/dev/null || true; }
+        mkdir -p "$backup/$(dirname "$f")"
+        mv "$HOME/$f" "$backup/$f"
+        echo "  removed  $f"
+    done < <(git -C "$DOTFILES" log --no-renames --diff-filter=D --name-only --format= | sort -u)
+    rm -f "$current"
+    [[ "$dry" == 1 || $pruned -eq 0 ]] || echo " -> $pruned obsolete files moved to $backup"
+    return 0
+}
+
 copy_configs() {
     local dry="${1:-0}" f src dst backup="" changed=0 new=0
     [[ "$dry" == 1 ]] || backup="$STATE_DIR/deploy-backup/$(date +%Y%m%d-%H%M%S)"
@@ -239,6 +271,7 @@ copy_configs() {
 
     echo " -> $new new, $changed updated"
     [[ "$dry" != 1 && $changed -gt 0 ]] && echo " -> Replaced files backed up to $backup"
+    prune_obsolete "$dry" "${backup:-$STATE_DIR/deploy-backup/$(date +%Y%m%d-%H%M%S)}"
     if [[ "$dry" != 1 && $changed -eq 0 && -n "$backup" ]]; then rmdir -p "$backup" 2>/dev/null || true; fi
     if [[ "$dry" != 1 ]] && command -v niri >/dev/null; then
         niri validate -c "$HOME/.config/niri/config.kdl" >/dev/null 2>&1 \
@@ -308,6 +341,11 @@ system_setup() {
     if ask "Ask for the password once per system update instead of once per package (polkit rule)?"; then
         sudo install -Dm644 "$DOTFILES/.local/share/rp-sys/49-rp-pacman.rules" /etc/polkit-1/rules.d/49-rp-pacman.rules
     fi
+    if systemctl is-enabled NetworkManager &>/dev/null \
+        && systemctl is-enabled systemd-networkd-wait-online &>/dev/null \
+        && ask "Disable systemd-networkd-wait-online? NetworkManager is in charge and the wait can delay boot by 2 minutes."; then
+        sudo systemctl disable systemd-networkd-wait-online.service
+    fi
     if ask "Install power profiles (rp-power)?"; then
         sudo "$share/rp-power/install.sh" || echo "warning: rp-power installation failed" >&2
     fi
@@ -369,14 +407,7 @@ merge_configs() {
         fi
     done < <(repo_files)
 
-    while IFS= read -r f; do
-        [[ -z "$f" || -e "$DOTFILES/$f" || ! -f "$HOME/$f" ]] && continue
-        [[ "$f" == .config/systemd/user/* ]] && systemctl --user disable --now "${f##*/}" >/dev/null 2>&1
-        git -C "$DOTFILES" show "$base:$f" 2>/dev/null | cmp -s - "$HOME/$f" || continue
-        mkdir -p "$backup/$(dirname "$f")"
-        mv "$HOME/$f" "$backup/$f"
-        echo "  removed  $f"
-    done < <(git -C "$DOTFILES" diff --name-only --diff-filter=D "$base" HEAD 2>/dev/null)
+    prune_obsolete 0 "$backup"
 
     rm -rf "$tmp"
     echo " -> $new new, $updated updated, $merged merged with your changes, $kept kept as you changed them"
