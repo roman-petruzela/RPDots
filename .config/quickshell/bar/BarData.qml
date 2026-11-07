@@ -72,11 +72,12 @@ Item {
 
     Process {
         id: cavaProc
-        running: root.active
+        running: root.active && root.playing
         command: [root.bin + "bar-cava-stream.sh"]
         stdout: SplitParser { onRead: line => root.cava = line }
+        onRunningChanged: if (!running && !root.playing) root.cava = ""
     }
-    Timer { interval: 3000; running: root.active && !cavaProc.running; repeat: true; onTriggered: cavaProc.running = true }
+    Timer { interval: 3000; running: root.active && root.playing && !cavaProc.running; repeat: true; onTriggered: cavaProc.running = true }
 
     property var lastCpu: null
     FileView { id: statFile; path: "/proc/stat" }
