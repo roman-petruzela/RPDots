@@ -21,6 +21,7 @@ for f in .config/niri/config.kdl .config/quickshell/shell.qml .local/bin/rp-sett
     check "deployed $f" test -f "$HOME/$f"
 done
 check "nothing left to deploy" bash -c '! ~/dotfiles/install.sh diff | grep -qE "^  (changed|new) "'
+check "no obsolete files to prune" bash -c '! ~/dotfiles/install.sh diff | grep -q "^  obsolete "'
 check "no waybar/eww/rofi leftovers" bash -c '! ls ~/.config/waybar ~/.config/eww ~/.config/rofi 2>/dev/null | grep -q .'
 
 check "rp-settings apply" "$HOME/.local/bin/rp-settings" apply
