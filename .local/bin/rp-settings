@@ -161,6 +161,7 @@ validate() {
             [[ ",$(options "$key")," == *",$val,"* ]] || die "$key: allowed values are $(options "$key")"
             echo "$val" ;;
         string)
+            [[ "$key" == input.kb_layouts ]] && val=$(tr 'A-Z;' 'a-z,' <<<"${val// /}")
             local re="${A[$key]}"
             [[ -n "${B[$key]}" ]] && re+="|${B[$key]}"
             [[ "$val" =~ $re ]] || die "$key: invalid value '$val'"
